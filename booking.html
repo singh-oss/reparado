@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Termin buchen · Dein Handy Doc</title>
+<style>
+  :root{--ink:#12241b;--ink2:#6b6b6b;--line:#e6e6e6;--soft:#f6f6f6}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:#fff;-webkit-font-smoothing:antialiased}
+  svg{display:block}
+  .top{border-bottom:1px solid var(--line);padding:16px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;background:#fff;z-index:5}
+  .top .dot{width:30px;height:30px;border-radius:9px;background:#0e7a3c;color:#fff;display:grid;place-items:center;font-weight:800}
+  .top b{font-size:17px;letter-spacing:-.3px}
+  .top .m{margin-left:auto;color:var(--ink2);font-size:13px}
+  .wrap{max-width:560px;margin:0 auto;padding:24px 20px 60px}
+  .steps{display:flex;gap:8px;margin-bottom:22px}
+  .steps .s{flex:1;height:5px;border-radius:20px;background:var(--soft)}
+  .steps .s.on{background:#0e7a3c}
+  h1{font-size:26px;letter-spacing:-.8px;margin-bottom:4px}
+  .sub{color:var(--ink2);margin-bottom:20px}
+  .grid{display:grid;gap:10px}
+  .g2{grid-template-columns:1fr 1fr}
+  .g3{grid-template-columns:1fr 1fr 1fr}
+  .opt{border:1px solid var(--line);border-radius:12px;padding:15px;font-weight:700;cursor:pointer;transition:.12s;text-align:left;background:#fff;display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .opt:hover{border-color:#0e7a3c}
+  .opt.on{background:#0e7a3c;color:#fff;border-color:#0e7a3c}
+  .opt .p{font-weight:800}
+  .opt small{display:block;font-weight:500;color:var(--ink2);font-size:12px;margin-top:2px}
+  .opt.on small{color:#cfcfcf}
+  .in{width:100%;border:1px solid var(--line);border-radius:12px;padding:13px 14px;outline:0;font-size:15px;margin-top:4px}
+  .in:focus{border-color:#0e7a3c}
+  label{font-size:12px;font-weight:700;color:#333;display:block;margin-top:14px}
+  .nav{display:flex;gap:10px;margin-top:24px}
+  .btn{flex:1;border:1px solid var(--line);background:#fff;border-radius:12px;padding:14px;font-weight:700;font-size:15px;cursor:pointer}
+  .btn.pri{background:#0e7a3c;color:#fff;border-color:#0e7a3c}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .summary{border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
+  .summary .r{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)}
+  .summary .r:last-child{border:0}
+  .summary .r b{font-weight:800}
+  .done{text-align:center;padding:30px 10px}
+  .done .ck{width:64px;height:64px;border-radius:50%;background:#0e7a3c;color:#fff;display:grid;place-items:center;margin:0 auto 18px}
+  .note{background:var(--soft);border-radius:12px;padding:12px 14px;font-size:13px;color:#444;margin-top:16px}
+  .foot{text-align:center;color:var(--ink2);font-size:13px;margin-top:26px}
+</style>
+</head>
+<body>
+<div class="top"><span class="dot">D</span><b>Dein Handy Doc</b><span class="m">Online-Terminbuchung</span></div>
+<div class="wrap">
+  <div class="steps"><div class="s on" id="s1"></div><div class="s" id="s2"></div><div class="s" id="s3"></div><div class="s" id="s4"></div></div>
+  <div id="view"></div>
+  <div class="foot">Bahnhofstr. 12 · 72336 Balingen · 07433 9678444</div>
+</div>
+
+<script>
+const CATALOG={
+  Apple:['iPhone 15 Pro','iPhone 15','iPhone 14 Pro','iPhone 14','iPhone 13','iPhone 12','iPhone 11','iPhone SE'],
+  Samsung:['Galaxy S24','Galaxy S23','Galaxy A56','Galaxy A34','Galaxy A14','Galaxy S22'],
+  Xiaomi:['Redmi Note 14 Pro 5G','Redmi Note 13','Redmi Note 8 Pro','Mi 11'],
+  Huawei:['P30 Pro','P40 Lite','Mate 20'],
+};
+const REP=[['Displaytausch',129],['Akkutausch',59],['Ladebuchse',69],['Kameraglas',39],['Backcover',79],['Software / Datenrettung',49]];
+const state={step:1, brand:'', model:'', issue:'', price:0, appt:'', time:'', name:'', tel:'', mail:''};
+const CK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" width="30" height="30"><path d="M20 6L9 17l-5-5"/></svg>';
+function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function eur(n){return '€ '+Number(n||0).toLocaleString('de-DE',{minimumFractionDigits:0});}
+function price(){const b=state.brand==='Apple'?1.2:1;const r=REP.find(x=>x[0]===state.issue);return r?Math.round(r[1]*b):0;}
+function slots(){const out=[];for(let h=9;h<18;h++){out.push((h<10?'0':'')+h+':00');out.push((h<10?'0':'')+h+':30');}return out;}
+function minDate(){const d=new Date();d.setDate(d.getDate()+1);return d.toISOString().slice(0,10);}
+
+function setStep(n){state.step=n;[1,2,3,4].forEach(i=>document.getElementById('s'+i).classList.toggle('on',i<=n));render();window.scrollTo(0,0);}
+function render(){
+  const v=document.getElementById('view');
+  if(state.step===1){
+    v.innerHTML=`<h1>Welches Gerät?</h1><p class="sub">Wählen Sie Marke und Modell.</p>
+      <div class="grid g3">${Object.keys(CATALOG).map(b=>`<button class="opt ${state.brand===b?'on':''}" style="justify-content:center" onclick="pickBrand('${b}')">${b}</button>`).join('')}</div>
+      ${state.brand?`<label>Modell</label><div class="grid g2" style="margin-top:6px">${CATALOG[state.brand].map(mo=>`<button class="opt ${state.model===mo?'on':''}" onclick="pickModel('${esc(mo)}')">${mo}</button>`).join('')}</div>`:''}
+      <div class="nav"><button class="btn pri" ${state.model?'':'disabled'} onclick="setStep(2)">Weiter</button></div>`;
+  } else if(state.step===2){
+    v.innerHTML=`<h1>Was sollen wir reparieren?</h1><p class="sub">${esc(state.brand)} ${esc(state.model)}</p>
+      <div class="grid">${REP.map(r=>{const b=state.brand==='Apple'?1.2:1;const p=Math.round(r[1]*b);return `<button class="opt ${state.issue===r[0]?'on':''}" onclick="pickIssue('${esc(r[0])}')"><span>${r[0]}<small>Preis inkl. MwSt. · Garantie 6 Monate</small></span><span class="p">${eur(p)}</span></button>`;}).join('')}</div>
+      <div class="nav"><button class="btn" onclick="setStep(1)">Zurück</button><button class="btn pri" ${state.issue?'':'disabled'} onclick="setStep(3)">Weiter</button></div>`;
+  } else if(state.step===3){
+    v.innerHTML=`<h1>Wann passt es Ihnen?</h1><p class="sub">Wählen Sie Tag und Uhrzeit.</p>
+      <label>Datum</label><input class="in" type="date" id="d" min="${minDate()}" value="${state.appt||minDate()}" onchange="state.appt=this.value">
+      <label>Uhrzeit</label><div class="grid g3" style="margin-top:6px">${slots().map(t=>`<button class="opt ${state.time===t?'on':''}" style="justify-content:center;padding:11px" onclick="pickTime('${t}')">${t}</button>`).join('')}</div>
+      <div class="nav"><button class="btn" onclick="setStep(2)">Zurück</button><button class="btn pri" ${state.time?'':'disabled'} onclick="beforeContact()">Weiter</button></div>`;
+  } else if(state.step===4){
+    v.innerHTML=`<h1>Ihre Kontaktdaten</h1><p class="sub">Damit wir Ihnen die Bestätigung schicken können.</p>
+      <div class="summary">
+        <div class="r"><span>Gerät</span><b>${esc(state.brand)} ${esc(state.model)}</b></div>
+        <div class="r"><span>Reparatur</span><b>${esc(state.issue)}</b></div>
+        <div class="r"><span>Preis</span><b>${eur(state.price)}</b></div>
+        <div class="r"><span>Termin</span><b>${fmtDate(state.appt)} · ${state.time} Uhr</b></div>
+      </div>
+      <label>Name</label><input class="in" id="n" value="${esc(state.name)}" placeholder="Vor- und Nachname">
+      <label>Telefon</label><input class="in" id="t" value="${esc(state.tel)}" placeholder="Für Rückfragen">
+      <label>E-Mail</label><input class="in" id="m" value="${esc(state.mail)}" placeholder="Für die Bestätigung">
+      <div class="note">Mit dem Absenden buchen Sie einen unverbindlichen Termin. Der endgültige Preis kann nach Prüfung des Geräts abweichen; wir informieren Sie vorher.</div>
+      <div class="nav"><button class="btn" onclick="setStep(3)">Zurück</button><button class="btn pri" onclick="submit()">Termin buchen</button></div>`;
+  } else if(state.step===5){
+    v.innerHTML=`<div class="done"><div class="ck">${CK}</div>
+      <h1>Termin gebucht</h1><p class="sub">Vielen Dank, ${esc(state.name.split(' ')[0]||'')}. Wir haben Ihren Termin notiert.</p>
+      <div class="summary" style="text-align:left">
+        <div class="r"><span>Gerät</span><b>${esc(state.brand)} ${esc(state.model)}</b></div>
+        <div class="r"><span>Reparatur</span><b>${esc(state.issue)}</b></div>
+        <div class="r"><span>Termin</span><b>${fmtDate(state.appt)} · ${state.time} Uhr</b></div>
+      </div>
+      <div class="note">Sie erhalten in Kürze eine Bestätigung. Bitte bringen Sie Ihr Gerät möglichst geladen und mit deaktiviertem Sperrcode vorbei.</div>
+      <div class="nav"><button class="btn pri" onclick="reset()">Weiteren Termin buchen</button></div></div>`;
+  }
+}
+function pickBrand(b){state.brand=b;state.model='';render();}
+function pickModel(m){state.model=m;render();}
+function pickIssue(i){state.issue=i;state.price=price();render();}
+function pickTime(t){state.time=t;render();}
+function beforeContact(){if(!state.appt)state.appt=minDate();setStep(4);}
+function fmtDate(d){if(!d)return '';return new Date(d).toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});}
+function submit(){
+  state.name=document.getElementById('n').value.trim();
+  state.tel=document.getElementById('t').value.trim();
+  state.mail=document.getElementById('m').value.trim();
+  if(!state.name||!state.tel){alert('Bitte Name und Telefon angeben.');return;}
+  // Prototyp: Buchung in gemeinsamen Speicher legen -> erscheint in der App unter Aufträge
+  let arr=[];try{arr=JSON.parse(localStorage.getItem('reparado_bookings')||'[]');}catch(e){}
+  arr.push({name:state.name,tel:state.tel,mail:state.mail,brand:state.brand,model:state.model,issue:state.issue,price:state.price,appt:state.appt,ts:Date.now()});
+  localStorage.setItem('reparado_bookings',JSON.stringify(arr));
+  setStep(5);
+}
+function reset(){Object.assign(state,{step:1,brand:'',model:'',issue:'',price:0,appt:'',time:'',name:'',tel:'',mail:''});[1,2,3,4].forEach(i=>document.getElementById('s'+i).classList.toggle('on',i===1));render();}
+render();
+</script>
+</body>
+</html>

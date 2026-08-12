@@ -1,0 +1,1477 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reparado · Werkstatt-Software</title>
+<style>
+  :root{
+    --bg:#ffffff; --ink:#12241b; --ink2:#6b6b6b; --line:#e6e6e6;
+    --soft:#f6f6f6; --soft2:#efefef; --black:#0e7a3c; --white:#fff;
+    --radius:14px; --shadow:0 1px 2px rgba(0,0,0,.04),0 8px 24px rgba(0,0,0,.05);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+       color:var(--ink);background:var(--bg);font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+  button{font-family:inherit;font-size:inherit;cursor:pointer}
+  input,select,textarea{font-family:inherit;font-size:inherit}
+  svg{display:block}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:#dcdcdc;border-radius:20px}
+
+  .app{display:grid;grid-template-columns:250px 1fr;min-height:100vh}
+  .side{border-right:1px solid var(--line);padding:18px 14px;position:sticky;top:0;height:100vh;overflow:auto;background:var(--white)}
+  .brand{display:flex;align-items:center;gap:10px;padding:6px 8px 16px;font-weight:800;letter-spacing:-.5px;font-size:20px}
+  .brand .dot{width:26px;height:26px;border-radius:8px;background:var(--black);color:#fff;display:grid;place-items:center;font-size:14px;font-weight:800}
+  .nav{display:flex;flex-direction:column;gap:2px;margin-top:6px}
+  .nav a{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;color:var(--ink2);font-weight:600}
+  .nav a .ic{width:18px;height:18px;flex:none;color:currentColor}
+  .nav a:hover{background:var(--soft)}
+  .nav a.active{background:var(--black);color:#fff}
+  .nav .grouplbl{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#9a9a9a;padding:16px 12px 6px;font-weight:700}
+  .nav a .badge{margin-left:auto;background:#0e7a3c;color:#fff;font-size:11px;border-radius:20px;padding:1px 7px;font-weight:700}
+  .nav a.active .badge{background:#fff;color:#0e7a3c}
+
+  .main{min-width:0;display:flex;flex-direction:column}
+  .top{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.85);backdrop-filter:blur(8px);
+       border-bottom:1px solid var(--line);padding:12px 26px;display:flex;align-items:center;gap:14px}
+  .top .search{flex:1;max-width:460px;display:flex;align-items:center;gap:8px;background:var(--soft);border:1px solid transparent;border-radius:10px;padding:9px 12px;color:var(--ink2)}
+  .top .search:focus-within{border-color:#0e7a3c;background:#fff}
+  .top .search input{border:0;background:transparent;outline:0;width:100%;color:var(--ink)}
+  .top .sp{flex:1}
+  .content{padding:24px 26px 60px;max-width:1180px;width:100%}
+
+  .h1{font-size:24px;font-weight:800;letter-spacing:-.5px;margin:0}
+  .sub{color:var(--ink2);margin:2px 0 0}
+  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .between{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+  .btn{border:1px solid var(--line);background:#fff;color:#0e7a3c;border-radius:10px;padding:9px 14px;font-weight:600;display:inline-flex;align-items:center;gap:8px;transition:.12s}
+  .btn:hover{border-color:#0e7a3c}
+  .btn.pri{background:#0e7a3c;color:#fff;border-color:#0e7a3c}
+  .btn.pri:hover{opacity:.86}
+  .btn.sm{padding:6px 10px;font-size:13px;border-radius:9px}
+  .btn.gho{border-color:transparent;background:transparent}
+  .btn.gho:hover{background:var(--soft)}
+  .btn .ic{width:16px;height:16px}
+  .card{border:1px solid var(--line);border-radius:var(--radius);background:#fff;padding:18px}
+  .grid{display:grid;gap:16px}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .g4{grid-template-columns:repeat(4,1fr)}
+  .g2{grid-template-columns:1fr 1fr}
+  .muted{color:var(--ink2)}
+  .kpi .n{font-size:30px;font-weight:800;letter-spacing:-1px}
+  .kpi .l{color:var(--ink2);font-size:13px;margin-top:2px}
+  .kpi .t{font-size:12px;font-weight:700;margin-top:8px;color:#0e7a3c}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px;border:1px solid #0e7a3c;white-space:nowrap}
+  .pill .d{width:7px;height:7px;border-radius:50%;background:#0e7a3c}
+  .pill.solid{background:#0e7a3c;color:#fff}
+  .pill.solid .d{background:#fff}
+  .pill.soft{border-color:var(--line);color:var(--ink2)}
+  .pill.soft .d{background:#bdbdbd}
+  .pill.dash{border-style:dashed}
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#9a9a9a;font-weight:700;padding:10px 12px;border-bottom:1px solid var(--line)}
+  td{padding:13px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+  tr:last-child td{border-bottom:0}
+  tbody tr{cursor:pointer}
+  tbody tr:hover{background:var(--soft)}
+  .tag{font-size:11px;font-weight:700;background:var(--soft);border-radius:6px;padding:2px 7px;color:#444}
+  .avatar{width:34px;height:34px;border-radius:9px;background:#0e7a3c;color:#fff;display:grid;place-items:center;font-weight:700;font-size:13px;flex:none}
+  .avatar.out{background:#fff;color:#0e7a3c;border:1px solid #0e7a3c}
+  .seg{display:inline-flex;background:var(--soft);border-radius:10px;padding:3px;gap:2px;flex-wrap:wrap}
+  .seg button{border:0;background:transparent;padding:7px 13px;border-radius:8px;font-weight:600;color:var(--ink2)}
+  .seg button.on{background:#0e7a3c;color:#fff}
+  label.f{display:block;font-size:12px;font-weight:700;color:#333;margin:0 0 5px}
+  .in{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px 12px;outline:0;background:#fff}
+  .in:focus{border-color:#0e7a3c}
+  .divider{height:1px;background:var(--line);margin:16px 0}
+  .empty{text-align:center;color:var(--ink2);padding:40px 10px}
+  .switch{width:42px;height:24px;border-radius:20px;background:#d9d9d9;position:relative;transition:.15s;flex:none;border:0}
+  .switch.on{background:#0e7a3c}
+  .switch i{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.15s}
+  .switch.on i{left:21px}
+
+  .scrim{position:fixed;inset:0;background:rgba(0,0,0,.28);z-index:50;display:none}
+  .scrim.show{display:block}
+  .drawer{position:fixed;top:0;right:0;height:100vh;width:560px;max-width:94vw;background:#fff;z-index:60;
+          box-shadow:-16px 0 40px rgba(0,0,0,.12);transform:translateX(100%);transition:.22s;overflow:auto}
+  .drawer.show{transform:none}
+  .drawer .dhead{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--line);padding:16px 20px;display:flex;align-items:center;gap:12px}
+  .drawer .dbody{padding:20px}
+  .modal{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;padding:20px}
+  .modal.show{display:flex}
+  .modal .box{background:#fff;border-radius:16px;max-width:580px;width:100%;max-height:92vh;overflow:auto;box-shadow:var(--shadow)}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:#0e7a3c;color:#fff;
+         padding:12px 18px;border-radius:12px;font-weight:600;z-index:80;opacity:0;transition:.2s;pointer-events:none;box-shadow:var(--shadow)}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  .listitem{display:flex;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
+  .listitem:last-child{border-bottom:0}
+  .mono{font-variant-numeric:tabular-nums}
+  .chip{border:1px solid var(--line);border-radius:20px;padding:6px 12px;font-weight:600;font-size:13px;cursor:pointer}
+  .chip.on{background:#0e7a3c;color:#fff;border-color:#0e7a3c}
+  .bar{height:8px;background:var(--soft2);border-radius:20px;overflow:hidden}
+  .bar > i{display:block;height:100%;background:#0e7a3c;border-radius:20px}
+  .integ{display:flex;align-items:center;gap:14px;padding:14px;border:1px solid var(--line);border-radius:12px}
+  .integ .lg{width:44px;height:44px;border-radius:10px;background:var(--soft);display:grid;place-items:center;font-weight:800;flex:none;font-size:13px}
+  .note{background:var(--soft);border-radius:12px;padding:12px 14px;font-size:13px;color:#444}
+  .note b{color:#0e7a3c}
+
+  .mailprev{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .mailprev .mh{background:var(--soft);padding:12px 16px;border-bottom:1px solid var(--line);font-size:13px}
+  .mailprev .mb{padding:18px 16px;white-space:pre-wrap;font-size:14px;line-height:1.6}
+
+  .democtl{position:fixed;left:50%;top:74px;transform:translateX(-50%);background:#0e7a3c;color:#fff;border-radius:14px;padding:12px 16px;z-index:85;display:flex;gap:16px;align-items:center;max-width:92vw;box-shadow:var(--shadow)}
+  .democtl .txt b{font-weight:800}
+  .democtl .stop{border:1px solid #fff;background:transparent;color:#fff;border-radius:9px;padding:7px 12px;font-weight:700;cursor:pointer;flex:none}
+  .democtl .stop:hover{background:#fff;color:#0e7a3c}
+  .callhdr{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--soft)}
+  .dotpulse{width:12px;height:12px;border-radius:50%;background:#0e7a3c;flex:none;animation:pulse 1.2s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(0,0,0,.35)}70%{box-shadow:0 0 0 8px rgba(0,0,0,0)}100%{box-shadow:0 0 0 0 rgba(0,0,0,0)}}
+  .callchat{display:flex;flex-direction:column;gap:9px;max-height:46vh;overflow:auto;padding:4px}
+  .cb{max-width:82%;padding:9px 13px;border-radius:14px;font-size:14px;line-height:1.5;animation:cbin .25s ease}
+  @keyframes cbin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .cb.ki{align-self:flex-end;background:#0e7a3c;color:#fff;border-bottom-right-radius:4px}
+  .cb.anr{align-self:flex-start;background:var(--soft);border-bottom-left-radius:4px}
+  .cb .lbl{font-size:11px;font-weight:700;opacity:.6;margin-bottom:2px}
+  .sigwrap{border:1px solid var(--line);border-radius:10px;background:#fff}
+  .sigwrap canvas{width:100%;height:150px;display:block;touch-action:none;border-radius:10px}
+  .hamb{display:none}
+  @media(max-width:920px){
+    .app{grid-template-columns:1fr}
+    .side{position:fixed;left:0;top:0;z-index:70;transform:translateX(-100%);transition:.2s;width:250px}
+    .side.show{transform:none;box-shadow:0 0 60px rgba(0,0,0,.2)}
+    .hamb{display:inline-grid}
+    .g4{grid-template-columns:1fr 1fr}
+    .g3{grid-template-columns:1fr}
+    .g2{grid-template-columns:1fr}
+    .content{padding:18px 16px 60px}
+    .top{padding:10px 14px}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side" id="side">
+    <div class="brand"><span class="dot">R</span> Reparado</div>
+    <div class="nav" id="nav">
+      <a data-view="dashboard" class="active"><span class="ic" data-ic="grid"></span> Übersicht</a>
+      <a data-view="anrufe"><span class="ic" data-ic="phone"></span> Empfang <span class="badge" id="bg-call">0</span></a>
+      <a data-view="diagnose"><span class="ic" data-ic="diag"></span> KI-Diagnose</a>
+      <a data-view="auftraege"><span class="ic" data-ic="clip"></span> Aufträge <span class="badge" id="bg-auf">0</span></a>
+      <a data-view="kalender"><span class="ic" data-ic="cal"></span> Kalender</a>
+      <a data-view="kunden"><span class="ic" data-ic="user"></span> Kunden</a>
+      <div class="grouplbl">Werkstatt</div>
+      <a data-view="erinnerungen"><span class="ic" data-ic="bell"></span> Erinnerungen <span class="badge" id="bg-rem">0</span></a>
+      <a data-view="bestellungen"><span class="ic" data-ic="box"></span> Bestellungen</a>
+      <a data-view="lager"><span class="ic" data-ic="arch"></span> Lager &amp; Teile</a>
+      <a data-view="ankauf"><span class="ic" data-ic="swap"></span> Ankauf / Verkauf</a>
+      <a data-view="preise"><span class="ic" data-ic="tag"></span> Modelle &amp; Preise</a>
+      <div class="grouplbl">Verkauf</div>
+      <a data-view="kasse"><span class="ic" data-ic="rcpt"></span> Kasse</a>
+      <a data-view="statistik"><span class="ic" data-ic="chart"></span> Statistik</a>
+      <div class="grouplbl">System</div>
+      <a data-view="einstellungen"><span class="ic" data-ic="gear"></span> Einstellungen</a>
+    </div>
+    <div class="divider"></div>
+    <div class="row" style="padding:0 8px">
+      <div class="avatar">DH</div>
+      <div style="min-width:0">
+        <div style="font-weight:700;font-size:13px">Dein Handy Doc</div>
+        <div class="muted" style="font-size:12px">Balingen</div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="top">
+      <button class="btn gho hamb" onclick="document.getElementById('side').classList.toggle('show')"><span class="ic" data-ic="menu"></span></button>
+      <div class="search"><span class="ic" data-ic="search"></span><input id="gsearch" placeholder="Auftrag, Kunde, Telefon, IMEI …" oninput="globalSearch(this.value)"></div>
+      <div class="sp"></div>
+      <button class="btn" onclick="go('erinnerungen')"><span class="ic" data-ic="bell"></span></button>
+      <button class="btn pri" onclick="newOrder()"><span class="ic" data-ic="plus"></span> Neuer Auftrag</button>
+    </div>
+    <div class="content" id="main"></div>
+  </div>
+</div>
+
+<div class="scrim" id="scrim" onclick="closeAll()"></div>
+<div class="drawer" id="drawer"></div>
+<div class="modal" id="modal"><div class="box" id="modalbox"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================ ICONS (line, kein Emoji) ============================ */
+const ICONS={
+ grid:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+ clip:'<rect x="8" y="3" width="8" height="4" rx="1"/><path d="M9 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3"/><path d="M9 12h6M9 16h4"/>',
+ cal:'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>',
+ user:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+ bell:'<path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>',
+ box:'<path d="M21 8v8l-9 5-9-5V8l9-5 9 5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
+ arch:'<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/>',
+ swap:'<path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
+ tag:'<path d="M3 3h8l10 10-8 8L3 11V3z"/><circle cx="7.5" cy="7.5" r="1.4"/>',
+ rcpt:'<rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 8h6M9 12h6M9 16h4"/>',
+ chart:'<path d="M3 21h18"/><rect x="6" y="10" width="3" height="8"/><rect x="11" y="6" width="3" height="12"/><rect x="16" y="13" width="3" height="5"/>',
+ gear:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1l2.1-2.1M17 7l2.1-2.1"/>',
+ plus:'<path d="M12 5v14M5 12h14"/>',
+ search:'<circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/>',
+ menu:'<path d="M4 6h16M4 12h16M4 18h16"/>',
+ print:'<path d="M6 9V3h12v6"/><rect x="4" y="9" width="16" height="8" rx="2"/><path d="M8 15h8v6H8z"/>',
+ label:'<path d="M3 3h8l10 10-8 8L3 11V3z"/><circle cx="7.5" cy="7.5" r="1.4"/>',
+ shield:'<path d="M12 2l8 3v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V5l8-3z"/><path d="M9 12l2 2 4-4"/>',
+ pen:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>',
+ cart:'<circle cx="9" cy="21" r="1.5"/><circle cx="18" cy="21" r="1.5"/><path d="M2 3h3l2.5 13h11l2-9H6"/>',
+ mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
+ phone:'<path d="M6.6 10.8a15 15 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.24 11 11 0 0 0 3.5.56 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.6a1 1 0 0 1 1 1 11 11 0 0 0 .56 3.5 1 1 0 0 1-.24 1z"/>',
+ diag:'<path d="M12 3l1.7 4.1L18 8.8l-4.3 1.7L12 15l-1.7-4.5L6 8.8l4.3-1.7L12 3z"/><path d="M18.5 14l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9.9-2.1z"/>',
+};
+function ic(name,size){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" width="'+(size||18)+'" height="'+(size||18)+'">'+(ICONS[name]||'')+'</svg>';}
+function paintIcons(){document.querySelectorAll('[data-ic]').forEach(e=>{if(!e.__done){e.innerHTML=ic(e.dataset.ic, e.classList.contains('ic')?18:18);e.__done=1;}});}
+
+/* ============================ STATE ============================ */
+const SHOP = {name:"Dein Handy Doc", city:"Balingen", street:"Bahnhofstr. 12", zip:"72336", phone:"07433 9678444", email:"info@deinhandydoc.de", google:"g.page/deinhandydoc/review", hours:"Mo–Fr 9–18 Uhr, Sa 9–13 Uhr", warranty:6};
+const KEY='reparado_v1';
+let S = load();
+
+function load(){ try{const r=JSON.parse(localStorage.getItem(KEY)); if(r&&r.v===5) return r;}catch(e){} const s=seed(); save(s); return s; }
+function save(x){ localStorage.setItem(KEY, JSON.stringify(x||S)); }
+function uid(p){ return p+Math.random().toString(36).slice(2,7); }
+
+function seed(){
+  const cust = [
+    {id:'c1',name:'Peter Durau',tel:'+49 1744315450',mail:'durau91@t-online.de',adr:'Bürgermeister-Jetter-Straße 41, 72336 Balingen'},
+    {id:'c2',name:'Wojciech Kruk',tel:'+49 15145711681',mail:'',adr:'Angerstraße 4, 72479 Egesheim'},
+    {id:'c3',name:'Leonarda Pellegrino',tel:'+49 7433 7562',mail:'l.pellegrino@gmx.de',adr:'Stauffenbergstraße 9/1, 72336 Balingen'},
+    {id:'c4',name:'Markus Dick',tel:'+49 1736654809',mail:'dick-markus@gmx.net',adr:'Höhenweg 9, 72401 Haigerloch'},
+    {id:'c5',name:'Diana Roth',tel:'+49 15213427202',mail:'diana.roth@web.de',adr:'Sonnenstraße 80, 72458 Albstadt'},
+    {id:'c6',name:'Ping Leibold',tel:'+49 1706925034',mail:'',adr:'Gymnasiumstraße 13, 72336 Balingen'},
+    {id:'c7',name:'Evie Rosner',tel:'+49 17620755540',mail:'gromnizki@gmail.com',adr:'Raichbergstraße 9, 72406 Bisingen'},
+    {id:'c8',name:'Thomas Rehfuss',tel:'+49 160 2224477',mail:'t.rehfuss@outlook.de',adr:'Friedrichstraße 2, 72336 Balingen'},
+  ];
+  const today = new Date();
+  const d=(off)=>{const x=new Date(today);x.setDate(x.getDate()+off);return x.toISOString().slice(0,10);};
+  const ord = [
+    {id:'o1115',nr:'REP-1115',cid:'c1',brand:'Samsung',model:'Galaxy A56',imei:'',issue:'Kameraglas',qual:'Original',price:50,status:'offen',prio:'Standard',created:d(0),due:d(3),notes:'Kameraglas austauschen',appt:'',readyAt:'',warranty:6,sig:'',source:''},
+    {id:'o1114',nr:'REP-1114',cid:'c2',brand:'Xiaomi',model:'Redmi Note 8 Pro',imei:'',issue:'Displaytausch',qual:'Kopie',price:120,status:'offen',prio:'Standard',created:d(0),due:d(4),notes:'',appt:d(1),readyAt:'',warranty:6,sig:'',source:''},
+    {id:'o1113',nr:'REP-1113',cid:'c3',brand:'Samsung',model:'Galaxy A14',imei:'',issue:'Displaytausch',qual:'Original',price:140,status:'warten',prio:'Standard',created:d(0),due:d(5),notes:'Wartet auf Galaxy A14 Display',appt:'',readyAt:'',warranty:6,sig:'',source:''},
+    {id:'o1111',nr:'REP-1111',cid:'c5',brand:'Apple',model:'iPhone 13',imei:'356789…',issue:'Akkutausch',qual:'Original',price:69,status:'bearbeitung',prio:'Express',created:d(-1),due:d(1),notes:'',appt:'',readyAt:'',warranty:12,sig:'',source:''},
+    {id:'o1110',nr:'REP-1110',cid:'c8',brand:'Apple',model:'iPhone 15 Pro',imei:'',issue:'Backcover Glas',qual:'Original',price:230,status:'bearbeitung',prio:'Standard',created:d(-1),due:d(2),notes:'',appt:'',readyAt:'',warranty:6,sig:'',source:''},
+    {id:'o1109',nr:'REP-1109',cid:'c4',brand:'Xiaomi',model:'Redmi Note 14 Pro 5G',imei:'',issue:'Displaytausch',qual:'Original',price:160,status:'warten',prio:'Standard',created:d(-1),due:d(3),notes:'Teil bestellt (Foneday)',appt:'',readyAt:'',warranty:6,sig:'',source:''},
+    {id:'o1108',nr:'REP-1108',cid:'c7',brand:'Samsung',model:'Galaxy S22',imei:'',issue:'Displaytausch',qual:'Original',price:250,status:'fertig',prio:'Standard',created:d(-3),due:d(-1),notes:'',appt:'',readyAt:d(-4),warranty:6,sig:'',source:''},
+    {id:'o1107',nr:'REP-1107',cid:'c6',brand:'Apple',model:'iPhone 12',imei:'',issue:'Displaytausch',qual:'Kopie',price:99,status:'fertig',prio:'Standard',created:d(-9),due:d(-6),notes:'Kunde mehrfach nicht erreicht',appt:'',readyAt:d(-8),warranty:6,sig:'',source:''},
+    {id:'o1106',nr:'REP-1106',cid:'c1',brand:'Samsung',model:'Galaxy A34',imei:'',issue:'Ladebuchse',qual:'Original',price:75,status:'abgeholt',prio:'Standard',created:d(-6),due:d(-4),notes:'',appt:'',readyAt:d(-5),pickedAt:d(-4),warranty:6,sig:'',source:''},
+  ];
+  const parts=[
+    {id:'p1',cat:'Display',name:'Galaxy A14 Display (Original)',sku:'DS-A14',stock:0,min:2,price:78},
+    {id:'p2',cat:'Display',name:'iPhone 13 Display (OLED)',sku:'DS-IP13',stock:4,min:2,price:55},
+    {id:'p3',cat:'Akku',name:'iPhone 13 Akku',sku:'AK-IP13',stock:1,min:3,price:19},
+    {id:'p4',cat:'Kamera',name:'Galaxy A56 Kameraglas',sku:'KG-A56',stock:6,min:2,price:8},
+    {id:'p5',cat:'Backcover',name:'iPhone 15 Pro Backcover',sku:'BC-IP15P',stock:2,min:1,price:60},
+    {id:'p6',cat:'Ladebuchse',name:'Galaxy A34 Ladebuchse',sku:'LB-A34',stock:3,min:2,price:12},
+  ];
+  const orders=[
+    {id:'b1',nr:'REP-1113',supplier:'Foneday',part:'Galaxy A14 Display',status:'offen',eta:d(2),ref:'o1113'},
+    {id:'b2',nr:'REP-1109',supplier:'Foneday',part:'Redmi Note 14 Pro 5G Display',status:'unterwegs',eta:d(1),ref:'o1109'},
+    {id:'b3',nr:'Lager',supplier:'GSMparts',part:'iPhone 13 Akku ×5',status:'offen',eta:d(3),ref:''},
+  ];
+  // --- Demo-Anreicherung: gut laufender Betrieb (für die Vorführung) ---
+  const moreNames=['Sabine Vogt','Ali Demir','Marta Nowak','Jens Krause','Yusuf Kaya','Christina Bauer','Paolo Ricci','Lena Hofmann','Dennis Braun','Aylin Şahin','Robert Fischer','Nadia Haddad'];
+  const cities=['72336 Balingen','72458 Albstadt','72379 Hechingen','72406 Bisingen','72401 Haigerloch'];
+  moreNames.forEach((nm,i)=>cust.push({id:'c'+(9+i),name:nm,tel:'+49 1'+[5,6,7][i%3]+'0 '+(2100000+i*40707),mail:(i%3===0?nm.toLowerCase().replace(/[^a-z]/g,'')+'@web.de':''),adr:'Musterstraße '+(3+i)+', '+cities[i%5]}));
+  const HC=[['Apple','iPhone 15 Pro','Displaytausch',249],['Apple','iPhone 14','Displaytausch',159],['Apple','iPhone 13','Akkutausch',69],['Apple','iPhone 12','Displaytausch',129],['Apple','iPhone 11','Displaytausch',99],['Apple','iPhone SE','Akkutausch',49],['Apple','iPhone 14 Pro','Kameraglas',59],['Samsung','Galaxy S23','Displaytausch',209],['Samsung','Galaxy S22','Ladebuchse',75],['Samsung','Galaxy A54','Displaytausch',139],['Samsung','Galaxy A34','Akkutausch',59],['Samsung','Galaxy S21','Displaytausch',179],['Xiaomi','Redmi Note 12','Displaytausch',119],['Xiaomi','Redmi Note 11','Akkutausch',55],['Huawei','P30 Pro','Displaytausch',139],['Apple','iPad 9','Displaytausch',149]];
+  let hn=1060;
+  for(let k=0;k<40;k++){const it=HC[k%HC.length];const day=-(1+(k%25));const c=cust[k%cust.length];
+    ord.push({id:'o'+hn,nr:'REP-'+hn,cid:c.id,brand:it[0],model:it[1],imei:'',issue:it[2],qual:(k%4===0?'Kopie':'Original'),price:it[3],status:'abgeholt',prio:'Standard',created:d(day-2),due:d(day-1),notes:'',appt:'',readyAt:d(day-1),pickedAt:d(day),warranty:6,sig:'',source:(k%6===0?'online':(k%9===0?'telefon':''))});hn++;}
+  // Termine heute (damit "Termine heute" > 0)
+  [['c5','Apple','iPhone 13','Displaytausch',149,'Express'],['c6','Samsung','Galaxy A14','Akkutausch',59,'Standard'],['c9','Apple','iPhone 12','Kameraglas',49,'Standard']].forEach((t,i)=>ord.unshift({id:'ot'+i,nr:'REP-'+(1116+i),cid:t[0],brand:t[1],model:t[2],imei:'',issue:t[3],qual:'Original',price:t[4],status:'offen',prio:t[5],created:d(0),due:d(0),notes:'Terminkunde heute',appt:d(0),readyAt:'',pickedAt:'',warranty:6,sig:'',source:''}));
+  // Verkäufe (Kasse) diesen Monat
+  const sales=[];for(let s=0;s<22;s++)sales.push({t:new Date(d(0)+'T'+String(9+(s%8)).padStart(2,'0')+':15:00').toISOString(),total:[15,12,9,25,19,39,10,29][s%8],items:1+(s%3)});
+  return {v:5, cust, ord, parts, orders, sold:[], counter:1119, rules: defaultRules(), sales, cash:{connected:''}, mailLog:[], calls:seedCalls(), phone:defaultPhone()};
+}
+function defaultPhone(){return {active:true, mode:'overflow',
+  greeting:'Herzlich willkommen bei Dein Handy Doc. Ich bin die digitale Assistentin. Wie kann ich Ihnen helfen?',
+  greetingAfter:'Willkommen bei Dein Handy Doc. Wir haben gerade geschlossen – aber ich bin die digitale Assistentin und helfe Ihnen gern sofort weiter.',
+  answer:{status:true,price:true,hours:true,booking:true,message:true,stock:true}};}
+const HOURS={1:[9,18],2:[9,18],3:[9,18],4:[9,18],5:[9,18],6:[9,13]}; // 0=So geschlossen
+function isOpenNow(){const d=new Date();const h=HOURS[d.getDay()];if(!h)return false;const t=d.getHours()+d.getMinutes()/60;return t>=h[0]&&t<h[1];}
+function seedCalls(){
+  return [
+   {id:'k1',channel:'anruf',time:'19:58',from:'+49 160 5540122',name:'',intent:'status',dur:'0:44',order:'REP-1108',task:false,after:true,
+    result:'Status genannt: Abholbereit',
+    transcript:[{who:'ki',text:'Willkommen bei Dein Handy Doc. Wir haben gerade geschlossen – aber ich helfe Ihnen gern sofort weiter.'},{who:'anr',text:'Hallo, ist mein Samsung schon fertig?'},{who:'ki',text:'Sehr gerne. Auf welchen Namen läuft der Auftrag?'},{who:'anr',text:'Rosner.'},{who:'ki',text:'Ihr Samsung Galaxy S22 ist abholbereit. Abholen können Sie es morgen ab 9 Uhr. Der Endbetrag beträgt € 250,00.'},{who:'anr',text:'Perfekt, danke!'}]},
+   {id:'w1',channel:'whatsapp',time:'14:12',from:'+49 176 3344556',name:'',intent:'stock',dur:'—',order:'',task:false,after:false,
+    result:'Verfügbarkeit bestätigt: iPhone 15 Pro Backcover',
+    transcript:[{who:'kunde',text:'Hallo, habt ihr ein Backcover fürs iPhone 15 Pro da?'},{who:'ki',text:'Hallo! Ja, das iPhone 15 Pro Backcover ist vorrätig. Möchten Sie einen Termin zum Tausch?'},{who:'kunde',text:'Ja, morgen wäre gut.'},{who:'ki',text:'Ich habe Ihnen morgen 15:00 Uhr vorgemerkt und melde mich gleich mit der Bestätigung.'}]},
+   {id:'k2',channel:'anruf',time:'13:20',from:'+49 151 7788990',name:'',intent:'price',dur:'1:02',order:'',task:false,after:false,
+    result:'Preis genannt: Galaxy A14 Displaytausch',
+    transcript:[{who:'ki',text:'Herzlich willkommen bei Dein Handy Doc. Wie kann ich helfen?'},{who:'anr',text:'Was kostet ein Displaytausch beim Samsung A14?'},{who:'ki',text:'Für das Samsung Galaxy A14 kostet der Displaytausch € 129,00 mit Originalteil. Der Preis ist unverbindlich; den genauen Betrag nennen wir nach kurzer Prüfung vor Ort.'},{who:'anr',text:'Okay, danke.'}]},
+   {id:'w2',channel:'whatsapp',time:'11:40',from:'+49 151 9090909',name:'',intent:'status',dur:'—',order:'',task:false,after:false,
+    result:'Status genannt: In Bearbeitung',
+    transcript:[{who:'kunde',text:'Moin, wie weit ist mein iPhone?'},{who:'ki',text:'Auf welchen Namen läuft der Auftrag?'},{who:'kunde',text:'Roth.'},{who:'ki',text:'Ihr iPhone 13 ist gerade in Bearbeitung. Sie bekommen automatisch eine Nachricht, sobald es fertig ist.'}]},
+   {id:'k3',channel:'anruf',time:'11:07',from:'+49 176 2030405',name:'',intent:'message',dur:'1:33',order:'',task:true,done:false,after:false,
+    result:'Rückruf-Aufgabe erstellt',
+    transcript:[{who:'ki',text:'Herzlich willkommen bei Dein Handy Doc. Wie kann ich helfen?'},{who:'anr',text:'Mein repariertes Handy macht schon wieder Probleme.'},{who:'ki',text:'Das tut mir leid. Ich nehme das auf und ein Mitarbeiter ruft Sie zurück. Auf welche Nummer und welchen Namen?'},{who:'anr',text:'Bergmann, 0176 2030405.'},{who:'ki',text:'Danke. Ich habe eine Rückruf-Aufgabe für das Team angelegt. Wir melden uns zeitnah.'}]},
+   {id:'k4',channel:'anruf',time:'09:41',from:'+49 170 6655443',name:'',intent:'hours',dur:'0:19',order:'',task:false,after:false,
+    result:'Öffnungszeiten genannt',
+    transcript:[{who:'ki',text:'Herzlich willkommen bei Dein Handy Doc. Wie kann ich helfen?'},{who:'anr',text:'Habt ihr heute geöffnet?'},{who:'ki',text:'Ja. Heute haben wir von 9 bis 18 Uhr für Sie geöffnet. Sie finden uns in der Bahnhofstr. 12 in Balingen.'},{who:'anr',text:'Super, bis gleich.'}]},
+  ];
+}
+
+/* ============================ ERINNERUNGS-REGELN (ohne Emoji, persönlicher Ton) ============================ */
+function defaultRules(){
+  return [
+   {id:'r_confirm', who:'kunde', on:true, ch:'E-Mail', trigger:'termin_gebucht', when:'sofort',
+    name:'Terminbestätigung', desc:'Direkt nach der Online- oder Telefonbuchung.',
+    subj:'Ihr Termin bei {werkstatt}',
+    body:'Hallo {kunde},\n\nvielen Dank für Ihre Buchung. Wir haben Ihren Termin notiert:\n\nTermin: {termin}\nGerät: {geraet}\nLeistung: {leistung}\n\nBitte bringen Sie Ihr Gerät möglichst geladen und mit deaktiviertem Sperrcode bzw. deaktivierter Face-ID vorbei.\n\nWir freuen uns auf Sie.\nIhr Team von {werkstatt}\n{telefon}'},
+   {id:'r_appt24', who:'kunde', on:true, ch:'SMS', trigger:'termin', when:'24 Std vorher',
+    name:'Terminerinnerung (Vortag)', desc:'Erinnert den Kunden 24 Stunden vor dem Termin.',
+    subj:'Erinnerung an Ihren Termin morgen',
+    body:'Hallo {kunde}, wir erinnern Sie an Ihren Termin morgen ({termin}) bei {werkstatt} für {geraet}. Falls Sie verschieben möchten, melden Sie sich gern unter {telefon}.'},
+   {id:'r_dropoff', who:'kunde', on:true, ch:'E-Mail', trigger:'termin', when:'am Termintag, morgens',
+    name:'Abgabe-Checkliste', desc:'Am Tag der Geräteabgabe – was mitzubringen ist.',
+    subj:'Ihr Termin ist heute – eine kurze Checkliste',
+    body:'Guten Morgen {kunde},\n\nheute ist Ihr Termin für {geraet}. Damit alles schnell geht, bitten wir Sie:\n\n- Sperrcode und Face-ID vorübergehend deaktivieren\n- die Funktion „Mein Gerät suchen" ausschalten\n- wichtige Daten vorab sichern\n\nSie finden uns in der {adresse}.\nBis später, Ihr Team von {werkstatt}'},
+   {id:'r_received', who:'kunde', on:true, ch:'E-Mail', trigger:'status_bearbeitung', when:'sofort',
+    name:'Auftrag angenommen', desc:'Sobald das Gerät angenommen und in Bearbeitung ist.',
+    subj:'Ihr Auftrag {auftrag} ist bei uns eingegangen',
+    body:'Hallo {kunde},\n\nwir haben Ihr {geraet} erhalten. Ihre Auftragsnummer lautet {auftrag}.\nGeschätzter Preis: {preis}.\n\nDen aktuellen Stand Ihrer Reparatur können Sie jederzeit hier einsehen:\n{tracking}\n\nSobald Ihr Gerät fertig ist, melden wir uns bei Ihnen.\nIhr Team von {werkstatt}'},
+   {id:'r_kva', who:'kunde', on:true, ch:'E-Mail', trigger:'kva_offen', when:'sofort + Erinnerung nach 2 Tagen',
+    name:'Kostenvoranschlag freigeben', desc:'Wenn eine Freigabe auf die Antwort des Kunden wartet.',
+    subj:'Kostenvoranschlag für Ihr {geraet}',
+    body:'Hallo {kunde},\n\nwir haben Ihr {geraet} geprüft. Der Kostenvoranschlag beläuft sich auf {preis}.\nBitte geben Sie uns kurz Bescheid, ob wir die Reparatur durchführen dürfen:\n\n{tracking}\n\nOhne Rückmeldung halten wir Ihr Gerät 14 Tage zur Abholung bereit.\nIhr Team von {werkstatt}\n{telefon}'},
+   {id:'r_waitpart', who:'kunde', on:true, ch:'SMS', trigger:'status_warten', when:'sofort',
+    name:'Ersatzteil bestellt', desc:'Information an den Kunden, dass auf ein Teil gewartet wird.',
+    subj:'Kurzes Update zu Ihrer Reparatur',
+    body:'Hallo {kunde}, für Ihr {geraet} bestellen wir gerade das passende Ersatzteil. Wir melden uns, sobald es eingetroffen ist. Ihr Team von {werkstatt}.'},
+   {id:'r_ready', who:'kunde', on:true, ch:'SMS', trigger:'status_fertig', when:'sofort',
+    name:'Fertig und abholbereit', desc:'Sobald die Reparatur fertig ist – die wichtigste Nachricht.',
+    subj:'Ihr {geraet} ist fertig',
+    body:'Hallo {kunde}, Ihr {geraet} ist repariert und abholbereit. Sie können es zu unseren Öffnungszeiten abholen ({oeffnung}). Endbetrag: {preis}. Adresse: {adresse}. Ihr Team von {werkstatt}.'},
+   {id:'r_pickup3', who:'kunde', on:true, ch:'SMS', trigger:'fertig_nicht_abgeholt', when:'3 Tage nach fertig',
+    name:'Abhol-Erinnerung', desc:'Wenn ein fertiges Gerät nach 3 Tagen nicht abgeholt wurde.',
+    subj:'Ihr Gerät wartet auf Sie',
+    body:'Hallo {kunde}, Ihr {geraet} liegt seit einigen Tagen abholbereit bei uns. Wann dürfen wir Sie erwarten? Ihr Team von {werkstatt} · {telefon}'},
+   {id:'r_pickup14', who:'kunde', on:true, ch:'E-Mail', trigger:'fertig_nicht_abgeholt', when:'14 Tage nach fertig',
+    name:'Letzte Abhol-Erinnerung', desc:'Nach 14 Tagen – mit Hinweis auf die Lagerung.',
+    subj:'Bitte um Abholung Ihres {geraet}',
+    body:'Hallo {kunde},\n\nIhr repariertes {geraet} (Auftrag {auftrag}) liegt seit 14 Tagen abholbereit bei uns.\nBitte holen Sie es innerhalb der nächsten Tage ab. Nach längerer Lagerung kann eine Gebühr anfallen.\n\nVielen Dank und beste Grüße\nIhr Team von {werkstatt} · {telefon}'},
+   {id:'r_review', who:'kunde', on:true, ch:'E-Mail', trigger:'abgeholt', when:'1 Tag nach Abholung',
+    name:'Bewertungsanfrage', desc:'Bittet zufriedene Kunden um eine Google-Bewertung.',
+    subj:'Wie war Ihre Erfahrung bei {werkstatt}?',
+    body:'Hallo {kunde},\n\nwir hoffen, Ihr {geraet} funktioniert wieder einwandfrei.\nWenn Sie zufrieden waren, würden wir uns sehr über eine kurze Bewertung freuen:\n\n{google}\n\nVielen Dank und bis zum nächsten Mal.\nIhr Team von {werkstatt}'},
+
+   {id:'w_daily', who:'werkstatt', on:true, ch:'E-Mail', trigger:'taeglich', when:'werktags 08:00',
+    name:'Tagesüberblick', desc:'Termine heute, abholbereite Geräte und offene Freigaben.',
+    subj:'Ihr Tagesüberblick',
+    body:'Guten Morgen,\n\nheute im Überblick:\n\nTermine heute: {n_termine}\nAbholbereite Geräte: {n_fertig}\nWartet auf Ersatzteil: {n_warten}\nÜberfällige Aufträge: {n_ueberfaellig}\n\nDie Details finden Sie in Reparado.'},
+   {id:'w_part', who:'werkstatt', on:true, ch:'E-Mail', trigger:'teil_geliefert', when:'sofort',
+    name:'Ersatzteil eingetroffen', desc:'Sobald eine Bestellung als geliefert markiert wird.',
+    subj:'Ersatzteil eingetroffen',
+    body:'Das Ersatzteil für {auftrag} ({teil}) ist eingetroffen. Der Auftrag von {kunde} kann jetzt weiterbearbeitet werden.'},
+   {id:'w_order_late', who:'werkstatt', on:true, ch:'E-Mail', trigger:'bestellung_ueberfaellig', when:'ETA überschritten',
+    name:'Bestellung überfällig', desc:'Eine Ersatzteil-Lieferung ist über dem erwarteten Termin.',
+    subj:'Lieferung überfällig: {teil}',
+    body:'Die Bestellung „{teil}" bei {lieferant} ist überfällig. Bitte beim Lieferanten nachfassen.'},
+   {id:'w_overdue', who:'werkstatt', on:true, ch:'E-Mail', trigger:'auftrag_ueberfaellig', when:'Fälligkeit überschritten',
+    name:'Auftrag überfällig', desc:'Ein Auftrag hat die zugesagte Fertigstellung überschritten.',
+    subj:'Auftrag {auftrag} ist überfällig',
+    body:'Auftrag {auftrag} ({kunde}, {geraet}) hat den zugesagten Termin überschritten. Bitte den Kunden informieren.'},
+   {id:'w_uncoll', who:'werkstatt', on:true, ch:'E-Mail', trigger:'fertig_nicht_abgeholt', when:'7 Tage nach fertig',
+    name:'Gerät nicht abgeholt', desc:'Ein fertiges Gerät liegt seit 7 Tagen in der Ablage.',
+    subj:'Nicht abgeholt: {geraet}',
+    body:'{geraet} von {kunde} (Auftrag {auftrag}) ist seit sieben Tagen fertig, aber noch nicht abgeholt. Bitte kurz nachfassen: {telefon_kunde}'},
+   {id:'w_lowstock', who:'werkstatt', on:true, ch:'E-Mail', trigger:'lager_niedrig', when:'unter Mindestbestand',
+    name:'Lagerbestand niedrig', desc:'Ein Teil ist unter dem Mindestbestand – nachbestellen.',
+    subj:'Bitte nachbestellen: {teil}',
+    body:'Der Bestand von „{teil}" ist niedrig ({stock} Stück, Minimum {min}). Bitte nachbestellen.'},
+  ];
+}
+
+/* ============================ HELPERS ============================ */
+const STATUS = {
+  offen:{lbl:'Offen', cls:''},
+  bearbeitung:{lbl:'In Bearbeitung', cls:'solid'},
+  warten:{lbl:'Warte auf Ersatzteil', cls:'dash'},
+  fertig:{lbl:'Abholbereit', cls:'solid'},
+  abgeholt:{lbl:'Abgeschlossen', cls:'soft'},
+};
+const STFLOW=['offen','bearbeitung','warten','fertig','abgeholt'];
+function statusPill(s){const m=STATUS[s]||STATUS.offen;return `<span class="pill ${m.cls}"><span class="d"></span>${m.lbl}</span>`;}
+function cust(id){return S.cust.find(c=>c.id===id)||{name:'—',tel:'',mail:'',adr:''};}
+function eur(n){return '€ '+Number(n||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function initials(n){return (n||'?').split(' ').map(x=>x[0]).slice(0,2).join('').toUpperCase();}
+function today(){return new Date().toISOString().slice(0,10);}
+function daysBetween(a,b){return Math.round((new Date(b)-new Date(a))/864e5);}
+function addMonths(ds,m){const x=new Date(ds);x.setMonth(x.getMonth()+(+m||0));return x.toISOString().slice(0,10);}
+function fmtDate(d){if(!d)return '—';const x=new Date(d);return x.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});}
+function isThisMonth(ds){if(!ds)return false;const x=new Date(ds);const n=new Date();return x.getFullYear()===n.getFullYear()&&x.getMonth()===n.getMonth();}
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._);t._=setTimeout(()=>t.classList.remove('show'),2200);}
+function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+/* ============================ ROUTER ============================ */
+const views={};
+let current='dashboard';
+function go(v){ current=v;
+  document.querySelectorAll('#nav a').forEach(a=>a.classList.toggle('active',a.dataset.view===v));
+  document.getElementById('side').classList.remove('show');
+  window.scrollTo(0,0);
+  (views[v]||views.dashboard)();
+  paintIcons(); refreshBadges();
+}
+document.getElementById('nav').addEventListener('click',e=>{const a=e.target.closest('a');if(a){go(a.dataset.view);}});
+function refreshBadges(){
+  document.getElementById('bg-auf').textContent=S.ord.filter(o=>o.status!=='abgeholt').length;
+  document.getElementById('bg-rem').textContent=computeQueue().length;
+  const bc=document.getElementById('bg-call'); if(bc) bc.textContent=(S.calls||[]).filter(c=>c.task&&!c.done).length;
+}
+
+/* ============================ DASHBOARD ============================ */
+views.dashboard=function(){
+  const m=document.getElementById('main');
+  const monthRev=S.ord.filter(o=>(o.status==='abgeholt'||o.status==='fertig')&&isThisMonth(o.pickedAt||o.readyAt||o.created)).reduce((s,o)=>s+(+o.price||0),0)+ S.sales.filter(x=>isThisMonth(x.t)).reduce((s,x)=>s+x.total,0);
+  const offen=S.ord.filter(o=>o.status!=='abgeholt').length;
+  const fertig=S.ord.filter(o=>o.status==='fertig').length;
+  const heute=S.ord.filter(o=>o.appt===today()).length;
+  const q=computeQueue();
+  const agenda=[
+    ...S.ord.filter(o=>o.appt===today()).map(o=>({t:'Termin heute',o})),
+    ...S.ord.filter(o=>o.status==='fertig').map(o=>({t:'Abholbereit',o})),
+  ];
+  m.innerHTML=`
+   <div class="between"><div><h1 class="h1">Guten Tag</h1><p class="sub">${SHOP.name} · ${fmtDate(today())}</p></div>
+     <div class="row"><button class="btn" onclick="newOrder()">Neuer Auftrag</button><button class="btn" onclick="go('kasse')">Kasse öffnen</button><button class="btn pri" onclick="startDemo()">Demo-Tour</button></div></div>
+   <div class="grid g4" style="margin-top:18px">
+     <div class="card kpi"><div class="n">${eur(monthRev)}</div><div class="l">Umsatz diesen Monat</div><div class="t">Reparaturen führen</div></div>
+     <div class="card kpi"><div class="n">${offen}</div><div class="l">Offene Aufträge</div><div class="t">${fertig} abholbereit</div></div>
+     <div class="card kpi"><div class="n">${heute}</div><div class="l">Termine heute</div><div class="t">Kalender ansehen</div></div>
+     <div class="card kpi"><div class="n">${q.length}</div><div class="l">Geplante Erinnerungen</div><div class="t">Kunde &amp; Werkstatt</div></div>
+   </div>
+   <div class="card" style="background:#0e7a3c;color:#fff;margin-top:16px">
+     <div class="between"><div><b style="font-size:16px">Deine KI-Empfangskraft</b><div style="opacity:.8;font-size:13px;margin-top:2px">Nimmt Anrufe und WhatsApp entgegen, auch nach Feierabend – bucht Termine, beantwortet Fragen, trägt alles ein.</div></div>
+       <div class="row"><button class="btn" style="background:transparent;color:#fff;border-color:rgba(255,255,255,.35)" onclick="simMenu()">Gespräch simulieren</button><button class="btn" style="background:#fff;color:#0e7a3c;border-color:#fff" onclick="go('anrufe')">Empfang öffnen</button></div></div>
+     <div class="grid g4" style="margin-top:14px">
+       <div><div style="font-size:22px;font-weight:800">${S.calls.length}</div><div style="opacity:.7;font-size:12px">Gespräche heute</div></div>
+       <div><div style="font-size:22px;font-weight:800">${S.calls.filter(c=>!c.task).length}</div><div style="opacity:.7;font-size:12px">automatisch beantwortet</div></div>
+       <div><div style="font-size:22px;font-weight:800">${S.calls.filter(c=>c.intent==='booking').length}</div><div style="opacity:.7;font-size:12px">Termine gebucht</div></div>
+       <div><div style="font-size:22px;font-weight:800">${S.calls.filter(c=>c.task&&!c.done).length}</div><div style="opacity:.7;font-size:12px">Aufgaben für dich</div></div>
+     </div>
+   </div>
+   <div class="grid g2" style="margin-top:16px">
+     <div class="card">
+       <div class="between"><b>Heute zu tun</b><button class="btn sm gho" onclick="go('kalender')">Alle</button></div>
+       <div style="margin-top:6px">${agenda.length?agenda.map(a=>`
+         <div class="listitem" onclick="openOrder('${a.o.id}')">
+           <div class="avatar">${initials(cust(a.o.cid).name)}</div>
+           <div style="flex:1;min-width:0"><div style="font-weight:700">${esc(cust(a.o.cid).name)} · ${esc(a.o.model)}</div><div class="muted" style="font-size:13px">${a.t} · ${a.o.nr}</div></div>
+           ${statusPill(a.o.status)}
+         </div>`).join(''):'<div class="empty">Für heute ist nichts offen.</div>'}</div>
+     </div>
+     <div class="card">
+       <div class="between"><b>Nächste Erinnerungen</b><button class="btn sm gho" onclick="go('erinnerungen')">Alle</button></div>
+       <div style="margin-top:6px">${q.slice(0,5).map(r=>`
+         <div class="listitem">
+           <div class="avatar ${r.who==='werkstatt'?'out':''}">${r.who==='kunde'?initials(r.toName):'WS'}</div>
+           <div style="flex:1;min-width:0"><div style="font-weight:700">${r.title}</div><div class="muted" style="font-size:13px">${r.sub}</div></div>
+           <span class="pill soft"><span class="d"></span>${r.when}</span>
+         </div>`).join('')||'<div class="empty">Keine geplanten Erinnerungen</div>'}</div>
+     </div>
+   </div>`;
+};
+
+/* ============================ AUFTRÄGE ============================ */
+let aufFilter='alle';
+views.auftraege=function(){
+  const m=document.getElementById('main');
+  const counts={alle:S.ord.length};
+  STFLOW.forEach(s=>counts[s]=S.ord.filter(o=>o.status===s).length);
+  const list=S.ord.filter(o=>aufFilter==='alle'?true:o.status===aufFilter);
+  m.innerHTML=`
+   <div class="between"><div><h1 class="h1">Aufträge</h1><p class="sub">${S.ord.length} Aufträge insgesamt</p></div>
+     <button class="btn pri" onclick="newOrder()">Neuer Auftrag</button></div>
+   <div class="row" style="margin:16px 0">
+     ${['alle',...STFLOW].map(s=>`<button class="chip ${aufFilter===s?'on':''}" onclick="aufFilter='${s}';views.auftraege();paintIcons()">${s==='alle'?'Alle':STATUS[s].lbl} · ${counts[s]||0}</button>`).join('')}
+   </div>
+   <div class="card" style="padding:0;overflow:auto">
+    <table><thead><tr><th>Nr.</th><th>Kunde</th><th>Gerät</th><th>Fehler</th><th>Preis</th><th>Status</th><th>Fällig</th></tr></thead>
+    <tbody>${list.map(o=>`<tr onclick="openOrder('${o.id}')">
+      <td><b>${o.nr}</b>${o.source==='online'?' <span class="tag">Online</span>':''}</td>
+      <td>${esc(cust(o.cid).name)}</td>
+      <td>${esc(o.brand)} ${esc(o.model)}</td>
+      <td>${esc(o.issue)}</td>
+      <td class="mono">${eur(o.price)}</td>
+      <td>${statusPill(o.status)}</td>
+      <td class="muted mono">${fmtDate(o.due)}</td>
+    </tr>`).join('')||'<tr><td colspan="7"><div class="empty">Keine Aufträge in diesem Filter</div></td></tr>'}</tbody></table>
+   </div>`;
+};
+
+function openOrder(id){
+  const o=S.ord.find(x=>x.id===id); if(!o)return; const c=cust(o.cid);
+  const track='reparado.de/status/'+o.nr;
+  const warrUntil=o.pickedAt?addMonths(o.pickedAt,o.warranty):(o.readyAt?addMonths(o.readyAt,o.warranty):'');
+  const dr=document.getElementById('drawer');
+  dr.innerHTML=`
+   <div class="dhead"><b style="flex:1">Auftrag ${o.nr}</b>
+     <button class="btn sm" onclick="editOrder('${o.id}')">Bearbeiten</button>
+     <button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+   <div class="dbody">
+     <div class="card" style="background:var(--soft);border:0">
+       <div class="between"><div><div style="font-weight:800;font-size:16px">${esc(c.name)}</div>
+         <div class="muted" style="font-size:13px">${esc(c.tel)}${c.mail?' · '+esc(c.mail):''}</div>
+         <div class="muted" style="font-size:13px">${esc(c.adr)}</div></div>
+         <div class="avatar" style="width:44px;height:44px">${initials(c.name)}</div></div>
+     </div>
+     <div class="grid g2" style="margin-top:14px">
+       <div><label class="f">Gerät</label><div style="font-weight:700">${esc(o.brand)} ${esc(o.model)}</div><div class="muted" style="font-size:13px">IMEI: ${esc(o.imei)||'—'}</div></div>
+       <div><label class="f">Reparatur</label><div style="font-weight:700">${esc(o.issue)}</div><div class="muted" style="font-size:13px">Qualität: ${esc(o.qual)} · Priorität: ${esc(o.prio)}</div></div>
+       <div><label class="f">Preis</label><div style="font-weight:800;font-size:18px">${eur(o.price)}</div></div>
+       <div><label class="f">Termin / Fällig</label><div style="font-weight:700">${o.appt?'Termin '+fmtDate(o.appt)+' · ':''}Fällig ${fmtDate(o.due)}</div></div>
+       <div><label class="f">Garantie</label><div style="font-weight:700">${o.warranty} Monate${warrUntil?' · bis '+fmtDate(warrUntil):' (ab Abholung)'}</div></div>
+       <div><label class="f">Annahme</label><div style="font-weight:700">${o.sig?'Unterschrieben':'Keine Unterschrift'}</div>${o.sig?`<img src="${o.sig}" alt="Unterschrift" style="height:40px;margin-top:4px;border:1px solid var(--line);border-radius:6px;background:#fff">`:''}</div>
+     </div>
+     ${o.notes?`<div class="note" style="margin-top:12px">Notiz: ${esc(o.notes)}</div>`:''}
+
+     <label class="f" style="margin-top:18px">Status ändern</label>
+     <div class="row">${STFLOW.map(s=>`<button class="chip ${o.status===s?'on':''}" onclick="setStatus('${o.id}','${s}')">${STATUS[s].lbl}</button>`).join('')}</div>
+
+     <div class="divider"></div>
+     <label class="f">Aktionen</label>
+     <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px">
+       <button class="btn" onclick="sendReminderFor('${o.id}')">Erinnerung senden</button>
+       <button class="btn" onclick="printKVA('${o.id}')">Kostenvoranschlag</button>
+       <button class="btn" onclick="printReceipt('${o.id}')">Beleg / Quittung</button>
+       <button class="btn" onclick="printLabel('${o.id}')">Etikett drucken</button>
+       <button class="btn" onclick="printWarranty('${o.id}')">Garantie-Beleg</button>
+       <button class="btn" onclick="go('kasse');closeAll();addToCart('${o.id}')">In die Kasse</button>
+       <button class="btn" onclick="orderPartFor('${o.id}')">Ersatzteil bestellen</button>
+       <button class="btn" onclick="signOrder('${o.id}')">Unterschrift erfassen</button>
+     </div>
+
+     <div class="divider"></div>
+     <label class="f">Status-Link für den Kunden</label>
+     <div class="row"><input class="in" style="flex:1" readonly value="${track}"><button class="btn" onclick="navigator.clipboard&&navigator.clipboard.writeText('${track}');toast('Link kopiert')">Kopieren</button><button class="btn" onclick="window.open('status.html?nr=${o.nr}','_blank')">Ansehen</button></div>
+   </div>`;
+  openDrawer(); paintIcons();
+}
+
+function setStatus(id,s){
+  const o=S.ord.find(x=>x.id===id); o.status=s;
+  if(s==='fertig'&&!o.readyAt) o.readyAt=today();
+  if(s==='abgeholt') o.pickedAt=today();
+  save();
+  const map={bearbeitung:'r_received',warten:'r_waitpart',fertig:'r_ready'};
+  if(map[s]){const r=S.rules.find(x=>x.id===map[s]); if(r&&r.on) logMail(o,r,'automatisch ausgelöst');}
+  toast('Status: '+STATUS[s].lbl+(map[s]?' · Kunde benachrichtigt':''));
+  openOrder(id); (views[current]||views.dashboard)(); paintIcons(); refreshBadges();
+}
+
+function sendReminderFor(id){
+  const o=S.ord.find(x=>x.id===id);
+  const opts=S.rules.filter(r=>r.who==='kunde');
+  openModal(`<div class="dhead"><b style="flex:1">Erinnerung senden</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+    <div class="dbody"><p class="muted">An ${esc(cust(o.cid).name)} · ${esc(o.model)}</p>
+    ${opts.map(r=>`<div class="listitem"><div style="flex:1"><b>${r.name}</b><div class="muted" style="font-size:13px">${r.ch}</div></div>
+      <button class="btn sm pri" onclick="logMail(S.ord.find(x=>x.id==='${o.id}'),S.rules.find(x=>x.id==='${r.id}'),'manuell');closeAll();toast('${r.ch} an Kunde gesendet')">Senden</button></div>`).join('')}
+    </div>`);
+}
+function logMail(o,r,how){
+  const rendered=renderTemplate(r,o);
+  S.mailLog.unshift({t:new Date().toISOString(),to:r.who==='kunde'?cust(o.cid).name:'Werkstatt',ch:r.ch,rule:r.name,subj:rendered.subj,how});
+  save();
+}
+
+/* ============================ UNTERSCHRIFT (Annahme) ============================ */
+function signOrder(id){
+  openModal(`<div class="dhead"><b style="flex:1">Unterschrift bei Annahme</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+   <div class="dbody">
+     <div class="note" style="margin-bottom:12px">Der Kunde bestätigt mit seiner Unterschrift die Auftragserteilung sowie die Kenntnisnahme des Hinweises zur Datensicherung. Für Datenverlust wird keine Haftung übernommen.</div>
+     <div class="sigwrap"><canvas id="sig" width="520" height="150"></canvas></div>
+     <div class="row" style="margin-top:12px;justify-content:space-between">
+       <button class="btn gho" onclick="clearSig()">Löschen</button>
+       <button class="btn pri" onclick="saveSig('${id}')">Übernehmen</button>
+     </div>
+   </div>`);
+  setTimeout(initSig,30);
+}
+function initSig(){
+  const c=document.getElementById('sig'); if(!c)return; const ctx=c.getContext('2d');
+  ctx.lineWidth=2.4;ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle='#0e7a3c';
+  let drawing=false,last=null; window.__sigDirty=false;
+  const pos=e=>{const r=c.getBoundingClientRect();const t=e.touches?e.touches[0]:e;return {x:(t.clientX-r.left)*(c.width/r.width),y:(t.clientY-r.top)*(c.height/r.height)};};
+  const start=e=>{drawing=true;last=pos(e);e.preventDefault();};
+  const move=e=>{if(!drawing)return;const p=pos(e);ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(p.x,p.y);ctx.stroke();last=p;window.__sigDirty=true;e.preventDefault();};
+  const end=()=>{drawing=false;};
+  c.addEventListener('mousedown',start);c.addEventListener('mousemove',move);window.addEventListener('mouseup',end);
+  c.addEventListener('touchstart',start,{passive:false});c.addEventListener('touchmove',move,{passive:false});c.addEventListener('touchend',end);
+}
+function clearSig(){const c=document.getElementById('sig');if(c){c.getContext('2d').clearRect(0,0,c.width,c.height);window.__sigDirty=false;}}
+function saveSig(id){const c=document.getElementById('sig');const o=S.ord.find(x=>x.id===id);
+  if(!window.__sigDirty){toast('Bitte zuerst unterschreiben');return;}
+  o.sig=c.toDataURL('image/png');save();closeAll();toast('Unterschrift gespeichert');openOrder(id);}
+
+/* ============================ NEUER / EDIT AUFTRAG ============================ */
+function newOrder(){ orderForm(null); }
+function editOrder(id){ orderForm(S.ord.find(x=>x.id===id)); }
+function orderForm(o){
+  const edit=!!o;
+  const custOpts=S.cust.map(c=>`<option value="${c.id}" ${o&&o.cid===c.id?'selected':''}>${esc(c.name)}</option>`).join('');
+  openModal(`<div class="dhead"><b style="flex:1">${edit?'Auftrag bearbeiten':'Neuer Auftrag'}</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+   <div class="dbody">
+     <label class="f">Kunde</label>
+     <div class="row"><select class="in" id="f_cid" style="flex:1">${custOpts}</select><button class="btn" onclick="quickCustomer()">Neu</button></div>
+     <div class="grid g2" style="margin-top:12px">
+       <div><label class="f">Marke</label><input class="in" id="f_brand" value="${o?esc(o.brand):''}" placeholder="Apple, Samsung …"></div>
+       <div><label class="f">Modell</label><input class="in" id="f_model" value="${o?esc(o.model):''}" placeholder="iPhone 13"></div>
+       <div><label class="f">Reparatur / Fehler</label><input class="in" id="f_issue" value="${o?esc(o.issue):''}" placeholder="Displaytausch"></div>
+       <div><label class="f">Preis (€)</label><input class="in" id="f_price" type="number" value="${o?o.price:''}" placeholder="0.00"></div>
+       <div><label class="f">Qualität</label><select class="in" id="f_qual"><option${o&&o.qual==='Original'?' selected':''}>Original</option><option${o&&o.qual==='Kopie'?' selected':''}>Kopie</option></select></div>
+       <div><label class="f">Priorität</label><select class="in" id="f_prio"><option${o&&o.prio==='Standard'?' selected':''}>Standard</option><option${o&&o.prio==='Express'?' selected':''}>Express</option></select></div>
+       <div><label class="f">Garantie (Monate)</label><select class="in" id="f_warr"><option${o&&o.warranty==6?' selected':''}>6</option><option${o&&o.warranty==12?' selected':''}>12</option><option${o&&o.warranty==24?' selected':''}>24</option><option${o&&o.warranty==0?' selected':''}>0</option></select></div>
+       <div><label class="f">IMEI / Seriennr.</label><input class="in" id="f_imei" value="${o?esc(o.imei):''}" placeholder="optional"></div>
+       <div><label class="f">Termin (optional)</label><input class="in" id="f_appt" type="date" value="${o?o.appt:''}"></div>
+       <div><label class="f">Fällig bis</label><input class="in" id="f_due" type="date" value="${o?o.due:today()}"></div>
+     </div>
+     <label class="f" style="margin-top:12px">Notiz</label><textarea class="in" id="f_notes" rows="2" placeholder="Interne Notiz …">${o?esc(o.notes):''}</textarea>
+     ${edit?'':`<div class="note" style="margin-top:12px">Beim Anlegen wird automatisch eine Auftragsbestätigung an den Kunden vorbereitet (sofern eine E-Mail vorliegt). Die Unterschrift bei Annahme können Sie danach im Auftrag erfassen.</div>`}
+     <div class="row" style="margin-top:16px;justify-content:flex-end">
+       <button class="btn gho" onclick="closeAll()">Abbrechen</button>
+       <button class="btn pri" onclick="saveOrder(${o?`'${o.id}'`:'null'})">${edit?'Speichern':'Auftrag anlegen'}</button>
+     </div>
+   </div>`);
+}
+function saveOrder(id){
+  const g=x=>document.getElementById(x).value;
+  const data={cid:g('f_cid'),brand:g('f_brand'),model:g('f_model'),issue:g('f_issue'),price:+g('f_price')||0,
+    qual:g('f_qual'),prio:g('f_prio'),warranty:+g('f_warr'),imei:g('f_imei'),appt:g('f_appt'),due:g('f_due'),notes:g('f_notes')};
+  if(id){ Object.assign(S.ord.find(x=>x.id===id),data); toast('Auftrag gespeichert'); }
+  else{ const nr='REP-'+(S.counter++); const o={id:uid('o'),nr,status:'offen',created:today(),readyAt:'',sig:'',source:'',...data};
+    S.ord.unshift(o);
+    const r=S.rules.find(x=>x.id==='r_received'); if(r&&r.on&&cust(o.cid).mail) logMail(o,r,'automatisch (Anlage)');
+    toast('Auftrag '+nr+' angelegt'); }
+  save(); closeAll(); go('auftraege');
+}
+function quickCustomer(){
+  const name=prompt('Name des Kunden:'); if(!name)return;
+  const tel=prompt('Telefon:')||''; const mail=prompt('E-Mail (optional):')||'';
+  const c={id:uid('c'),name,tel,mail,adr:''}; S.cust.push(c); save();
+  toast('Kunde angelegt'); orderForm(null); document.getElementById('f_cid').value=c.id;
+}
+
+/* ============================ DRUCK (Etikett, Beleg, Garantie, KVA) ============================ */
+const PRINTCSS=`*{box-sizing:border-box;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#0e7a3c}
+ body{margin:0;padding:22px}
+ .doc{max-width:520px;margin:0 auto}
+ .hd{display:flex;justify-content:space-between;border-bottom:2px solid #0e7a3c;padding-bottom:10px;margin-bottom:14px}
+ .hd .n{font-weight:800;font-size:18px}
+ .muted{color:#555;font-size:12px}
+ h2{font-size:20px;margin:0 0 4px}
+ table{width:100%;border-collapse:collapse;margin:12px 0}
+ td,th{text-align:left;padding:8px 6px;border-bottom:1px solid #ddd;font-size:14px}
+ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#666}
+ .tot{display:flex;justify-content:space-between;font-weight:800;font-size:18px;border-top:2px solid #0e7a3c;padding-top:10px;margin-top:6px}
+ .foot{margin-top:20px;font-size:12px;color:#555;border-top:1px solid #ddd;padding-top:10px}
+ .label{border:2px solid #0e7a3c;border-radius:10px;padding:14px;text-align:center}
+ .label .big{font-size:30px;font-weight:900;letter-spacing:-1px}
+ .bc{height:44px;margin:10px 0;background:repeating-linear-gradient(90deg,#0e7a3c 0 2px,#fff 2px 4px,#0e7a3c 4px 7px,#fff 7px 10px,#0e7a3c 10px 12px,#fff 12px 16px)}
+ .lrow{font-size:13px;text-align:left;margin:3px 0}
+ .box{border:1px solid #0e7a3c;border-radius:10px;padding:16px;margin-top:12px}
+ @media print{body{padding:0}.doc{max-width:none}}`;
+function printHTML(title,body){ showDoc(title,body); }
+function showDoc(title,body){
+  const html='<!doctype html><html><head><meta charset="utf-8"><style>'+PRINTCSS+'</style></head><body><div class="doc">'+body+'</div></body></html>';
+  openModal('<div class="dhead"><b style="flex:1">'+title+'</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>'+
+   '<div class="dbody"><div class="muted" style="font-size:13px;margin-bottom:10px">Druckvorschau – so erhält es der Kunde. Über „Drucken / Als PDF" öffnet sich der Druckdialog (dort auch „Als PDF sichern").</div>'+
+   '<div style="border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--soft)"><iframe id="docframe" style="width:100%;height:54vh;border:0;background:#fff"></iframe></div>'+
+   '<div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn gho" onclick="closeAll()">Schließen</button><button class="btn pri" onclick="printDocFrame()">Drucken / Als PDF</button></div></div>');
+  const f=document.getElementById('docframe'); if(f) f.srcdoc=html;
+}
+function printDocFrame(){const f=document.getElementById('docframe'); if(f&&f.contentWindow){f.contentWindow.focus();f.contentWindow.print();}}
+function shopHead(){return `<div class="hd"><div><div class="n">${SHOP.name}</div><div class="muted">${SHOP.street} · ${SHOP.zip} ${SHOP.city}<br>${SHOP.phone} · ${SHOP.email}</div></div><div class="muted" style="text-align:right">${fmtDate(today())}</div></div>`;}
+function printLabel(id){const o=S.ord.find(x=>x.id===id);const c=cust(o.cid);
+  printHTML('Etikett '+o.nr, `<div class="label"><div class="muted">${SHOP.name}</div><div class="big">${o.nr}</div><div class="bc"></div>
+    <div class="lrow"><b>Kunde:</b> ${esc(c.name)}</div><div class="lrow"><b>Telefon:</b> ${esc(c.tel)}</div>
+    <div class="lrow"><b>Gerät:</b> ${esc(o.brand)} ${esc(o.model)}</div><div class="lrow"><b>Fehler:</b> ${esc(o.issue)}</div>
+    <div class="lrow"><b>Angenommen:</b> ${fmtDate(o.created)}</div>${o.imei?`<div class="lrow"><b>IMEI:</b> ${esc(o.imei)}</div>`:''}
+    <div class="lrow" style="margin-top:8px;color:#555">reparado.de/status/${o.nr}</div></div>`);
+  }
+function printReceipt(id){const o=S.ord.find(x=>x.id===id);const c=cust(o.cid);
+  printHTML('Beleg '+o.nr, shopHead()+`<h2>Beleg / Quittung</h2><div class="muted">Auftrag ${o.nr} · ${fmtDate(o.created)}</div>
+    <div class="box" style="margin-top:12px"><b>${esc(c.name)}</b><br><span class="muted">${esc(c.adr)}</span></div>
+    <table><thead><tr><th>Position</th><th style="text-align:right">Betrag</th></tr></thead>
+    <tbody><tr><td>${esc(o.brand)} ${esc(o.model)} — ${esc(o.issue)} (${esc(o.qual)})</td><td style="text-align:right" class="mono">${eur(o.price)}</td></tr></tbody></table>
+    <div class="tot"><span>Gesamt</span><span>${eur(o.price)}</span></div>
+    <div class="foot">Preis inkl. gesetzlicher MwSt. · Garantie: ${o.warranty} Monate auf die durchgeführte Reparatur.<br>Vielen Dank für Ihren Auftrag bei ${SHOP.name}.</div>`);
+  }
+function printWarranty(id){const o=S.ord.find(x=>x.id===id);const c=cust(o.cid);
+  const start=o.pickedAt||o.readyAt||today();const until=addMonths(start,o.warranty);
+  printHTML('Garantie '+o.nr, shopHead()+`<h2>Garantie-Nachweis</h2><div class="muted">Auftrag ${o.nr}</div>
+    <div class="box" style="margin-top:12px"><b>${esc(c.name)}</b><br><span class="muted">${esc(c.adr)}</span></div>
+    <table><tbody>
+      <tr><th>Gerät</th><td>${esc(o.brand)} ${esc(o.model)}</td></tr>
+      <tr><th>Durchgeführte Reparatur</th><td>${esc(o.issue)} (${esc(o.qual)}teil)</td></tr>
+      <tr><th>Garantiedauer</th><td>${o.warranty} Monate</td></tr>
+      <tr><th>Gültig bis</th><td><b>${fmtDate(until)}</b></td></tr>
+    </tbody></table>
+    <div class="foot">Die Garantie gilt für die durchgeführte Reparatur und das eingesetzte Ersatzteil. Ausgenommen sind Folgeschäden durch Sturz, Feuchtigkeit oder unsachgemäße Handhabung. Bitte bewahren Sie diesen Nachweis auf.<br>${SHOP.name} · ${SHOP.street}, ${SHOP.zip} ${SHOP.city}</div>`);
+  }
+function printKVA(id){const o=S.ord.find(x=>x.id===id);const c=cust(o.cid);
+  printHTML('Kostenvoranschlag '+o.nr, shopHead()+`<h2>Kostenvoranschlag</h2><div class="muted">Auftrag ${o.nr} · ${fmtDate(today())}</div>
+    <div class="box" style="margin-top:12px"><b>${esc(c.name)}</b><br><span class="muted">${esc(c.adr)}</span></div>
+    <table><thead><tr><th>Leistung</th><th style="text-align:right">Preis</th></tr></thead>
+    <tbody><tr><td>${esc(o.brand)} ${esc(o.model)} — ${esc(o.issue)} (${esc(o.qual)})</td><td style="text-align:right" class="mono">${eur(o.price)}</td></tr></tbody></table>
+    <div class="tot"><span>Voraussichtlich</span><span>${eur(o.price)}</span></div>
+    <div class="foot">Unverbindlicher Kostenvoranschlag, gültig 14 Tage. Der endgültige Preis kann nach genauer Prüfung abweichen; wir informieren Sie vor Ausführung.<br>${SHOP.name}</div>`);
+  }
+
+/* ============================ KALENDER ============================ */
+views.kalender=function(){
+  const m=document.getElementById('main');
+  const base=new Date(); base.setDate(1);
+  const y=base.getFullYear(),mo=base.getMonth();
+  const first=(new Date(y,mo,1).getDay()+6)%7; const dim=new Date(y,mo+1,0).getDate();
+  const evByDay={};
+  S.ord.forEach(o=>{ if(o.appt){(evByDay[o.appt]=evByDay[o.appt]||[]).push({t:'Termin',o});}
+    if(o.due&&o.status!=='abgeholt'){(evByDay[o.due]=evByDay[o.due]||[]).push({t:'Fällig',o});}});
+  let cells='';
+  for(let i=0;i<first;i++)cells+='<div></div>';
+  for(let dnum=1;dnum<=dim;dnum++){
+    const ds=`${y}-${String(mo+1).padStart(2,'0')}-${String(dnum).padStart(2,'0')}`;
+    const ev=evByDay[ds]||[]; const isToday=ds===today();
+    cells+=`<div style="border:1px solid var(--line);border-radius:10px;padding:8px;min-height:92px;${isToday?'outline:2px solid #0e7a3c;outline-offset:-2px':''}">
+      <div style="font-weight:700;font-size:13px;${isToday?'':'color:#888'}">${dnum}</div>
+      ${ev.slice(0,3).map(e=>`<div onclick="openOrder('${e.o.id}')" style="cursor:pointer;font-size:11px;margin-top:3px;padding:2px 5px;border-radius:5px;${e.t==='Termin'?'background:#0e7a3c;color:#fff':'background:var(--soft);color:#0e7a3c'}">${esc(cust(e.o.cid).name.split(' ')[0])}</div>`).join('')}
+      ${ev.length>3?`<div class="muted" style="font-size:11px;margin-top:2px">+${ev.length-3} mehr</div>`:''}
+    </div>`;
+  }
+  const monName=base.toLocaleDateString('de-DE',{month:'long',year:'numeric'});
+  m.innerHTML=`<div class="between"><div><h1 class="h1">Kalender</h1><p class="sub">${monName}</p></div>
+     <div class="row"><span class="pill solid"><span class="d"></span>Termin</span><span class="pill soft"><span class="d"></span>Fällig</span></div></div>
+   <div class="card" style="margin-top:16px">
+     <div class="grid" style="grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:8px">${['Mo','Di','Mi','Do','Fr','Sa','So'].map(d=>`<div class="muted" style="font-size:12px;font-weight:700;text-align:center">${d}</div>`).join('')}</div>
+     <div class="grid" style="grid-template-columns:repeat(7,1fr);gap:6px">${cells}</div>
+   </div>`;
+};
+
+/* ============================ KUNDEN ============================ */
+views.kunden=function(){
+  const m=document.getElementById('main');
+  m.innerHTML=`<div class="between"><div><h1 class="h1">Kunden</h1><p class="sub">${S.cust.length} Kunden</p></div>
+     <div class="row"><button class="btn" onclick="toast('CSV importiert (Demo)')">CSV Import</button><button class="btn pri" onclick="quickCustomer2()">Neuer Kunde</button></div></div>
+   <div class="card" style="margin-top:16px;padding:0;overflow:auto"><table>
+     <thead><tr><th>Name</th><th>Telefon</th><th>E-Mail</th><th>Adresse</th><th>Aufträge</th></tr></thead>
+     <tbody>${S.cust.map(c=>`<tr onclick="custProfile('${c.id}')">
+       <td><div class="row"><div class="avatar">${initials(c.name)}</div><b>${esc(c.name)}</b></div></td>
+       <td class="mono">${esc(c.tel)||'—'}</td><td>${esc(c.mail)||'—'}</td><td class="muted">${esc(c.adr)||'—'}</td>
+       <td>${S.ord.filter(o=>o.cid===c.id).length}</td></tr>`).join('')}</tbody></table></div>`;
+};
+function quickCustomer2(){ quickCustomer(); setTimeout(()=>{closeAll();go('kunden');},50); }
+function custProfile(id){
+  const c=cust(id); const os=S.ord.filter(o=>o.cid===id);
+  openDrawerHTML(`<div class="dhead"><b style="flex:1">${esc(c.name)}</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+   <div class="dbody">
+     <div class="card" style="background:var(--soft);border:0"><div class="muted" style="font-size:13px">Telefon: ${esc(c.tel)||'—'}<br>E-Mail: ${esc(c.mail)||'—'}<br>Adresse: ${esc(c.adr)||'—'}</div></div>
+     <label class="f" style="margin-top:16px">Aufträge (${os.length})</label>
+     ${os.map(o=>`<div class="listitem" onclick="openOrder('${o.id}')"><div style="flex:1"><b>${o.nr}</b> · ${esc(o.model)}<div class="muted" style="font-size:13px">${esc(o.issue)} · ${eur(o.price)}</div></div>${statusPill(o.status)}</div>`).join('')||'<div class="empty">Noch keine Aufträge</div>'}
+   </div>`);
+}
+
+/* ============================ ERINNERUNGEN ============================ */
+let remTab='queue';
+views.erinnerungen=function(){
+  const m=document.getElementById('main');
+  const q=computeQueue();
+  m.innerHTML=`<div class="between"><div><h1 class="h1">Erinnerungen &amp; E-Mails</h1><p class="sub">Automatische Nachrichten an Kunden und Ihr Team – logisch getaktet, nichts geht unter.</p></div></div>
+   <div class="seg" style="margin:16px 0">
+     <button class="${remTab==='queue'?'on':''}" onclick="remTab='queue';views.erinnerungen();paintIcons()">Geplant (${q.length})</button>
+     <button class="${remTab==='kunde'?'on':''}" onclick="remTab='kunde';views.erinnerungen();paintIcons()">Regeln · Kunde</button>
+     <button class="${remTab==='werkstatt'?'on':''}" onclick="remTab='werkstatt';views.erinnerungen();paintIcons()">Regeln · Werkstatt</button>
+     <button class="${remTab==='log'?'on':''}" onclick="remTab='log';views.erinnerungen();paintIcons()">Verlauf</button>
+   </div>
+   <div id="remc"></div>`;
+  const c=document.getElementById('remc');
+  if(remTab==='queue'){
+    c.innerHTML=`<div class="card" style="padding:0">
+      ${q.length?`<table><thead><tr><th>Wann</th><th>Empfänger</th><th>Nachricht</th><th>Kanal</th><th></th></tr></thead><tbody>
+      ${q.map((r,i)=>`<tr onclick="previewQueue(${i})">
+        <td><span class="pill soft"><span class="d"></span>${r.when}</span></td>
+        <td><div class="row"><div class="avatar ${r.who==='werkstatt'?'out':''}" style="width:28px;height:28px;font-size:11px">${r.who==='kunde'?initials(r.toName):'WS'}</div>${esc(r.toName)}</div></td>
+        <td><b>${r.title}</b><div class="muted" style="font-size:13px">${r.sub}</div></td>
+        <td><span class="tag">${r.ch}</span></td>
+        <td><button class="btn sm pri" onclick="event.stopPropagation();fireQueue(${i})">Jetzt senden</button></td>
+      </tr>`).join('')}</tbody></table>`:'<div class="empty">Aktuell ist nichts geplant. Sobald Termine anstehen oder Geräte fertig werden, erscheinen hier automatisch Nachrichten.</div>'}
+    </div>
+    <div class="note" style="margin-top:14px">Diese Liste wird <b>automatisch</b> aus Ihren Aufträgen berechnet: anstehende Termine, fertige Geräte, überfällige Abholungen, niedrige Lagerbestände und überfällige Bestellungen.</div>`;
+  } else if(remTab==='log'){
+    c.innerHTML=`<div class="card" style="padding:0">${S.mailLog.length?`<table><thead><tr><th>Zeit</th><th>Empfänger</th><th>Nachricht</th><th>Kanal</th><th>Auslöser</th></tr></thead><tbody>
+      ${S.mailLog.slice(0,40).map(l=>`<tr><td class="muted mono">${new Date(l.t).toLocaleString('de-DE')}</td><td>${esc(l.to)}</td><td>${esc(l.subj)}</td><td><span class="tag">${l.ch}</span></td><td class="muted">${l.how}</td></tr>`).join('')}
+      </tbody></table>`:'<div class="empty">Noch keine Nachrichten versendet. Ändern Sie den Status eines Auftrags oder senden Sie manuell – hier landet der Verlauf.</div>'}</div>`;
+  } else {
+    const rules=S.rules.filter(r=>r.who===remTab);
+    c.innerHTML=`<div class="grid" style="gap:12px">${rules.map(r=>`
+      <div class="card" style="display:flex;gap:14px;align-items:flex-start">
+        <button class="switch ${r.on?'on':''}" onclick="toggleRule('${r.id}')"><i></i></button>
+        <div style="flex:1;min-width:0">
+          <div class="between"><div><b>${r.name}</b> <span class="tag">${r.ch}</span></div>
+            <span class="pill soft"><span class="d"></span>${r.when}</span></div>
+          <div class="muted" style="font-size:13px;margin-top:2px">${r.desc}</div>
+          <div class="row" style="margin-top:10px">
+            <button class="btn sm" onclick="editRule('${r.id}')">Vorlage bearbeiten</button>
+            <button class="btn sm gho" onclick="previewRule('${r.id}')">Vorschau</button>
+          </div>
+        </div>
+      </div>`).join('')}</div>`;
+  }
+};
+function toggleRule(id){const r=S.rules.find(x=>x.id===id);r.on=!r.on;save();views.erinnerungen();paintIcons();toast(r.on?'Aktiv':'Deaktiviert');refreshBadges();}
+
+function renderTemplate(r,o){
+  const c=o?cust(o.cid):{name:'',mail:'',tel:''};
+  const stats={n_termine:S.ord.filter(x=>x.appt===today()).length,n_fertig:S.ord.filter(x=>x.status==='fertig').length,
+    n_warten:S.ord.filter(x=>x.status==='warten').length,n_ueberfaellig:S.ord.filter(x=>x.due<today()&&x.status!=='abgeholt').length};
+  const map={
+    '{kunde}':c.name||'Kunde','{werkstatt}':SHOP.name,'{stadt}':SHOP.city,'{telefon}':SHOP.phone,
+    '{adresse}':SHOP.street+', '+SHOP.zip+' '+SHOP.city,'{oeffnung}':SHOP.hours,
+    '{google}':SHOP.google,'{geraet}':o?(o.brand+' '+o.model):'Ihr Gerät','{leistung}':o?o.issue:'',
+    '{auftrag}':o?o.nr:'','{preis}':o?eur(o.price):'','{termin}':o&&o.appt?fmtDate(o.appt):'nach Absprache',
+    '{tracking}':o?('reparado.de/status/'+o.nr):'','{teil}':o?o.issue:'','{lieferant}':'Foneday','{eta}':'',
+    '{telefon_kunde}':c.tel||'','{stock}':'','{min}':'',
+    '{n_termine}':stats.n_termine,'{n_fertig}':stats.n_fertig,'{n_warten}':stats.n_warten,'{n_ueberfaellig}':stats.n_ueberfaellig,
+  };
+  const rep=s=>Object.keys(map).reduce((a,k)=>a.split(k).join(map[k]),s||'');
+  return {subj:rep(r.subj),body:rep(r.body),to:r.who==='kunde'?(c.mail||c.name):(SHOP.email)};
+}
+function previewRule(id){ const r=S.rules.find(x=>x.id===id); const o=S.ord.find(x=>x.status!=='abgeholt')||S.ord[0]; showMail(r,o); }
+function showMail(r,o){
+  const t=renderTemplate(r,o);
+  openModal(`<div class="dhead"><b style="flex:1">Vorschau · ${r.name}</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+   <div class="dbody">
+     <div class="mailprev"><div class="mh"><b>An:</b> ${esc(t.to)} &nbsp;·&nbsp; <b>Kanal:</b> ${r.ch}<br><b>Betreff:</b> ${esc(t.subj)}</div>
+       <div class="mb">${esc(t.body)}</div></div>
+     <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn gho" onclick="closeAll()">Schließen</button>
+       <button class="btn pri" onclick="closeAll();toast('Testnachricht gesendet')">Testnachricht senden</button></div>
+   </div>`);
+}
+function editRule(id){
+  const r=S.rules.find(x=>x.id===id);
+  openModal(`<div class="dhead"><b style="flex:1">Vorlage · ${r.name}</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+   <div class="dbody">
+     <div class="grid g2"><div><label class="f">Kanal</label><select class="in" id="e_ch"><option${r.ch==='E-Mail'?' selected':''}>E-Mail</option><option${r.ch==='SMS'?' selected':''}>SMS</option></select></div>
+       <div><label class="f">Zeitpunkt</label><input class="in" id="e_when" value="${esc(r.when)}"></div></div>
+     <label class="f" style="margin-top:12px">Betreff</label><input class="in" id="e_subj" value="${esc(r.subj)}">
+     <label class="f" style="margin-top:12px">Nachricht</label><textarea class="in" id="e_body" rows="9">${esc(r.body)}</textarea>
+     <div class="note" style="margin-top:10px">Platzhalter: {kunde} {geraet} {auftrag} {preis} {termin} {werkstatt} {telefon} {adresse} {tracking} {google}</div>
+     <div class="row" style="margin-top:16px;justify-content:flex-end"><button class="btn gho" onclick="closeAll()">Abbrechen</button>
+       <button class="btn pri" onclick="saveRule('${r.id}')">Speichern</button></div>
+   </div>`);
+}
+function saveRule(id){const r=S.rules.find(x=>x.id===id);r.ch=document.getElementById('e_ch').value;r.when=document.getElementById('e_when').value;
+  r.subj=document.getElementById('e_subj').value;r.body=document.getElementById('e_body').value;save();closeAll();views.erinnerungen();paintIcons();toast('Vorlage gespeichert');}
+
+function computeQueue(){
+  const q=[]; const on=id=>{const r=S.rules.find(x=>x.id===id);return r&&r.on?r:null;};
+  const push=(r,who,ch,toName,title,sub,when,o)=>q.push({who,ch,toName,title,sub,when,o,ruleId:r.id});
+  S.ord.forEach(o=>{
+    const c=cust(o.cid); let r;
+    if(o.appt){ const dd=daysBetween(today(),o.appt);
+      if(dd===1&&(r=on('r_appt24'))) push(r,'kunde',r.ch,c.name,'Terminerinnerung',o.model+' · morgen',fmtDate(o.appt),o);
+      if(dd===0&&(r=on('r_dropoff'))) push(r,'kunde',r.ch,c.name,'Abgabe-Checkliste',o.model+' · heute',fmtDate(o.appt),o);
+    }
+    if(o.status==='fertig'&&o.readyAt){ const age=daysBetween(o.readyAt,today());
+      if(age>=3&&age<14&&(r=on('r_pickup3'))) push(r,'kunde',r.ch,c.name,'Abhol-Erinnerung',o.model+' · seit '+age+' Tagen fertig','in Kürze',o);
+      if(age>=14&&(r=on('r_pickup14'))) push(r,'kunde',r.ch,c.name,'Letzte Abhol-Erinnerung',o.model+' · seit '+age+' Tagen','fällig',o);
+      if(age>=7&&(r=on('w_uncoll'))) push(r,'werkstatt',r.ch,'Werkstatt','Gerät nicht abgeholt',c.name+' · '+o.model+' · '+age+' Tage','nachfassen',o);
+    }
+    if(o.status==='abgeholt'&&o.pickedAt){ const age=daysBetween(o.pickedAt,today());
+      if(age>=1&&age<3&&(r=on('r_review'))) push(r,'kunde',r.ch,c.name,'Bewertungsanfrage',o.model,'morgen',o);}
+    if(o.status!=='abgeholt'&&o.due<today()&&(r=on('w_overdue'))) push(r,'werkstatt',r.ch,'Werkstatt','Auftrag überfällig',o.nr+' · '+c.name,'jetzt',o);
+  });
+  S.orders.forEach(b=>{ let r;
+    if(b.status!=='geliefert'&&b.eta<today()&&(r=on('w_order_late'))) push(r,'werkstatt',r.ch,'Werkstatt','Bestellung überfällig',b.part+' · '+b.supplier,'jetzt',null);
+  });
+  S.parts.forEach(p=>{ let r; if(p.stock<p.min&&(r=on('w_lowstock'))) push(r,'werkstatt',r.ch,'Werkstatt','Lager niedrig',p.name+' · '+p.stock+'/'+p.min,'nachbestellen',null);});
+  const rd=on('w_daily'); if(rd) push(rd,'werkstatt',rd.ch,'Werkstatt','Tagesüberblick','Termine, Abholungen und offene Punkte','morgen 08:00',null);
+  const order={'jetzt':0,'fällig':0,'in Kürze':1,'morgen':2,'nachfassen':3,'nachbestellen':3,'morgen 08:00':9};
+  return q.sort((a,b)=>(order[a.when]??5)-(order[b.when]??5));
+}
+function previewQueue(i){const r=computeQueue()[i];const rule=S.rules.find(x=>x.id===r.ruleId);showMail(rule,r.o);}
+function fireQueue(i){const r=computeQueue()[i];const rule=S.rules.find(x=>x.id===r.ruleId);logMail(r.o||{cid:''},rule,'manuell aus Liste');toast(r.ch+' an '+r.toName+' gesendet');views.erinnerungen();paintIcons();}
+
+/* ============================ BESTELLUNGEN ============================ */
+views.bestellungen=function(){
+  const m=document.getElementById('main');
+  m.innerHTML=`<div class="between"><div><h1 class="h1">Bestellungen</h1><p class="sub">Ersatzteile – direkt mit Aufträgen verknüpft</p></div>
+     <button class="btn pri" onclick="newPartOrder()">Bestellung</button></div>
+   <div class="card" style="margin-top:16px;padding:0"><table>
+     <thead><tr><th>Für</th><th>Teil</th><th>Lieferant</th><th>Erwartet</th><th>Status</th><th></th></tr></thead>
+     <tbody>${S.orders.map(b=>`<tr>
+       <td><b>${esc(b.nr)}</b></td><td>${esc(b.part)}</td><td>${esc(b.supplier)}</td><td class="mono muted">${fmtDate(b.eta)}${b.eta<today()&&b.status!=='geliefert'?' <span class="tag">überfällig</span>':''}</td>
+       <td>${b.status==='geliefert'?'<span class="pill solid"><span class="d"></span>Geliefert</span>':b.status==='unterwegs'?'<span class="pill"><span class="d"></span>Unterwegs</span>':'<span class="pill soft"><span class="d"></span>Offen</span>'}</td>
+       <td>${b.status!=='geliefert'?`<button class="btn sm" onclick="deliverOrder('${b.id}')">Als geliefert</button>`:''}</td>
+     </tr>`).join('')||'<tr><td colspan="6"><div class="empty">Keine Bestellungen</div></td></tr>'}</tbody></table></div>`;
+};
+function deliverOrder(id){const b=S.orders.find(x=>x.id===id);b.status='geliefert';
+  const r=S.rules.find(x=>x.id==='w_part'); if(r&&r.on){S.mailLog.unshift({t:new Date().toISOString(),to:'Werkstatt',ch:r.ch,rule:r.name,subj:'Ersatzteil eingetroffen: '+b.nr,how:'automatisch'});}
+  if(b.ref){const o=S.ord.find(x=>x.id===b.ref); if(o&&o.status==='warten'){o.status='bearbeitung';}}
+  save();toast('Als geliefert markiert · Auftrag geht weiter');views.bestellungen();paintIcons();refreshBadges();}
+function newPartOrder(){const part=prompt('Welches Teil bestellen?');if(!part)return;const supplier=prompt('Lieferant:')||'Foneday';
+  S.orders.unshift({id:uid('b'),nr:'Lager',supplier,part,status:'offen',eta:today(),ref:''});save();views.bestellungen();paintIcons();toast('Bestellung angelegt');}
+function orderPartFor(id){const o=S.ord.find(x=>x.id===id);S.orders.unshift({id:uid('b'),nr:o.nr,supplier:'Foneday',part:o.model+' '+o.issue,status:'offen',eta:today(),ref:o.id});o.status='warten';save();closeAll();toast('Teil bestellt · Kunde informiert');go('bestellungen');}
+
+/* ============================ LAGER ============================ */
+views.lager=function(){
+  const m=document.getElementById('main');
+  const low=S.parts.filter(p=>p.stock<p.min).length;
+  const val=S.parts.reduce((s,p)=>s+p.stock*p.price,0);
+  m.innerHTML=`<div class="between"><div><h1 class="h1">Lager &amp; Teile</h1><p class="sub">${S.parts.length} Artikel · Lagerwert ${eur(val)}</p></div>
+     <button class="btn pri" onclick="newPart()">Teil</button></div>
+   ${low?`<div class="note" style="margin-top:14px;border:1px solid #0e7a3c;background:#fff"><b>${low} Teil(e) unter Mindestbestand</b> – die Werkstatt-Erinnerung „Lagerbestand niedrig" ist dafür aktiv.</div>`:''}
+   <div class="card" style="margin-top:16px;padding:0"><table>
+     <thead><tr><th>Artikel</th><th>Kategorie</th><th>SKU</th><th>Bestand</th><th>Wert</th><th></th></tr></thead>
+     <tbody>${S.parts.map(p=>`<tr>
+       <td><b>${esc(p.name)}</b></td><td><span class="tag">${esc(p.cat)}</span></td><td class="mono muted">${esc(p.sku)}</td>
+       <td>${p.stock<p.min?`<span class="pill dash"><span class="d"></span>${p.stock} / min ${p.min}</span>`:`<b>${p.stock}</b> Stk`}</td>
+       <td class="mono">${eur(p.stock*p.price)}</td>
+       <td><div class="row"><button class="btn sm gho" onclick="adjPart('${p.id}',1)">+</button><button class="btn sm gho" onclick="adjPart('${p.id}',-1)">–</button></div></td>
+     </tr>`).join('')}</tbody></table></div>`;
+};
+function adjPart(id,d){const p=S.parts.find(x=>x.id===id);p.stock=Math.max(0,p.stock+d);save();views.lager();paintIcons();refreshBadges();}
+function newPart(){const name=prompt('Teilebezeichnung:');if(!name)return;const cat=prompt('Kategorie:')||'Sonstige';const stock=+prompt('Bestand:')||0;
+  S.parts.push({id:uid('p'),cat,name,sku:'NEU-'+Math.floor(Math.random()*900),stock,min:2,price:+prompt('EK-Preis (€):')||0});save();views.lager();paintIcons();toast('Teil angelegt');}
+
+/* ============================ ANKAUF/VERKAUF ============================ */
+views.ankauf=function(){
+  const m=document.getElementById('main');
+  m.innerHTML=`<div class="between"><div><h1 class="h1">Ankauf / Verkauf</h1><p class="sub">Gebrauchtgeräte-Handel</p></div>
+     <button class="btn pri" onclick="buyDevice()">Gerät ankaufen</button></div>
+   <div class="grid g3" style="margin-top:16px">
+     <div class="card kpi"><div class="n">${S.sold.length}</div><div class="l">Geräte im Bestand</div></div>
+     <div class="card kpi"><div class="n">${eur(S.sold.reduce((s,x)=>s+x.buy,0))}</div><div class="l">Ankaufswert</div></div>
+     <div class="card kpi"><div class="n">${eur(S.sold.filter(x=>x.sellPrice).reduce((s,x)=>s+(x.sellPrice-x.buy),0))}</div><div class="l">Marge (verkauft)</div></div>
+   </div>
+   <div class="card" style="margin-top:16px;padding:0"><table><thead><tr><th>Gerät</th><th>Ankauf</th><th>Verkauf</th><th>Profit</th><th>Status</th></tr></thead>
+     <tbody>${S.sold.map(x=>`<tr><td><b>${esc(x.model)}</b></td><td class="mono">${eur(x.buy)}</td><td class="mono">${x.sellPrice?eur(x.sellPrice):'—'}</td><td class="mono">${x.sellPrice?eur(x.sellPrice-x.buy):'—'}</td><td>${x.sellPrice?'<span class="pill soft"><span class="d"></span>Verkauft</span>':'<span class="pill"><span class="d"></span>Verfügbar</span>'}</td></tr>`).join('')||'<tr><td colspan="5"><div class="empty">Noch kein Gerät im Bestand. Mit „Gerät ankaufen" starten.</div></td></tr>'}</tbody></table></div>`;
+};
+function buyDevice(){const model=prompt('Gerät (z. B. iPhone 12 128GB):');if(!model)return;const buy=+prompt('Ankaufspreis (€):')||0;
+  S.sold.push({id:uid('s'),model,buy,sellPrice:0});save();views.ankauf();paintIcons();toast('Gerät angekauft');}
+
+/* ============================ PREISE ============================ */
+const CATALOG={
+  Apple:['iPhone 15 Pro','iPhone 15','iPhone 14 Pro','iPhone 14','iPhone 13','iPhone 12','iPhone 11','iPhone SE'],
+  Samsung:['Galaxy S24','Galaxy S23','Galaxy A56','Galaxy A34','Galaxy A14','Galaxy S22'],
+  Xiaomi:['Redmi Note 14 Pro 5G','Redmi Note 13','Redmi Note 8 Pro','Mi 11'],
+  Huawei:['P30 Pro','P40 Lite','Mate 20'],
+};
+const REPTYPES=['Displaytausch','Akkutausch','Ladebuchse','Kameraglas','Backcover','Software'];
+const BASEPRICE={Displaytausch:129,Akkutausch:59,Ladebuchse:69,Kameraglas:39,Backcover:79,Software:49};
+let priceBrand='Apple';
+views.preise=function(){
+  const m=document.getElementById('main');
+  const models=CATALOG[priceBrand]||[];
+  m.innerHTML=`<div class="between"><div><h1 class="h1">Modelle &amp; Preise</h1><p class="sub">Preiskatalog für die Kalkulation und die Online-Buchung</p></div>
+     <button class="btn" onclick="toast('Excel exportiert (Demo)')">Excel Export</button></div>
+   <div class="row" style="margin:16px 0">${Object.keys(CATALOG).map(b=>`<button class="chip ${priceBrand===b?'on':''}" onclick="priceBrand='${b}';views.preise();paintIcons()">${b}</button>`).join('')}</div>
+   <div class="card" style="padding:0;overflow:auto"><table><thead><tr><th>Modell</th>${REPTYPES.map(r=>`<th>${r}</th>`).join('')}</tr></thead>
+     <tbody>${models.map((mo,i)=>`<tr><td><b>${esc(mo)}</b></td>${REPTYPES.map(r=>{const p=Math.round((BASEPRICE[r]||50)*(priceBrand==='Apple'?1.2:1)*(1+(i%3)*0.06));return `<td class="mono">${eur(p)}</td>`;}).join('')}</tr>`).join('')}</tbody></table></div>
+   <div class="note" style="margin-top:14px">Diese Preise erscheinen automatisch in der <b>Online-Buchung</b> (Einstellungen → Integrationen), damit Kunden vorab Preise sehen und Termine buchen können.</div>`;
+};
+
+/* ============================ KASSE ============================ */
+let cart=[];
+views.kasse=function(){
+  const m=document.getElementById('main');
+  const connected=S.cash.connected;
+  m.innerHTML=`<div class="between"><div><h1 class="h1">Kasse</h1><p class="sub">${connected?('Verbunden mit '+connected+' · TSE aktiv'):'Barzahlung aktiv · Terminal optional anbinden'}</p></div>
+     ${connected?`<span class="pill solid"><span class="d"></span>${connected} verbunden</span>`:`<button class="btn" onclick="go('einstellungen')">Kasse anbinden</button>`}</div>
+   <div class="grid g2" style="margin-top:16px;grid-template-columns:1.4fr 1fr">
+     <div class="card">
+       <div class="search" style="background:var(--soft)"><span class="ic" data-ic="search"></span><input placeholder="Artikel, Reparatur oder Auftrag suchen …" oninput="posSearch(this.value)"></div>
+       <div class="row" style="margin:12px 0">${['Reparatur','Displayschutz','Hülle','Ladekabel','Powerbank','Reinigung'].map(x=>`<button class="chip" onclick="posAdd('${x}',${({Reparatur:0,Displayschutz:15,'Hülle':12,Ladekabel:9,Powerbank:19,Reinigung:10})[x]})">${x}</button>`).join('')}</div>
+       <div id="posres" class="muted" style="font-size:13px">Tipp: Einen offenen Auftrag über „In die Kasse" aus der Auftragsansicht übernehmen.</div>
+     </div>
+     <div class="card">
+       <b>Warenkorb</b>
+       <div id="cartlist" style="margin-top:8px">${renderCart()}</div>
+     </div>
+   </div>`;
+};
+function renderCart(){
+  if(!cart.length) return '<div class="empty">Warenkorb leer</div>';
+  const total=cart.reduce((s,i)=>s+i.price,0);
+  return cart.map((i,x)=>`<div class="listitem"><div style="flex:1"><b>${esc(i.name)}</b></div><div class="mono">${eur(i.price)}</div><button class="btn sm gho" onclick="cart.splice(${x},1);document.getElementById('cartlist').innerHTML=renderCart()">Entfernen</button></div>`).join('')
+   +`<div class="divider"></div><div class="between"><b>Gesamt</b><b style="font-size:20px">${eur(total)}</b></div>
+     <button class="btn pri" style="width:100%;margin-top:12px;justify-content:center" onclick="checkout()">Kassieren · ${eur(total)}</button>`;
+}
+function posAdd(name,price){ if(name==='Reparatur'){price=+prompt('Betrag (€):')||0;} cart.push({name,price:+price}); document.getElementById('cartlist').innerHTML=renderCart(); }
+function posSearch(v){ document.getElementById('posres').innerHTML = v?('Enter drücken, um „'+esc(v)+'" als Position hinzuzufügen'):''; }
+function addToCart(orderId){ const o=S.ord.find(x=>x.id===orderId); if(o){cart.push({name:o.nr+' · '+o.model+' · '+o.issue,price:o.price}); toast('Auftrag in Kasse übernommen'); views.kasse();paintIcons();} }
+function checkout(){ if(!cart.length)return; const total=cart.reduce((s,i)=>s+i.price,0);
+  S.sales.unshift({t:new Date().toISOString(),total,items:cart.length}); save(); cart=[];
+  toast('Verkauf abgeschlossen · Beleg gedruckt'); views.kasse();paintIcons(); }
+
+/* ============================ STATISTIK ============================ */
+views.statistik=function(){
+  const m=document.getElementById('main');
+  const rep=S.ord.filter(o=>(o.status==='abgeholt'||o.status==='fertig')&&isThisMonth(o.pickedAt||o.readyAt||o.created)).reduce((s,o)=>s+(+o.price||0),0);
+  const sale=S.sales.filter(x=>isThisMonth(x.t)).reduce((s,x)=>s+x.total,0);
+  const total=rep+sale;
+  const byType={};S.ord.forEach(o=>byType[o.issue]=(byType[o.issue]||0)+1);
+  const top=Object.entries(byType).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const maxT=Math.max(1,...top.map(t=>t[1]));
+  m.innerHTML=`<div class="between"><div><h1 class="h1">Statistik</h1><p class="sub">Aktueller Monat</p></div></div>
+   <div class="grid g4" style="margin-top:16px">
+     <div class="card kpi"><div class="n">${eur(total)}</div><div class="l">Gesamtumsatz</div></div>
+     <div class="card kpi"><div class="n">${eur(rep)}</div><div class="l">Reparaturen</div></div>
+     <div class="card kpi"><div class="n">${eur(sale)}</div><div class="l">Kasse / Verkauf</div></div>
+     <div class="card kpi"><div class="n">${S.ord.filter(o=>o.status==='abgeholt').length}</div><div class="l">Abgeschlossen</div></div>
+   </div>
+   <div class="grid g2" style="margin-top:16px">
+     <div class="card"><b>Häufigste Reparaturen</b><div style="margin-top:14px">${top.map(t=>`
+       <div style="margin-bottom:12px"><div class="between" style="margin-bottom:4px"><span>${esc(t[0])}</span><b>${t[1]}</b></div><div class="bar"><i style="width:${t[1]/maxT*100}%"></i></div></div>`).join('')}</div></div>
+     <div class="card"><b>Umsatz-Verteilung</b>
+       <div style="margin-top:14px"><div class="between" style="margin-bottom:4px"><span>Reparatur</span><b>${total?Math.round(rep/total*100):100}%</b></div><div class="bar"><i style="width:${total?rep/total*100:100}%"></i></div>
+       <div class="between" style="margin:14px 0 4px"><span>Verkauf (Kasse)</span><b>${total?Math.round(sale/total*100):0}%</b></div><div class="bar"><i style="width:${total?sale/total*100:0}%"></i></div></div>
+     </div>
+   </div>`;
+};
+
+/* ============================ EINSTELLUNGEN ============================ */
+views.einstellungen=function(){
+  const m=document.getElementById('main');
+  const cashConn=S.cash.connected;
+  m.innerHTML=`<div class="between"><div><h1 class="h1">Einstellungen</h1><p class="sub">Stammdaten, Kassen und Integrationen</p></div></div>
+   <div class="grid g2" style="margin-top:16px">
+     <div class="card"><b>Stammdaten</b>
+       <div class="grid g2" style="margin-top:12px"><div><label class="f">Firma</label><input class="in" value="${SHOP.name}"></div>
+       <div><label class="f">Telefon</label><input class="in" value="${SHOP.phone}"></div>
+       <div><label class="f">Straße</label><input class="in" value="${SHOP.street}"></div>
+       <div><label class="f">PLZ / Ort</label><input class="in" value="${SHOP.zip} ${SHOP.city}"></div></div>
+       <button class="btn pri" style="margin-top:12px" onclick="toast('Stammdaten gespeichert')">Speichern</button>
+     </div>
+     <div class="card"><b>Kasse anbinden</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Kartenzahlung und TSE-konforme Belege – verbinden Sie Ihr vorhandenes Terminal.</p>
+       ${[['SumUp','SU','Kartenterminal & Belege'],['Zettle by PayPal','ZE','Terminal & Kasse'],['HelloCash','HC','Registrierkasse / TSE'],['orderbird','OB','Kassensystem']].map(p=>`
+         <div class="integ" style="margin-bottom:10px"><div class="lg">${p[1]}</div>
+           <div style="flex:1"><b>${p[0]}</b><div class="muted" style="font-size:12px">${p[2]}</div></div>
+           ${cashConn===p[0]?'<span class="pill solid"><span class="d"></span>Verbunden</span>':`<button class="btn sm" onclick="connectCash('${p[0]}')">Verbinden</button>`}</div>`).join('')}
+     </div>
+     <div class="card"><b>Integrationen</b>
+       ${[['Lexware / lexoffice','LX','Rechnungen & Buchhaltung'],['Google Bewertungen','G','Automatische Bewertungsanfrage'],['E-Mail (SMTP)','@','Versand Ihrer Erinnerungen'],['SMS-Gateway','SMS','Reparatur-SMS an Kunden']].map(p=>`
+         <div class="integ" style="margin-bottom:10px"><div class="lg">${p[1]}</div><div style="flex:1"><b>${p[0]}</b><div class="muted" style="font-size:12px">${p[2]}</div></div><button class="btn sm" onclick="toast('${p[0]} verbunden')">Verbinden</button></div>`).join('')}
+     </div>
+     <div class="card"><b>KI-Empfangskraft (Telefon & WhatsApp)</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Nimmt Anrufe und WhatsApp entgegen und beantwortet Routinefragen aus Ihren Daten. Prototyp – Gespräche werden simuliert.</p>
+       <div class="integ" style="justify-content:space-between"><div style="display:flex;gap:12px;align-items:center"><div class="lg">${ic('phone')}</div><div><b>KI-Empfangskraft</b><div class="muted" style="font-size:12px">${S.phone.active?'Aktiv':'Deaktiviert'}</div></div></div>
+         <button class="switch ${S.phone.active?'on':''}" onclick="S.phone.active=!S.phone.active;save();views.einstellungen();paintIcons()"><i></i></button></div>
+       <label class="f" style="margin-top:12px">Wann annehmen</label>
+       <select class="in" onchange="S.phone.mode=this.value;save()">${Object.keys(MODES).map(k=>`<option value="${k}" ${S.phone.mode===k?'selected':''}>${MODES[k]}</option>`).join('')}</select>
+       <div class="note" style="margin-top:8px">Außerhalb der Öffnungszeiten (${SHOP.hours}) übernimmt die Empfangskraft automatisch – aktuell: <b>${isOpenNow()?'geöffnet':'geschlossen, KI übernimmt'}</b>.</div>
+       <label class="f" style="margin-top:12px">Darf beantworten</label>
+       <div class="row">${[['status','Reparaturstatus'],['price','Preisauskunft'],['stock','Lager-Auskunft'],['hours','Öffnungszeiten'],['booking','Terminbuchung'],['message','Nachricht aufnehmen']].map(a=>`<button class="chip ${S.phone.answer[a[0]]?'on':''}" onclick="S.phone.answer['${a[0]}']=!S.phone.answer['${a[0]}'];save();views.einstellungen();paintIcons()">${a[1]}</button>`).join('')}</div>
+       <label class="f" style="margin-top:12px">Ansage nach Feierabend</label>
+       <textarea class="in" rows="2" onchange="S.phone.greetingAfter=this.value;save()">${esc(S.phone.greetingAfter)}</textarea>
+       <button class="btn" style="margin-top:14px" onclick="go('anrufe')">Empfang & Simulation öffnen</button>
+     </div>
+     <div class="card"><b>Online-Buchung</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Kunden buchen Termine und sehen Preise direkt auf Ihrer Website.</p>
+       <div class="row" style="margin-bottom:10px"><a class="btn pri" href="booking.html" target="_blank">Buchungsseite öffnen</a><span class="muted" style="font-size:13px">Prototyp – Buchungen erscheinen in „Aufträge".</span></div>
+       <label class="f">Buchungslink</label><div class="row"><input class="in" style="flex:1" readonly value="reparado.de/buchen/dein-handy-doc"><button class="btn" onclick="toast('Link kopiert')">Kopieren</button></div>
+       <label class="f" style="margin-top:12px">Einbetten (WordPress-Shortcode)</label><input class="in" readonly value="[reparado shop=&quot;dein-handy-doc&quot;]">
+     </div>
+     <div class="card"><b>Garantie & Belege</b>
+       <div class="grid g2" style="margin-top:12px"><div><label class="f">Standard-Garantie (Monate)</label><input class="in" value="${SHOP.warranty}"></div>
+       <div><label class="f">Öffnungszeiten</label><input class="in" value="${SHOP.hours}"></div></div>
+       <div class="note" style="margin-top:12px">Beleg, Etikett, Kostenvoranschlag und Garantie-Nachweis lassen sich direkt aus jedem Auftrag drucken.</div>
+     </div>
+     <div class="card"><b>Benutzer & Rollen</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Mehrere Mitarbeiter, klare Rechte.</p>
+       <div class="listitem"><div class="avatar">DH</div><div style="flex:1"><b>Inhaber</b><div class="muted" style="font-size:12px">Vollzugriff</div></div><span class="tag">Admin</span></div>
+       <div class="listitem"><div class="avatar">MA</div><div style="flex:1"><b>Mitarbeiter</b><div class="muted" style="font-size:12px">Aufträge & Kasse</div></div><span class="tag">Techniker</span></div>
+       <button class="btn" style="margin-top:12px" onclick="toast('Einladung versendet')">Mitarbeiter einladen</button>
+     </div>
+   </div>`;
+};
+function connectCash(p){ S.cash.connected=p; save(); toast(p+' verbunden – Kartenzahlung aktiv'); views.einstellungen();paintIcons(); }
+
+/* ============================ ONLINE-BUCHUNGEN EINLESEN ============================ */
+function pullBookings(){
+  let arr=[]; try{arr=JSON.parse(localStorage.getItem('reparado_bookings')||'[]');}catch(e){}
+  if(!arr.length) return 0;
+  let n=0;
+  arr.forEach(bk=>{
+    let c=S.cust.find(x=>x.tel===bk.tel||(bk.mail&&x.mail===bk.mail));
+    if(!c){c={id:uid('c'),name:bk.name,tel:bk.tel,mail:bk.mail||'',adr:bk.adr||''};S.cust.push(c);}
+    const nr='REP-'+(S.counter++);
+    const o={id:uid('o'),nr,cid:c.id,brand:bk.brand,model:bk.model,issue:bk.issue,qual:'Original',price:+bk.price||0,
+      status:'offen',prio:'Standard',created:today(),due:bk.appt||today(),appt:bk.appt||'',notes:'Online gebucht',imei:'',
+      readyAt:'',warranty:SHOP.warranty,sig:'',source:'online'};
+    S.ord.unshift(o);
+    const r=S.rules.find(x=>x.id==='r_confirm'); if(r&&r.on) logMail(o,r,'automatisch (Online-Buchung)');
+    n++;
+  });
+  localStorage.removeItem('reparado_bookings'); save();
+  return n;
+}
+
+/* ============================ DRAWER/MODAL ============================ */
+function openDrawer(){document.getElementById('scrim').classList.add('show');document.getElementById('drawer').classList.add('show');}
+function openDrawerHTML(h){document.getElementById('drawer').innerHTML=h;openDrawer();paintIcons();}
+function openModal(h){document.getElementById('modalbox').innerHTML=h;document.getElementById('scrim').classList.add('show');document.getElementById('modal').classList.add('show');paintIcons();}
+function closeAll(){['scrim','drawer','modal'].forEach(i=>document.getElementById(i).classList.remove('show'));}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAll();});
+
+/* ============================ SEARCH ============================ */
+function globalSearch(v){ if(!v){go(current);return;} v=v.toLowerCase();
+  const hits=S.ord.filter(o=>[o.nr,cust(o.cid).name,cust(o.cid).tel,o.model,o.issue,o.imei].join(' ').toLowerCase().includes(v));
+  const m=document.getElementById('main');
+  m.innerHTML=`<h1 class="h1">Suche: „${esc(v)}"</h1><p class="sub">${hits.length} Treffer</p>
+    <div class="card" style="margin-top:16px;padding:0"><table><tbody>${hits.map(o=>`<tr onclick="openOrder('${o.id}')"><td><b>${o.nr}</b></td><td>${esc(cust(o.cid).name)}</td><td>${esc(o.model)}</td><td>${esc(o.issue)}</td><td>${statusPill(o.status)}</td></tr>`).join('')||'<tr><td><div class="empty">Nichts gefunden</div></td></tr>'}</tbody></table></div>`;
+}
+
+/* ============================ KI-DIAGNOSE (Techniker) ============================ */
+const DIAG_EXAMPLES=[
+  'Xiaomi Pro 2 Fehler 21 nach Regen, Akku 37 Volt',
+  'iPhone 13 lädt nicht mehr, Buchse sieht sauber aus',
+  'Samsung Galaxy S22 Display flackert nach Sturz',
+  'Ninebot Max G30 fährt nicht, Motor ruckelt',
+  'iPhone 12 Akku hält nur 2 Stunden, wird warm',
+];
+let diagLast=null;
+views.diagnose=function(){
+  const m=document.getElementById('main');
+  m.innerHTML=`<div class="between"><div><h1 class="h1">KI-Diagnose</h1><p class="sub">Beschreibe das Problem in eigenen Worten – die KI erkennt Gerät, Fehler und wahrscheinlichste Ursache, inkl. Prüfreihenfolge, Teilen und Zeit.</p></div></div>
+   <div class="card" style="margin-top:16px">
+     <label class="f">Fehlerbeschreibung</label>
+     <textarea class="in" id="diagIn" rows="3" placeholder="z. B. Xiaomi Pro 2 Fehler 21 nach Regen, Akku 37 Volt">${diagLast?esc(diagLast.input):''}</textarea>
+     <div class="row" style="margin-top:10px">
+       <button class="btn pri" onclick="runDiagnose(document.getElementById('diagIn').value)">Diagnose starten</button>
+       <span class="muted" style="font-size:13px">oder Beispiel wählen:</span>
+     </div>
+     <div class="row" style="margin-top:8px">${DIAG_EXAMPLES.map(e=>`<button class="chip" onclick="document.getElementById('diagIn').value=${JSON.stringify(e).replace(/"/g,'&quot;')};runDiagnose(${JSON.stringify(e).replace(/"/g,'&quot;')})">${esc(e)}</button>`).join('')}</div>
+   </div>
+   <div id="diagOut" style="margin-top:16px">${diagLast?diagCardHTML(diagLast):'<div class="empty">Noch keine Diagnose. Beschreibe oben ein Problem oder wähle ein Beispiel.</div>'}</div>`;
+};
+function pct(n){return Math.round(n)+'%';}
+function runDiagnose(txt){
+  txt=(txt||'').trim(); if(!txt){toast('Bitte Fehler beschreiben');return;}
+  diagLast=diagnoseEngine(txt);
+  const out=document.getElementById('diagOut'); if(out) out.innerHTML=diagCardHTML(diagLast);
+  toast('KI-Diagnose erstellt');
+}
+function diagnoseEngine(txt){
+  const t=txt.toLowerCase();
+  const voltM=t.match(/(\d{1,3})\s*(v\b|volt)/); const volt=voltM?+voltM[1]:null;
+  const errM=t.match(/fehler\s*(\d{1,3})|error\s*(\d{1,3})|\bcode\s*(\d{1,3})/); const errorCode=errM?(errM[1]||errM[2]||errM[3]):null;
+  const water=/regen|wasser|nass|feucht|flüssig|water|reingefallen|klo|toilette/.test(t);
+  const fell=/sturz|gefallen|runtergefallen|drop|gestürzt|aufgeschlagen/.test(t);
+  const swollen=/aufgebläht|geschwollen|gewölbt|swollen|bläht/.test(t);
+  const heat=/heiß|heiss|überhitz|ueberhitz|wird warm|zu warm|hot/.test(t);
+  const scooterHint=/scooter|roller|e-?scooter|ninebot|segway|g30|m365|pro 2|1s\b|essential|mi 3|max g/.test(t);
+  const ebikeHint=/e-?bike|pedelec|bosch|shimano|fahrrad/.test(t);
+  const type = scooterHint||(volt&&volt>=20)?'scooter':(ebikeHint?'ebike':'phone');
+  // Marke/Modell best-effort
+  let brand='', model='';
+  const bm=[['apple','Apple'],['iphone','Apple'],['ipad','Apple'],['samsung','Samsung'],['galaxy','Samsung'],['xiaomi','Xiaomi'],['redmi','Xiaomi'],['huawei','Huawei'],['ninebot','Ninebot'],['segway','Segway']];
+  bm.forEach(x=>{if(!brand&&t.includes(x[0]))brand=x[1];});
+  const modM=t.match(/\b(iphone|galaxy|redmi note|redmi|ipad|mi|pro|max|g30|note|s\d{2}|a\d{2})\s?[\w.+ ]{0,12}/i); if(modM){model=modM[0].replace(/\s+/g,' ').trim(); model=model.split(/\b(fehler|error|code|nach|akku|volt|display|lädt|startet|flackert|hält|geht|kein)\b/i)[0].replace(/[,;].*$/,'').replace(/\s+[a-zäöü]$/i,'').trim();}
+  // Symptome
+  const S={water,fell,swollen,heat,
+    noStart:/startet? nicht|geht nicht an|kein strom|\btot\b|bootet nicht|kein bild|fährt nicht/.test(t),
+    noCharge:/lädt nicht|laden|ladeanschluss|ladebuchse|charge|kein laden/.test(t),
+    battery:/akku|batterie|hält nicht|schnell leer|läuft leer|volt|kapazität/.test(t)||volt!=null,
+    display:/display|bildschirm|flackert|touch|streifen|schwarz|glas gebrochen|riss/.test(t),
+    motor:/motor|ruckelt|zieht nicht|dreht nicht|kein antrieb/.test(t),
+    brake:/bremse|brems|brake/.test(t),
+    audio:/lautsprecher|mikrofon|ton|leise/.test(t),
+    camera:/kamera|foto/.test(t)};
+  const causes=[];
+  const add=(label,w,why,tests,parts,tools)=>causes.push({label,w,why,tests:tests||[],parts:parts||[],tools:tools||[]});
+  if(type==='scooter'||type==='ebike'){
+    if(water) add('Feuchtigkeitsschaden / Korrosion an Steckverbindern',45,'„nach Regen" + Elektronik: Wasser dringt an Steckverbinder & Controller, Korrosion stört Signale.',['Sichtprüfung auf Feuchtigkeit/Korrosion','Steckverbinder trennen, trocknen, mit Isopropanol reinigen','erneut Fehlercode auslesen'],['Steckverbinder-Set','Dichtungen'],['Torx/Inbus-Set','Isopropanol','Heißluft/Föhn','Multimeter']);
+    if(errorCode) add('Kommunikationsfehler Controller ↔ Dashboard/BMS (Fehler '+errorCode+')',water?30:42,'Fehlercode '+errorCode+' deutet typ. auf gestörte Kommunikation zwischen Steuerung und Display/BMS.',['Fehlercode via Diagnose-App/Kabel auslesen','Kabelbaum & Stecker prüfen','Firmware/Reset','Controller tauschen wenn keine Kommunikation'],['Controller','Kabelbaum'],['Diagnose-App/Kabel','Multimeter']);
+    if(S.battery||volt) add('Akku-Unterspannung / schwache Zelle'+(volt?(' ('+volt+' V gemessen)'):''),volt&&volt<38?28:18,(volt?('Gemessene '+volt+' V liegen unter dem gesunden Bereich (~42 V voll bei 36-V-Systemen) → Zelle/BMS prüfen.'):'Reichweiten-/Startprobleme deuten auf Akku/BMS.'),['Gesamt- und Zellspannungen am BMS messen','Zellabweichung prüfen','Ladevorgang beobachten'],['Akkupack','BMS'],['Multimeter','Zellspannungsprüfer']);
+    if(S.motor) add('Hall-Sensor / Motorkabel',22,'Ruckeln/kein Antrieb deutet auf Hall-Sensor oder Motorphasenkabel.',['Motorstecker & Hall-Signale prüfen','Motorkabel auf Bruch prüfen','Motor testweise tauschen'],['Motorrad/Motor','Hall-Sensor'],['Multimeter','Torx-Set']);
+    if(S.brake) add('Bremssensor',12,'Bremssignal kann Motorfreigabe blockieren.',['Bremshebel-Sensor & Stecker prüfen'],['Bremssensor'],['Torx-Set']);
+    if(!causes.length) add('Elektronik / Verkabelung allgemein',40,'Zu wenig Anhaltspunkte – zuerst Sichtprüfung und Fehlercode auslesen.',['Sichtprüfung','Fehlercode auslesen','Spannungen messen'],[],['Multimeter','Diagnose-Kabel']);
+  } else {
+    if(S.noCharge) add('Ladeanschluss verschmutzt / defekt',52,'„lädt nicht" beginnt fast immer am Ladeport: Fussel/Oxidation oder mechanischer Defekt.',['Ladeport mit Licht prüfen & reinigen','anderes Kabel/Netzteil testen','Ladestrom messen','Ladebuchse tauschen'],['Ladebuchse / Ladeflex'],['Spudger','Reinigungsbürste','Multimeter','Heißluft']);
+    if(S.noCharge) add('Ladekabel / Netzteil',18,'Häufige, billige Ursache – vor Öffnen ausschließen.',['Original-Netzteil & neues Kabel testen'],['—'],['—']);
+    if(S.display) add('Display / Displayflex'+(fell?' (nach Sturz)':''),fell?68:55,(fell?'Sturz + Flackern/Streifen deutet stark auf beschädigtes Display oder gelösten Displaystecker.':'Flackern/Streifen deutet auf Display oder Flexkabel.'),['Displaystecker neu einstecken','Ersatzdisplay testweise anstecken','Display tauschen'],['Displayeinheit'],['Pentalobe/Torx','Saugnapf','Plektren','Heißluft']);
+    if(S.battery) add('Akku verschlissen'+(volt?'':''),heat?35:60,(heat?'„hält nicht" + Erwärmung: Akku am Lebensende, evtl. Lade-IC.':'Kurze Laufzeit deutet auf verschlissenen Akku (Zyklen/Health).'),['Akku-Health/Zyklen auslesen','Ruhestrom messen','Akku tauschen'],['Akku'],['Spudger','Klebestreifen','Heißluft']);
+    if(S.heat) add('Lade-IC / Board (Kurzschluss)',water?30:15,'Erwärmung ohne Last kann auf Kurzschluss am Lade-IC/Board hindeuten.',['Wärmebild/Strommessung im Kurzschlussfall','Board-Diagnose'],['Lade-IC','Board-Reparatur'],['Labornetzteil','Mikroskop','Heißluft']);
+    if(water) add('Flüssigkeitsschaden / Korrosion',water?45:0,'Wasserkontakt: Korrosion auf dem Board, Folgeschäden möglich.',['Öffnen, Board auf Korrosion prüfen','Ultraschallreinigung','betroffene Bauteile prüfen'],['—'],['Ultraschallbad','Mikroskop','Isopropanol']);
+    if(S.audio) add('Lautsprecher / Hörmuschel',30,'Tonproblem: Lautsprechermodul oder Verschmutzung.',['Lautsprecher testen & reinigen','Modul tauschen'],['Lautsprechermodul'],['Spudger']);
+    if(!causes.length) add('Allgemeine Fehlersuche',40,'Zu wenig Anhaltspunkte – strukturierte Sichtprüfung starten.',['Sichtprüfung','Funktionstest','Diagnose-Tool'],[],['Spudger','Multimeter']);
+  }
+  // normalisieren
+  const total=causes.reduce((s,c)=>s+c.w,0)||1;
+  causes.forEach(c=>c.p=c.w/total*100);
+  causes.sort((a,b)=>b.p-a.p);
+  const top=causes.slice(0,4);
+  // Prüfreihenfolge / Teile / Werkzeuge aggregiert (dedupe, Reihenfolge nach Wahrscheinlichkeit)
+  const seen=new Set(); const collect=(k)=>{const r=[];top.forEach(c=>c[k].forEach(x=>{if(x&&x!=='—'&&!seen.has(k+x)){seen.add(k+x);r.push(x);}}));return r;};
+  const tests=[]; const ts=new Set(); top.forEach(c=>c.tests.forEach(x=>{if(!ts.has(x)){ts.add(x);tests.push(x);}}));
+  const parts=[]; const ps=new Set(); top.forEach(c=>c.parts.forEach(x=>{if(x&&x!=='—'&&!ps.has(x)){ps.add(x);parts.push(x);}}));
+  const tools=[]; const ws=new Set(); top.forEach(c=>c.tools.forEach(x=>{if(x&&x!=='—'&&!ws.has(x)){ws.add(x);tools.push(x);}}));
+  // Zeit & Reparaturwahrscheinlichkeit
+  let timeMin=type==='phone'?30:60, timeMax=type==='phone'?60:120;
+  if(water){timeMin+=30;timeMax+=60;}
+  let repairProb = water?68:(fell?82:80); if(swollen)repairProb=Math.min(repairProb,60);
+  // Sicherheit
+  const safety=[];
+  if((S.battery||volt||type!=='phone')&&(water||heat||swollen)) safety.push('Lithium-Ionen-Akku + '+(swollen?'Aufblähung':water?'Feuchtigkeit':'Überhitzung')+': Brand-/Verpuffungsgefahr. Akku vor dem Laden prüfen, aufgeblähte Akkus fachgerecht sichern und nicht weiterverwenden.');
+  if(type!=='phone') safety.push('Hochstrom-/BMS-System: vor Arbeiten Akku trennen, auf Kurzschluss achten.');
+  if(water&&type==='phone') safety.push('Bei Wasserkontakt Gerät nicht laden/einschalten bis das Board gereinigt und geprüft ist (Datenverlust-Risiko).');
+  return {input:txt,type,brand,model,errorCode,volt,water,fell,top,tests,parts,tools,timeMin,timeMax,repairProb,safety};
+}
+function diagCardHTML(d){
+  const typeLbl={phone:'Smartphone/Tablet',scooter:'E-Scooter',ebike:'E-Bike'}[d.type]||'Gerät';
+  const chips=[];
+  if(d.brand) chips.push(['Hersteller',d.brand]);
+  if(d.model) chips.push(['Modell',d.model.replace(/\b\w/g,c=>c.toUpperCase())]);
+  chips.push(['Gerätetyp',typeLbl]);
+  if(d.errorCode) chips.push(['Fehlercode',d.errorCode]);
+  if(d.volt) chips.push(['Messwert',d.volt+' V']);
+  const syn=[]; if(d.water)syn.push('Wasserkontakt'); if(d.fell)syn.push('nach Sturz');
+  return `<div class="card">
+    <div class="between"><b style="font-size:16px">KI-Diagnose</b><span class="pill soft"><span class="d"></span>Vorabeinschätzung</span></div>
+    <div class="note" style="margin-top:10px">Automatische Einschätzung auf Basis der Beschreibung – <b>keine bestätigte Diagnose</b>. Bitte durch Messung/Sichtprüfung verifizieren. Kostenangaben als Richtwert.</div>
+    <label class="f" style="margin-top:14px">Erkannt</label>
+    <div class="row">${chips.map(c=>`<span class="tag">${c[0]}: <b>${esc(String(c[1]))}</b></span>`).join('')}${syn.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>
+
+    <label class="f" style="margin-top:16px">Wahrscheinlichste Ursachen</label>
+    ${d.top.map((c,i)=>`<div style="margin-bottom:12px">
+      <div class="between" style="margin-bottom:4px"><span style="font-weight:700">${i+1}. ${esc(c.label)}</span><b>${pct(c.p)}</b></div>
+      <div class="bar"><i style="width:${Math.round(c.p)}%"></i></div>
+      <div class="muted" style="font-size:13px;margin-top:4px">${esc(c.why)}</div>
+    </div>`).join('')}
+
+    <div class="grid g2" style="margin-top:8px">
+      <div><label class="f">Empfohlene Prüfreihenfolge</label><ol style="margin:0;padding-left:18px;font-size:14px;line-height:1.7">${d.tests.slice(0,6).map(x=>`<li>${esc(x)}</li>`).join('')}</ol></div>
+      <div>
+        <label class="f">Mögliche Ersatzteile</label><div class="row" style="margin-bottom:12px">${d.parts.length?d.parts.map(x=>`<span class="tag">${esc(x)}</span>`).join(''):'<span class="muted" style="font-size:13px">— erst nach Prüfung —</span>'}</div>
+        <label class="f">Benötigte Werkzeuge</label><div class="row">${d.tools.map(x=>`<span class="tag">${esc(x)}</span>`).join('')}</div>
+      </div>
+    </div>
+
+    <div class="grid g2" style="margin-top:14px">
+      <div class="card" style="padding:14px"><div class="muted" style="font-size:12px">Geschätzte Reparaturzeit</div><div style="font-size:20px;font-weight:800">${d.timeMin}–${d.timeMax} Min</div></div>
+      <div class="card" style="padding:14px"><div class="muted" style="font-size:12px">Reparaturwahrscheinlichkeit</div><div style="font-size:20px;font-weight:800">${pct(d.repairProb)}</div></div>
+    </div>
+
+    ${d.safety.length?`<div class="note" style="margin-top:14px;border:1px solid #0e7a3c"><b>⚠ Sicherheitshinweise</b><ul style="margin:6px 0 0;padding-left:18px">${d.safety.map(s=>`<li>${esc(s)}</li>`).join('')}</ul></div>`:''}
+
+    <div class="row" style="margin-top:16px">
+      <button class="btn pri" onclick="diagToOrder()">In Auftrag übernehmen</button>
+      <button class="btn" onclick="diagLast=null;views.diagnose();paintIcons()">Neue Diagnose</button>
+    </div>
+  </div>`;
+}
+function diagToOrder(){
+  if(!diagLast)return; const d=diagLast;
+  orderForm(null);
+  setTimeout(()=>{
+    const g=id=>document.getElementById(id);
+    if(g('f_brand'))g('f_brand').value=d.brand||'';
+    if(g('f_model'))g('f_model').value=(d.model||'').replace(/\b\w/g,c=>c.toUpperCase());
+    if(g('f_issue'))g('f_issue').value=d.top[0]?d.top[0].label.split(' (')[0]:'';
+    if(g('f_notes'))g('f_notes').value='KI-Vorabeinschätzung: '+d.top.slice(0,2).map(c=>c.label+' ('+pct(c.p)+')').join(', ')+'. Eingabe: '+d.input;
+  },40);
+  toast('Diagnose in neuen Auftrag übernommen');
+}
+
+/* ============================ ANRUFE (KI-Empfangskraft) ============================ */
+const INTENTS={status:{lbl:'Reparaturstatus'},price:{lbl:'Preisauskunft'},hours:{lbl:'Öffnungszeiten'},booking:{lbl:'Terminwunsch'},message:{lbl:'Nachricht / Rückruf'},stock:{lbl:'Teile-Verfügbarkeit'}};
+const MODES={overflow:'Nur wenn ich nicht rangehe',afterhours:'Nur nach Feierabend',always:'Immer'};
+const CH={anruf:'Anruf',whatsapp:'WhatsApp'};
+function ensureCustomer(name,tel,mail){let c=S.cust.find(x=>x.tel===tel||(mail&&x.mail===mail));if(!c){c={id:uid('c'),name,tel,mail:mail||'',adr:''};S.cust.push(c);}return c;}
+function randPhone(){const r=()=>Math.floor(1000+Math.random()*9000);return '+49 1'+[6,7,5][Math.floor(Math.random()*3)]+'0 '+r()+r();}
+function addDaysStr(n){const x=new Date();x.setDate(x.getDate()+n);return x.toISOString().slice(0,10);}
+
+let empfFilter='alle', simChannel='anruf', simAfter=false;
+views.anrufe=function(){
+  const m=document.getElementById('main');
+  const ph=S.phone; const open=isOpenNow();
+  const all=S.calls;
+  const calls=all.filter(c=> empfFilter==='alle'?true : empfFilter==='task'?(c.task&&!c.done) : c.channel===empfFilter);
+  const handled=all.filter(c=>!c.task).length;
+  const booked=all.filter(c=>c.intent==='booking').length;
+  const waCount=all.filter(c=>c.channel==='whatsapp').length;
+  const openTasks=all.filter(c=>c.task&&!c.done);
+  m.innerHTML=`<div class="between"><div><h1 class="h1">Empfang</h1><p class="sub">Deine KI-Empfangskraft nimmt Anrufe und WhatsApp entgegen, beantwortet Routinefragen und trägt alles automatisch ein.</p></div>
+     <button class="btn pri" onclick="simMenu()">Gespräch simulieren</button></div>
+   <div class="row" style="margin-top:14px">
+     <span class="pill ${open?'soft':'solid'}"><span class="d"></span>${open?'Jetzt geöffnet':'Jetzt geschlossen · KI übernimmt'}</span>
+     <span class="pill ${ph.active?'solid':'soft'}"><span class="d"></span>${ph.active?'KI aktiv · '+MODES[ph.mode]:'KI aus'}</span>
+   </div>
+   <div class="grid g4" style="margin-top:16px">
+     <div class="card kpi"><div class="n">${all.length}</div><div class="l">Gespräche heute</div></div>
+     <div class="card kpi"><div class="n">${handled}</div><div class="l">Automatisch beantwortet</div></div>
+     <div class="card kpi"><div class="n">${booked}</div><div class="l">Termine gebucht</div></div>
+     <div class="card kpi"><div class="n">~${handled*3}</div><div class="l">Minuten gespart</div></div>
+   </div>
+   ${openTasks.length?`<div class="card" style="margin-top:16px;border:1px solid #0e7a3c">
+     <b>Für dich zu erledigen (${openTasks.length})</b>
+     ${openTasks.map(c=>`<div class="listitem"><div style="flex:1"><b>Rückruf: ${esc(c.name||c.from)}</b><div class="muted" style="font-size:13px">${esc(c.result)} · ${c.time} Uhr</div></div>
+       <button class="btn sm" onclick="callDone('${c.id}')">Erledigt</button></div>`).join('')}
+   </div>`:''}
+   <div class="row" style="margin:16px 0 0">
+     ${[['alle','Alle · '+all.length],['anruf','Anrufe'],['whatsapp','WhatsApp · '+waCount],['task','Aufgaben · '+openTasks.length]].map(f=>`<button class="chip ${empfFilter===f[0]?'on':''}" onclick="empfFilter='${f[0]}';views.anrufe();paintIcons()">${f[1]}</button>`).join('')}
+   </div>
+   <div class="card" style="margin-top:14px;padding:0;overflow:auto"><table>
+     <thead><tr><th>Zeit</th><th>Kanal</th><th>Kontakt</th><th>Anliegen</th><th>Ergebnis</th></tr></thead>
+     <tbody>${calls.map(c=>`<tr onclick="callDetail('${c.id}')">
+       <td class="mono muted">${c.time}${c.after?' <span class="tag">n. Feierabend</span>':''}</td>
+       <td><span class="tag">${CH[c.channel]||'Anruf'}</span></td>
+       <td>${esc(c.name||c.from)}</td>
+       <td><span class="tag">${INTENTS[c.intent].lbl}</span></td>
+       <td>${esc(c.result)}${c.task?(c.done?' <span class="pill soft"><span class="d"></span>erledigt</span>':' <span class="pill dash"><span class="d"></span>offen</span>'):''}</td>
+     </tr>`).join('')||'<tr><td colspan="5"><div class="empty">Keine Gespräche in diesem Filter</div></td></tr>'}</tbody></table></div>
+   <div class="note" style="margin-top:14px">Prototyp: Gespräche werden simuliert. Die KI beantwortet aus echten Reparado-Daten (Status, Preise, Lagerbestand, Öffnungszeiten), bucht Termine und legt Rückruf-Aufgaben an – am Telefon <b>und</b> per WhatsApp. Außerhalb der Öffnungszeiten übernimmt sie automatisch. Konfiguration in <b>Einstellungen → KI-Empfangskraft</b>.</div>`;
+};
+function callDone(id){const c=S.calls.find(x=>x.id===id);if(c){c.done=true;save();views.anrufe();paintIcons();refreshBadges();toast('Als erledigt markiert');}}
+function callBubbles(tr,channel){const other=channel==='whatsapp'?'Kunde':'Anrufer';return tr.map(t=>`<div class="cb ${t.who==='ki'?'ki':'anr'}"><div class="lbl">${t.who==='ki'?'KI-Empfangskraft':other}</div>${esc(t.text)}</div>`).join('');}
+function callDetail(id){
+  const c=S.calls.find(x=>x.id===id); if(!c)return;
+  const isWa=c.channel==='whatsapp';
+  openDrawerHTML(`<div class="dhead"><b style="flex:1">${isWa?'WhatsApp':'Anruf'} · ${c.time} Uhr</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+   <div class="dbody">
+     <div class="callhdr"><div style="width:34px;height:34px;border-radius:50%;background:#0e7a3c;color:#fff;display:grid;place-items:center;flex:none">${(c.name?initials(c.name):(isWa?'W':'A'))}</div>
+       <div style="flex:1"><b>${esc(c.name||(isWa?'WhatsApp-Kontakt':'Unbekannter Anrufer'))}</b><div class="muted" style="font-size:13px">${esc(c.from)} · <span class="tag">${CH[c.channel]}</span> · ${INTENTS[c.intent].lbl}${c.dur&&c.dur!=='—'?' · '+c.dur+' Min':''}${c.after?' · nach Feierabend':''}</div></div></div>
+     <label class="f" style="margin-top:16px">Verlauf</label>
+     <div class="callchat">${callBubbles(c.transcript,c.channel)}</div>
+     <div class="note" style="margin-top:14px"><b>Ergebnis:</b> ${esc(c.result)}${c.order?` · <a style="text-decoration:underline;cursor:pointer" onclick="closeAll();openOrder(S.ord.find(o=>o.nr==='${c.order}')?.id)">${c.order}</a>`:''}</div>
+     ${c.task&&!c.done?`<button class="btn pri" style="margin-top:12px" onclick="callDone('${c.id}');closeAll()">Rückruf erledigt</button>`:''}
+   </div>`);
+}
+
+function simMenu(){
+  openModal(`<div class="dhead"><b style="flex:1">Gespräch simulieren</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+   <div class="dbody">
+     <label class="f">Kanal</label>
+     <div class="row">${Object.keys(CH).map(k=>`<button class="chip ${simChannel===k?'on':''}" onclick="simChannel='${k}';simMenu()">${CH[k]}</button>`).join('')}</div>
+     ${simChannel==='anruf'?`<label class="f" style="margin-top:14px">Zeitpunkt</label>
+       <div class="row"><button class="chip ${!simAfter?'on':''}" onclick="simAfter=false;simMenu()">Während der Öffnungszeit</button><button class="chip ${simAfter?'on':''}" onclick="simAfter=true;simMenu()">Nach Feierabend</button></div>`:''}
+     <label class="f" style="margin-top:16px">Szenario</label>
+     ${[['status','„Ist mein Handy fertig?"','Liest den Reparaturstatus vor'],['price','„Was kostet ein Displaytausch?"','Nennt den Preis aus dem Katalog'],['stock','„Habt ihr das Teil da?"','Antwortet aus dem Lagerbestand'],['booking','„Ich brauche einen Termin"','Bucht direkt in den Kalender'],['message','Reklamation / komplexe Frage','Nimmt Rückruf-Aufgabe auf']].map(s=>`
+       <div class="listitem"><div style="flex:1"><b>${s[1]}</b><div class="muted" style="font-size:13px">${s[2]}</div></div><button class="btn sm pri" onclick="simCall('${s[0]}')">${simChannel==='whatsapp'?'Nachricht':'Anrufen'}</button></div>`).join('')}
+   </div>`);
+}
+function simCall(type){
+  closeAll();
+  const now=new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+  const channel=simChannel; const isWa=channel==='whatsapp';
+  const after= !isWa && simAfter;
+  const greet= after? S.phone.greetingAfter : (isWa?'Hallo! Hier ist die digitale Assistentin von Dein Handy Doc. Wie kann ich helfen?':S.phone.greeting);
+  const you = isWa?'kunde':'anr';
+  const base={id:uid('call'),channel,time:now,from:randPhone(),name:'',after,done:false,dur:isWa?'—':'0:48'};
+  let call;
+  if(type==='status'){
+    const o=S.ord.find(x=>x.status==='fertig')||S.ord.find(x=>x.status!=='abgeholt')||S.ord[0]; const c=cust(o.cid);
+    const ab=o.status==='fertig';
+    call={...base,intent:'status',order:o.nr,task:false,result:'Status genannt: '+STATUS[o.status].lbl,
+      transcript:[{who:'ki',text:greet},{who:you,text:'Hallo, ist mein Handy schon fertig?'},
+       {who:'ki',text:'Sehr gerne. Auf welchen Namen läuft der Auftrag?'},{who:you,text:c.name+'.'},
+       {who:'ki',text:ab?('Ihr '+o.brand+' '+o.model+' ist abholbereit'+(o.readyAt?(' seit '+fmtDate(o.readyAt)):'')+'. '+(after?'Abholen können Sie es ab morgen 9 Uhr':'Sie können es zu unseren Öffnungszeiten abholen: '+SHOP.hours)+'. Der Endbetrag beträgt '+eur(o.price)+'.'):('Ihr '+o.brand+' '+o.model+' ist gerade in Bearbeitung. Sie bekommen automatisch eine Nachricht, sobald es fertig ist.')},
+       {who:you,text:ab?'Super, danke!':'Alles klar, danke.'},{who:'ki',text:'Sehr gerne. Bis bald!'}]};
+  } else if(type==='price'){
+    call={...base,intent:'price',order:'',task:false,result:'Preis genannt: Galaxy A14 Displaytausch',
+      transcript:[{who:'ki',text:greet},{who:you,text:'Was kostet bei euch ein Displaytausch für ein Samsung A14?'},
+       {who:'ki',text:'Für das Samsung Galaxy A14 kostet der Displaytausch '+eur(129)+' mit Originalteil. Der Preis ist unverbindlich; den genauen Betrag nennen wir Ihnen nach kurzer Prüfung vor Ort.'},
+       {who:you,text:'Alles klar, danke.'},{who:'ki',text:'Gerne! Möchten Sie einen Termin? Ich trage das gern ein.'}]};
+  } else if(type==='stock'){
+    const p=S.parts.find(x=>x.stock>0)||S.parts[0]; const avail=p.stock>0;
+    call={...base,intent:'stock',order:'',task:false,result:(avail?'Verfügbarkeit bestätigt: ':'Nicht vorrätig: ')+p.name,
+      transcript:[{who:'ki',text:greet},{who:you,text:'Habt ihr ein '+p.name.replace(/\\s*\\(.*\\)/,'')+' vorrätig?'},
+       {who:'ki',text:avail?('Ja, das ist vorrätig ('+p.stock+' Stück auf Lager). Soll ich es für Sie reservieren oder direkt einen Termin eintragen?'):('Aktuell ist das nicht auf Lager. Wir können es aber kurzfristig bestellen – meist in 1–2 Tagen da. Soll ich das veranlassen?')},
+       {who:you,text:'Super, dann reserviert es bitte.'},{who:'ki',text:'Erledigt, ich habe es vorgemerkt und das Team informiert.'}]};
+  } else if(type==='booking'){
+    const appt=addDaysStr(1);
+    call={...base,name:'Klaus Bergmann',from:'+49 170 5551234',intent:'booking',task:false,result:'Termin gebucht',
+      _book:{name:'Klaus Bergmann',tel:'+49 170 5551234',brand:'Apple',model:'iPhone 13',issue:'Akkutausch',price:69,appt},
+      transcript:[{who:'ki',text:greet},{who:you,text:'Ich hätte gern einen Termin, mein iPhone 13 hält keinen Akku mehr.'},
+       {who:'ki',text:'Klar, ein Akkutausch. Wie wäre morgen um 14:30 Uhr?'},{who:you,text:'Ja, das passt.'},
+       {who:'ki',text:'Auf welchen Namen darf ich den Termin eintragen?'},{who:you,text:'Klaus Bergmann.'},
+       {who:'ki',text:'Ihr Termin für den Akkutausch am '+fmtDate(appt)+' um 14:30 Uhr ist notiert. Sie erhalten gleich eine Bestätigung. Bis morgen!'}]};
+  } else {
+    call={...base,name:'Sandra Bergmann',from:'+49 176 2030405',intent:'message',task:true,result:'Rückruf-Aufgabe erstellt',
+      transcript:[{who:'ki',text:greet},{who:you,text:'Mein gerade repariertes Display flackert schon wieder. Das ärgert mich.'},
+       {who:'ki',text:'Das tut mir leid, das sehen wir uns natürlich an. Ich nehme das auf und ein Mitarbeiter meldet sich bei Ihnen. Auf welchen Namen und welche Nummer?'},
+       {who:you,text:'Bergmann, 0176 2030405.'},{who:'ki',text:'Danke. Ich habe eine Rückruf-Aufgabe für das Team angelegt – wir melden uns zeitnah bei Ihnen.'}]};
+  }
+  playCall(call);
+}
+function playCall(call){
+  const isWa=call.channel==='whatsapp';
+  openModal(`<div class="dhead"><b style="flex:1">${isWa?'Neue WhatsApp-Nachricht':'Eingehender Anruf'}</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+   <div class="dbody">
+     <div class="callhdr"><div class="dotpulse"></div><div style="flex:1"><b>${esc(call.name||(isWa?'WhatsApp-Kontakt':'Unbekannter Anrufer'))}</b><div class="muted" style="font-size:13px">${esc(call.from)} · ${call.after?'nach Feierabend · ':''}<span class="tag">${CH[call.channel]}</span> · KI-Empfangskraft ${isWa?'antwortet':'übernimmt'}</div></div></div>
+     <div class="callchat" id="callchat" style="margin-top:14px"></div>
+     <div id="callfoot"></div>
+   </div>`);
+  let i=0; const other=isWa?'Kunde':'Anrufer';
+  const step=()=>{
+    const chat=document.getElementById('callchat'); if(!chat)return;
+    if(i>=call.transcript.length){ finishCall(call); return; }
+    const t=call.transcript[i];
+    chat.insertAdjacentHTML('beforeend',`<div class="cb ${t.who==='ki'?'ki':'anr'}"><div class="lbl">${t.who==='ki'?'KI-Empfangskraft':other}</div>${esc(t.text)}</div>`);
+    chat.scrollTop=chat.scrollHeight; i++; setTimeout(step,1400);
+  };
+  setTimeout(step,700);
+}
+function finishCall(call){
+  if(call._book){const b=call._book;const c=ensureCustomer(b.name,b.tel,'');const nr='REP-'+(S.counter++);
+    const o={id:uid('o'),nr,cid:c.id,brand:b.brand,model:b.model,issue:b.issue,qual:'Original',price:b.price,status:'offen',prio:'Standard',created:today(),due:b.appt,appt:b.appt,notes:(call.channel==='whatsapp'?'Per WhatsApp gebucht':'Telefonisch gebucht')+' (KI-Empfangskraft)',imei:'',readyAt:'',warranty:SHOP.warranty,sig:'',source:call.channel};
+    S.ord.unshift(o);const r=S.rules.find(x=>x.id==='r_confirm');if(r&&r.on)logMail(o,r,'automatisch ('+CH[call.channel]+'-Buchung)');
+    call.order=nr;call.result='Termin gebucht: '+b.model+' '+b.issue+', '+fmtDate(b.appt)+' 14:30'; delete call._book;}
+  S.calls.unshift(call); save(); refreshBadges();
+  const foot=document.getElementById('callfoot');
+  if(foot) foot.innerHTML=`<div class="divider"></div><div class="note"><b>Automatisch erledigt:</b> ${esc(call.result)}${call.task?' · Rückruf-Aufgabe für das Team':''}${call.order?' · Auftrag '+call.order:''}</div>
+    <div class="row" style="margin-top:12px;justify-content:flex-end"><button class="btn gho" onclick="closeAll()">Schließen</button><button class="btn pri" onclick="closeAll();go('anrufe')">Zum Protokoll</button></div>`;
+}
+
+/* ============================ DEMO-TOUR ============================ */
+let _demoStop=false,_demoT=null;
+function demoBanner(txt,idx,total){
+  let el=document.getElementById('democtl');
+  if(!el){el=document.createElement('div');el.id='democtl';el.className='democtl';document.body.appendChild(el);}
+  el.innerHTML='<div class="txt"><b>Demo-Tour</b> · Schritt '+idx+'/'+total+'<div style="opacity:.85;font-size:13px;max-width:60ch">'+txt+'</div></div><button class="stop" onclick="stopDemo()">Stopp</button>';
+}
+function stopDemo(){_demoStop=true; if(_demoT)clearTimeout(_demoT); const el=document.getElementById('democtl'); if(el)el.remove(); }
+function startDemo(){
+  _demoStop=true; if(_demoT)clearTimeout(_demoT); _demoStop=false;
+  S.ord=S.ord.filter(o=>o.id!=='odemo');
+  const c=S.cust[0];
+  S.ord.unshift({id:'odemo',nr:'REP-DEMO',cid:c.id,brand:'Apple',model:'iPhone 13',issue:'Displaytausch',qual:'Original',price:129,status:'offen',prio:'Standard',created:today(),due:today(),appt:'',notes:'Demo-Auftrag',imei:'',readyAt:'',warranty:6,sig:'',source:''});
+  save();
+  const steps=[
+    {t:'Neuer Auftrag angenommen: '+c.name+' · iPhone 13 · Displaytausch.',run:()=>{go('auftraege');openOrder('odemo');}},
+    {t:'Status → In Bearbeitung. Der Kunde erhält automatisch die Eingangsbestätigung.',run:()=>{setStatus('odemo','bearbeitung');}},
+    {t:'Ersatzteil fehlt → der Kunde wird informiert, für die Werkstatt entsteht eine Erinnerung.',run:()=>{setStatus('odemo','warten');}},
+    {t:'Teil ist eingetroffen → die Reparatur läuft weiter.',run:()=>{setStatus('odemo','bearbeitung');}},
+    {t:'Fertig! Der Kunde bekommt sofort die Abhol-Nachricht.',run:()=>{setStatus('odemo','fertig');}},
+    {t:'Der Kunde verfolgt all das live auf seiner Status-Seite. Hier laufen die geplanten Erinnerungen auf.',run:()=>{closeAll();go('erinnerungen');remTab='queue';views.erinnerungen();paintIcons();}},
+    {t:'Abgeholt & abgeschlossen. Einen Tag später folgt automatisch die Bewertungsanfrage.',run:()=>{go('auftraege');setStatus('odemo','abgeholt');}},
+    {t:'Fertig. Jede versendete Nachricht ist im Verlauf protokolliert.',run:()=>{closeAll();go('erinnerungen');remTab='log';views.erinnerungen();paintIcons();}},
+  ];
+  let i=0;
+  const tick=()=>{ if(_demoStop)return;
+    const s=steps[i]; demoBanner(s.t,i+1,steps.length); s.run();
+    i++;
+    _demoT=setTimeout(i<steps.length?tick:demoDone,3000);
+  };
+  closeAll(); tick();
+}
+function demoDone(){ if(_demoStop)return; const el=document.getElementById('democtl');
+  if(el)el.innerHTML='<div class="txt"><b>Demo-Tour beendet</b><div style="opacity:.85;font-size:13px">Sie können sie jederzeit erneut starten.</div></div><button class="stop" onclick="stopDemo()">Schließen</button>';
+}
+
+/* ============================ BOOT ============================ */
+paintIcons();
+(function(){const n=pullBookings(); go('dashboard');
+  if(n) setTimeout(()=>toast(n+' neue Online-Buchung'+(n>1?'en':'')+' übernommen'),500);
+})();
+window.addEventListener('focus',()=>{const n=pullBookings(); if(n){go(current);toast(n+' neue Online-Buchung'+(n>1?'en':'')+' übernommen');}});
+</script>
+</body>
+</html>

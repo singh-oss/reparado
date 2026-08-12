@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reparado – Die einfache Software für Reparaturwerkstätten</title>
+<meta name="description" content="Reparado ist die schwarz-weiß-einfache Werkstatt-Software für Handy-Reparaturen: Aufträge, Kunden, Lager, Kasse und automatische Erinnerungen an Kunden & Team.">
+<style>
+  :root{--ink:#12241b;--ink2:#6b6b6b;--line:#e6e6e6;--soft:#f6f6f6;--radius:16px}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:#fff;font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+  .btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:#fff;color:#0e7a3c;border-radius:12px;padding:13px 22px;font-weight:700;font-size:15px;cursor:pointer;transition:.14s}
+  .btn:hover{border-color:#0e7a3c}
+  .btn.pri{background:#0e7a3c;color:#fff;border-color:#0e7a3c}
+  .btn.pri:hover{opacity:.85}
+  .btn.big{padding:16px 30px;font-size:17px}
+
+  header{position:sticky;top:0;z-index:40;background:rgba(255,255,255,.86);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  .nav{display:flex;align-items:center;gap:24px;height:70px}
+  .logo{display:flex;align-items:center;gap:10px;font-weight:900;font-size:22px;letter-spacing:-.6px}
+  .logo .dot{width:30px;height:30px;border-radius:9px;background:#0e7a3c;color:#fff;display:grid;place-items:center;font-size:17px}
+  .nav .links{display:flex;gap:26px;margin-left:20px}
+  .nav .links a{color:var(--ink2);font-weight:600;font-size:15px}
+  .nav .links a:hover{color:#0e7a3c}
+  .nav .sp{flex:1}
+  @media(max-width:820px){.nav .links{display:none}}
+
+  .hero{padding:74px 0 40px;text-align:center}
+  .badge{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:30px;padding:7px 16px;font-size:13px;font-weight:700;color:#333;margin-bottom:26px}
+  .badge .d{width:7px;height:7px;border-radius:50%;background:#0e7a3c}
+  h1{font-size:60px;line-height:1.03;letter-spacing:-2.4px;font-weight:900;max-width:900px;margin:0 auto}
+  h1 .u{text-decoration:underline;text-decoration-thickness:4px;text-underline-offset:6px}
+  .hero p.lead{font-size:20px;color:var(--ink2);max-width:640px;margin:24px auto 0}
+  .cta{display:flex;gap:14px;justify-content:center;margin-top:34px;flex-wrap:wrap}
+  .trust{margin-top:22px;color:var(--ink2);font-size:14px}
+  @media(max-width:720px){h1{font-size:40px;letter-spacing:-1.4px}.hero p.lead{font-size:17px}}
+
+  /* App mockup */
+  .shot{max-width:1000px;margin:52px auto 0;border:1px solid var(--line);border-radius:20px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.10)}
+  .shot .bar{display:flex;align-items:center;gap:7px;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--soft)}
+  .shot .bar i{width:11px;height:11px;border-radius:50%;background:#d5d5d5;display:block}
+  .shotgrid{display:grid;grid-template-columns:200px 1fr;min-height:340px}
+  .shotgrid .sb{border-right:1px solid var(--line);padding:16px 12px}
+  .shotgrid .sb .b{font-weight:900;font-size:16px;margin-bottom:14px;display:flex;gap:8px;align-items:center}
+  .shotgrid .sb .b .dot{width:22px;height:22px;border-radius:7px;background:#0e7a3c;color:#fff;display:grid;place-items:center;font-size:12px}
+  .shotgrid .sb a{display:block;padding:8px 10px;border-radius:8px;color:var(--ink2);font-weight:600;font-size:14px;margin-bottom:2px}
+  .shotgrid .sb a.on{background:#0e7a3c;color:#fff}
+  .shotgrid .bd{padding:20px;text-align:left}
+  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .kpis .k{border:1px solid var(--line);border-radius:12px;padding:14px}
+  .kpis .k .n{font-size:24px;font-weight:900;letter-spacing:-1px}
+  .kpis .k .l{color:var(--ink2);font-size:12px}
+  .mockrow{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}
+  .mockrow:last-child{border:0}
+  .av{width:30px;height:30px;border-radius:8px;background:#0e7a3c;color:#fff;display:grid;place-items:center;font-size:12px;font-weight:700}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;border:1px solid #0e7a3c}
+  .pill.solid{background:#0e7a3c;color:#fff}
+  .pill.soft{border-color:var(--line);color:var(--ink2)}
+  .pill .d{width:6px;height:6px;border-radius:50%;background:currentColor}
+  @media(max-width:720px){.shotgrid{grid-template-columns:1fr}.shotgrid .sb{display:none}}
+
+  section{padding:72px 0}
+  .sec-h{text-align:center;max-width:640px;margin:0 auto 44px}
+  .sec-h .t{font-size:38px;font-weight:900;letter-spacing:-1.4px}
+  .sec-h .s{color:var(--ink2);font-size:18px;margin-top:12px}
+  .feat{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  @media(max-width:820px){.feat{grid-template-columns:1fr}}
+  .card{border:1px solid var(--line);border-radius:var(--radius);padding:26px}
+  .card .ic{width:46px;height:46px;border-radius:12px;background:#0e7a3c;color:#fff;display:grid;place-items:center;margin-bottom:16px}
+  .card .ic svg{width:24px;height:24px}
+  .maillist .ico svg{width:20px;height:20px}
+  .chat{border:1px solid var(--line);border-radius:18px;padding:18px;display:flex;flex-direction:column;gap:10px;box-shadow:0 24px 60px rgba(0,0,0,.07)}
+  .chat .b{max-width:86%;padding:10px 13px;border-radius:14px;font-size:14px;line-height:1.5}
+  .chat .b.ki{align-self:flex-end;background:#0e7a3c;color:#fff;border-bottom-right-radius:4px}
+  .chat .b.an{align-self:flex-start;background:var(--soft);border-bottom-left-radius:4px}
+  .chat .b small{display:block;font-size:11px;opacity:.6;font-weight:700;margin-bottom:2px}
+  .callbar{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;margin-bottom:14px;background:var(--soft)}
+  .callbar .p{width:10px;height:10px;border-radius:50%;background:#0e7a3c}
+  .card h3{font-size:19px;margin-bottom:8px;letter-spacing:-.3px}
+  .card p{color:var(--ink2);font-size:15px}
+
+  .alt{background:#0e7a3c;color:#fff}
+  .alt .sec-h .s{color:rgba(255,255,255,.82)}
+  .alt .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;counter-reset:s}
+  @media(max-width:820px){.alt .steps{grid-template-columns:1fr 1fr}}
+  .alt .step{border:1px solid rgba(255,255,255,.22);border-radius:14px;padding:22px}
+  .alt .step .num{width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.5);display:grid;place-items:center;font-weight:800;margin-bottom:14px}
+  .alt .step h4{font-size:17px;margin-bottom:6px}
+  .alt .step p{color:rgba(255,255,255,.8);font-size:14px}
+
+  /* reminders showcase */
+  .remwrap{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:center}
+  @media(max-width:820px){.remwrap{grid-template-columns:1fr}}
+  .maillist .m{display:flex;gap:14px;align-items:flex-start;padding:16px;border:1px solid var(--line);border-radius:14px;margin-bottom:12px}
+  .maillist .m .ico{width:40px;height:40px;border-radius:10px;background:#0e7a3c;color:#fff;display:grid;place-items:center;flex:none;font-weight:700}
+  .maillist .m.w .ico{background:#fff;color:#0e7a3c;border:1px solid #0e7a3c}
+  .maillist .m .sub{color:var(--ink2);font-size:14px;margin-top:2px}
+  .maillist .m .when{margin-left:auto;font-size:12px;color:#999;font-weight:700;white-space:nowrap}
+
+  /* pricing */
+  .prices{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;align-items:stretch}
+  @media(max-width:820px){.prices{grid-template-columns:1fr}}
+  .price{border:1px solid var(--line);border-radius:18px;padding:28px;display:flex;flex-direction:column}
+  .price.hot{border:2px solid #0e7a3c;position:relative}
+  .price.hot .tag{position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:#0e7a3c;color:#fff;font-size:12px;font-weight:800;padding:5px 14px;border-radius:20px}
+  .price .name{font-weight:800;font-size:18px}
+  .price .amt{font-size:44px;font-weight:900;letter-spacing:-2px;margin:12px 0 2px}
+  .price .amt small{font-size:16px;font-weight:700;color:var(--ink2)}
+  .price ul{list-style:none;margin:18px 0;flex:1}
+  .price li{padding:8px 0;border-bottom:1px solid var(--line);font-size:15px;display:flex;gap:10px}
+  .price li::before{content:"✓";font-weight:900}
+
+  .final{text-align:center;padding:90px 0}
+  .final .t{font-size:44px;font-weight:900;letter-spacing:-1.6px;max-width:760px;margin:0 auto}
+  footer{border-top:1px solid var(--line);padding:40px 0;color:var(--ink2);font-size:14px}
+  .footgrid{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;align-items:center}
+</style>
+</head>
+<body>
+<header>
+ <div class="wrap nav">
+   <div class="logo"><span class="dot">R</span>Reparado</div>
+   <div class="links"><a href="#telefon">KI-Telefon</a><a href="#features">Funktionen</a><a href="#reminders">Erinnerungen</a><a href="#preise">Preise</a></div>
+   <div class="sp"></div>
+   <a class="btn" href="app.html">Anmelden</a>
+   <a class="btn pri" href="app.html">Kostenlos testen</a>
+ </div>
+</header>
+
+<div class="hero wrap">
+  <div class="badge"><span class="d"></span>Die KI-Empfangskraft für Reparaturwerkstätten</div>
+  <h1>Deine Werkstatt hat jetzt<br>eine <span class="u">Empfangskraft</span>.</h1>
+  <p class="lead">Reparado nimmt Anrufe an, bucht Termine und hält deine Kunden auf dem Laufenden. Die ganze Verwaltung – Aufträge, Lager, Kasse – erledigt sich dabei von selbst.</p>
+  <div class="cta">
+    <a class="btn pri big" href="app.html">Kostenlos starten →</a>
+    <a class="btn big" href="#telefon">Empfangskraft ansehen</a>
+  </div>
+  <div class="trust">Nimmt ab, wenn du gerade schraubst. Bucht Termine. Vergisst nichts.</div>
+
+  <!-- Mockup -->
+  <div class="shot">
+    <div class="bar"><i></i><i></i><i></i></div>
+    <div class="shotgrid">
+      <div class="sb">
+        <div class="b"><span class="dot">R</span>Reparado</div>
+        <a class="on">Übersicht</a><a>Anrufe</a><a>Aufträge</a><a>Kalender</a><a>Erinnerungen</a><a>Kasse</a>
+      </div>
+      <div class="bd">
+        <div class="kpis">
+          <div class="k"><div class="n">€ 4.465</div><div class="l">Umsatz Monat</div></div>
+          <div class="k"><div class="n">7</div><div class="l">Offene Aufträge</div></div>
+          <div class="k"><div class="n">12</div><div class="l">Erinnerungen geplant</div></div>
+        </div>
+        <div style="margin-top:18px">
+          <div class="mockrow"><div class="av">PD</div><div style="flex:1"><b>Peter Durau · Galaxy A56</b><div style="color:var(--ink2);font-size:13px">Kameraglas · REP-1115</div></div><span class="pill"><span class="d"></span>Offen</span></div>
+          <div class="mockrow"><div class="av">DR</div><div style="flex:1"><b>Diana Roth · iPhone 13</b><div style="color:var(--ink2);font-size:13px">Akkutausch · REP-1111</div></div><span class="pill solid"><span class="d"></span>In Bearbeitung</span></div>
+          <div class="mockrow"><div class="av">ER</div><div style="flex:1"><b>Evie Rosner · Galaxy S22</b><div style="color:var(--ink2);font-size:13px">Display · REP-1108</div></div><span class="pill solid"><span class="d"></span>Abholbereit</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- KI-TELEFON -->
+<section id="telefon" class="wrap">
+  <div class="sec-h"><div class="t">Das Telefon klingelt. Du schraubst weiter.</div>
+    <div class="s">Die KI-Empfangskraft nimmt Anrufe <b>und WhatsApp</b> entgegen – auch nach Feierabend – und beantwortet die immer gleichen Fragen selbst, aus deinen echten Daten.</div></div>
+  <div class="remwrap">
+    <div class="chat">
+      <div class="callbar"><span class="p"></span><div><b>Eingehender Anruf</b><div style="color:var(--ink2);font-size:13px">Unbekannter Anrufer · Empfangskraft übernimmt</div></div></div>
+      <div class="b ki"><small>KI-Empfangskraft</small>Dein Handy Doc, Sie sprechen mit der digitalen Assistentin. Wie kann ich helfen?</div>
+      <div class="b an"><small>Anrufer</small>Hallo, ist mein Samsung schon fertig?</div>
+      <div class="b ki"><small>KI-Empfangskraft</small>Auf welchen Namen läuft der Auftrag?</div>
+      <div class="b an"><small>Anrufer</small>Rosner.</div>
+      <div class="b ki"><small>KI-Empfangskraft</small>Ihr Galaxy S22 ist abholbereit – Mo–Fr 9–18 Uhr. Endbetrag 250 €.</div>
+      <div class="b an"><small>Anrufer</small>Perfekt, danke!</div>
+    </div>
+    <div>
+      <div style="font-size:26px;font-weight:900;letter-spacing:-1px;margin-bottom:12px">Nie wieder mitten in der Reparatur ans Telefon.</div>
+      <p style="color:var(--ink2);font-size:17px">„Ist mein Handy fertig?", „Was kostet ein Displaytausch?", „Habt ihr auf?" – die vier häufigsten Anrufe beantwortet die Empfangskraft aus deinen echten Daten. Sofort, auch nach Feierabend.</p>
+      <ul style="list-style:none;margin:18px 0;padding:0">
+        <li style="padding:8px 0;border-bottom:1px solid var(--line)">Liest den Reparaturstatus direkt vor – am Telefon und per WhatsApp</li>
+        <li style="padding:8px 0;border-bottom:1px solid var(--line)">Nennt Preise und Lagerbestand aus deinen Daten</li>
+        <li style="padding:8px 0;border-bottom:1px solid var(--line)">Bucht Termine direkt in deinen Kalender</li>
+        <li style="padding:8px 0;border-bottom:1px solid var(--line)">Übernimmt automatisch nach Feierabend, mit eigener Ansage</li>
+        <li style="padding:8px 0">Komplexe Fälle: nimmt Rückruf-Aufgabe für dich auf</li>
+      </ul>
+      <p style="color:var(--ink2);font-size:15px">Du entscheidest, wann sie rangeht: nur im Überlauf, nur nach Feierabend oder immer. Alle Anrufe und Nachrichten laufen in einem Posteingang zusammen.</p>
+      <a class="btn pri" style="margin-top:16px" href="app.html">Empfangskraft live testen →</a>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features" class="wrap">
+  <div class="sec-h"><div class="t">Alles, was eine Werkstatt braucht. Nichts, was sie bremst.</div>
+    <div class="s">Ein System für den ganzen Ablauf – von der Annahme bis zur Abholung.</div></div>
+  <div class="feat">
+    <div class="card"><div class="ic" data-ic="phone"></div><h3>KI-Empfangskraft am Telefon</h3><p>Nimmt Anrufe an, liest den Status vor, nennt Preise und bucht Termine – auch nach Feierabend. Komplexe Fälle landen als Rückruf-Aufgabe bei dir.</p></div>
+    <div class="card"><div class="ic" data-ic="clip"></div><h3>Aufträge in Sekunden</h3><p>Gerät, Fehler, Preis – fertig. Klarer Statusfluss von „Offen" über „In Bearbeitung" bis „Abholbereit". Jeder Kunde bekommt einen eigenen Status-Link.</p></div>
+    <div class="card"><div class="ic" data-ic="bell"></div><h3>Nie wieder nachtelefonieren</h3><p>Automatische Erinnerungen an Kunden (Termin, Abholung, Bewertung) und an das Team (Teil da, überfällig, Lager leer). Logisch getaktet.</p></div>
+    <div class="card"><div class="ic" data-ic="rcpt"></div><h3>Kasse, die sich anbindet</h3><p>Verbinden Sie SumUp, Zettle, HelloCash oder orderbird – Kartenzahlung und TSE-konforme Belege ohne neue Hardware.</p></div>
+    <div class="card"><div class="ic" data-ic="box"></div><h3>Lager & Ersatzteile</h3><p>Teile-Bestellungen hängen direkt am Auftrag. Kommt das Teil, geht der Auftrag automatisch weiter – und der Kunde wird informiert.</p></div>
+    <div class="card"><div class="ic" data-ic="tag"></div><h3>Preise & Online-Buchung</h3><p>Preiskatalog für tausende Modelle. Kunden buchen Termine und sehen Preise direkt auf Ihrer Website – per Widget oder WordPress-Plugin.</p></div>
+    <div class="card"><div class="ic" data-ic="chart"></div><h3>Zahlen, die zählen</h3><p>Umsatz, häufigste Reparaturen, Abschlüsse – auf einen Blick, ohne Excel. Sie wissen sofort, was läuft.</p></div>
+  </div>
+</section>
+
+<!-- REMINDERS -->
+<section id="reminders" class="wrap">
+  <div class="sec-h"><div class="t">Die richtige Nachricht. Automatisch. Zur richtigen Zeit.</div>
+    <div class="s">Reparado denkt an das, was im Alltag untergeht – für Kunden <b>und</b> für Sie.</div></div>
+  <div class="remwrap">
+    <div class="maillist">
+      <div class="m"><div class="ico" data-ic="chat"></div><div><b>Fertig und abholbereit</b><div class="sub">an den Kunden – sobald die Reparatur fertig ist</div></div><div class="when">sofort</div></div>
+      <div class="m"><div class="ico" data-ic="bell"></div><div><b>Abhol-Erinnerung</b><div class="sub">an den Kunden – wenn das Gerät 3 Tage liegt</div></div><div class="when">Tag 3</div></div>
+      <div class="m"><div class="ico" data-ic="mail"></div><div><b>Bewertungsanfrage</b><div class="sub">an den Kunden – 1 Tag nach der Abholung</div></div><div class="when">Tag +1</div></div>
+      <div class="m w"><div class="ico" data-ic="tool"></div><div><b>Ersatzteil eingetroffen</b><div class="sub">an das Team – Auftrag kann weiter</div></div><div class="when">sofort</div></div>
+      <div class="m w"><div class="ico" data-ic="arch"></div><div><b>Lagerbestand niedrig</b><div class="sub">an das Team – rechtzeitig nachbestellen</div></div><div class="when">auto</div></div>
+    </div>
+    <div>
+      <div style="font-size:26px;font-weight:900;letter-spacing:-1px;margin-bottom:12px">Kunden fühlen sich betreut.<br>Sie vergessen nichts mehr.</div>
+      <p style="color:var(--ink2);font-size:17px">Terminbestätigung, Vortags-Erinnerung, Abgabe-Checkliste, Kostenvoranschlag-Freigabe, „fertig", Abholung, Bewertung – alle Nachrichten sind fertig vorformuliert und lassen sich mit einem Klick anpassen.</p>
+      <p style="color:var(--ink2);font-size:17px;margin-top:14px">Ihr Team bekommt eigene Erinnerungen: Tagesüberblick, überfällige Aufträge, gelieferte Teile, leeres Lager.</p>
+      <a class="btn pri" style="margin-top:20px" href="app.html">Alle Vorlagen ansehen →</a>
+    </div>
+  </div>
+</section>
+
+<!-- HOW -->
+<section id="how" class="alt">
+ <div class="wrap">
+  <div class="sec-h"><div class="t" style="color:#fff">So einfach wie Zettel – nur besser.</div>
+    <div class="s">Vier Schritte. Keine Schulung. Kein Handbuch.</div></div>
+  <div class="steps">
+    <div class="step"><div class="num">1</div><h4>Auftrag annehmen</h4><p>Kunde, Gerät, Fehler, Preis. Kunde bekommt automatisch die Bestätigung.</p></div>
+    <div class="step"><div class="num">2</div><h4>Reparieren</h4><p>Status ziehen. Teil fehlt? Bestellung hängt am Auftrag, Kunde wird informiert.</p></div>
+    <div class="step"><div class="num">3</div><h4>„Fertig" tippen</h4><p>Der Kunde bekommt sofort die Abhol-Nachricht – ganz ohne Anruf.</p></div>
+    <div class="step"><div class="num">4</div><h4>Kassieren</h4><p>An der angebundenen Kasse bezahlen, Beleg drucken, Bewertung folgt automatisch.</p></div>
+  </div>
+ </div>
+</section>
+
+<!-- PRICING -->
+<section id="preise" class="wrap">
+  <div class="sec-h"><div class="t">Ein fairer Preis. Kein Kleingedrucktes.</div>
+    <div class="s">Monatlich kündbar. 14 Tage kostenlos testen – ohne Kreditkarte. KI-Empfangskraft optional zubuchbar (Aufpreis + Minutenpreis).</div></div>
+  <div class="prices">
+    <div class="price"><div class="name">Solo</div><div class="amt">29€ <small>/ Monat</small></div>
+      <p style="color:var(--ink2)">Für die Ein-Personen-Werkstatt.</p>
+      <ul><li>Aufträge & Kunden unbegrenzt</li><li>Kunden-Erinnerungen</li><li>Kalender & Status-Link</li><li>1 Benutzer</li></ul>
+      <a class="btn" href="app.html">Testen</a></div>
+    <div class="price hot"><div class="tag">Beliebt</div><div class="name">Werkstatt</div><div class="amt">49€ <small>/ Monat</small></div>
+      <p style="color:var(--ink2)">Der Standard für laufende Läden.</p>
+      <ul><li>Alles aus Solo</li><li>Team-Erinnerungen & Tagesüberblick</li><li>Lager, Bestellungen & Ankauf</li><li>Kassen-Anbindung (SumUp, HelloCash …)</li><li>Online-Buchungswidget</li><li>KI-Empfangskraft zubuchbar</li><li>bis 3 Benutzer</li></ul>
+      <a class="btn pri" href="app.html">Kostenlos starten →</a></div>
+    <div class="price"><div class="name">Filiale</div><div class="amt">99€ <small>/ Monat</small></div>
+      <p style="color:var(--ink2)">Für mehrere Standorte & größere Teams.</p>
+      <ul><li>Alles aus Werkstatt</li><li>Mehrere Standorte</li><li>Rollen & Rechte</li><li>Lexware / lexoffice Export</li><li>unbegrenzte Benutzer</li></ul>
+      <a class="btn" href="app.html">Testen</a></div>
+  </div>
+</section>
+
+<!-- FINAL -->
+<div class="final wrap">
+  <div class="t">Weniger Nachfragen. Mehr fertige Geräte. Zufriedenere Kunden.</div>
+  <div class="cta" style="margin-top:30px"><a class="btn pri big" href="app.html">Jetzt kostenlos testen →</a></div>
+  <div class="trust">14 Tage gratis · keine Kreditkarte · in Minuten startklar</div>
+</div>
+
+<footer>
+ <div class="wrap footgrid">
+   <div class="logo"><span class="dot">R</span>Reparado</div>
+   <div style="display:flex;gap:22px;flex-wrap:wrap"><a href="#features">Funktionen</a><a href="#preise">Preise</a><a href="app.html">Anmelden</a><a href="booking.html">Online-Termin (Kunden)</a><a href="#">Datenschutz</a><a href="#">Impressum</a></div>
+   <div>© 2026 Reparado · Werkstatt-Software</div>
+ </div>
+</footer>
+<script>
+const ICONS={
+ clip:'<rect x="8" y="3" width="8" height="4" rx="1"/><path d="M9 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3"/><path d="M9 12h6M9 16h4"/>',
+ bell:'<path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>',
+ rcpt:'<rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 8h6M9 12h6M9 16h4"/>',
+ box:'<path d="M21 8v8l-9 5-9-5V8l9-5 9 5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
+ tag:'<path d="M3 3h8l10 10-8 8L3 11V3z"/><circle cx="7.5" cy="7.5" r="1.4"/>',
+ chart:'<path d="M3 21h18"/><rect x="6" y="10" width="3" height="8"/><rect x="11" y="6" width="3" height="12"/><rect x="16" y="13" width="3" height="5"/>',
+ phone:'<path d="M6.6 10.8a15 15 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.24 11 11 0 0 0 3.5.56 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.6a1 1 0 0 1 1 1 11 11 0 0 0 .56 3.5 1 1 0 0 1-.24 1z"/>',
+ chat:'<path d="M4 4h16v12H8l-4 4V4z"/>',
+ mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
+ tool:'<path d="M14.5 5.5a4 4 0 0 0 5 5L21 12l-8 8-2-2 8-8-1.5-1.5-2 2-2-2 2-2z"/>',
+ arch:'<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/>',
+};
+document.querySelectorAll('[data-ic]').forEach(e=>{e.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">'+(ICONS[e.dataset.ic]||'')+'</svg>';});
+</script>
+</body>
+</html>

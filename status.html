@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reparatur-Status · Dein Handy Doc</title>
+<style>
+  :root{--ink:#12241b;--ink2:#6b6b6b;--line:#e6e6e6;--soft:#f6f6f6}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:#fff;-webkit-font-smoothing:antialiased}
+  svg{display:block}
+  .top{border-bottom:1px solid var(--line);padding:16px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;background:#fff;z-index:5}
+  .top .dot{width:30px;height:30px;border-radius:9px;background:#0e7a3c;color:#fff;display:grid;place-items:center;font-weight:800}
+  .top b{font-size:17px;letter-spacing:-.3px}
+  .top .m{margin-left:auto;color:var(--ink2);font-size:13px}
+  .wrap{max-width:560px;margin:0 auto;padding:26px 20px 60px}
+  h1{font-size:26px;letter-spacing:-.7px;margin-bottom:4px}
+  .sub{color:var(--ink2);margin-bottom:22px}
+  .card{border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:16px}
+  .row{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:15px}
+  .row:last-child{border:0}
+  .row b{font-weight:800}
+  .badge{display:inline-flex;align-items:center;gap:7px;border:1px solid #0e7a3c;border-radius:20px;padding:6px 13px;font-weight:800;font-size:14px}
+  .badge.solid{background:#0e7a3c;color:#fff}
+  .badge .d{width:8px;height:8px;border-radius:50%;background:currentColor}
+
+  .steps{position:relative;margin-top:6px}
+  .step{display:flex;gap:16px;padding-bottom:26px;position:relative}
+  .step:last-child{padding-bottom:0}
+  .step .linewrap{position:relative;display:flex;flex-direction:column;align-items:center}
+  .step .cir{width:34px;height:34px;border-radius:50%;border:2px solid var(--line);background:#fff;display:grid;place-items:center;flex:none;z-index:2;color:#bdbdbd}
+  .step .bar{position:absolute;top:34px;bottom:-2px;width:2px;background:var(--line)}
+  .step:last-child .bar{display:none}
+  .step.done .cir{background:#0e7a3c;border-color:#0e7a3c;color:#fff}
+  .step.done .bar{background:#0e7a3c}
+  .step.cur .cir{border-color:#0e7a3c;color:#0e7a3c;box-shadow:0 0 0 4px rgba(0,0,0,.08)}
+  .step .txt{padding-top:5px}
+  .step .txt .t{font-weight:800;font-size:16px}
+  .step.future .txt .t{color:#bdbdbd}
+  .step .txt .s{color:var(--ink2);font-size:13px;margin-top:2px}
+  .step .note{background:var(--soft);border-radius:10px;padding:9px 12px;font-size:13px;color:#444;margin-top:8px}
+
+  .cta{display:block;text-align:center;background:#0e7a3c;color:#fff;border-radius:12px;padding:14px;font-weight:700;margin-top:6px}
+  .muted{color:var(--ink2)}
+  .in{width:100%;border:1px solid var(--line);border-radius:12px;padding:13px 14px;outline:0;font-size:15px;margin-top:8px}
+  .in:focus{border-color:#0e7a3c}
+  .btn{width:100%;border:1px solid #0e7a3c;background:#0e7a3c;color:#fff;border-radius:12px;padding:14px;font-weight:700;font-size:15px;cursor:pointer;margin-top:14px}
+  .foot{text-align:center;color:var(--ink2);font-size:13px;margin-top:26px;line-height:1.7}
+  a.plain{color:#0e7a3c;font-weight:700}
+</style>
+</head>
+<body>
+<div class="top"><span class="dot">D</span><b>Dein Handy Doc</b><span class="m">Reparatur-Status</span></div>
+<div class="wrap" id="wrap"></div>
+
+<script>
+const SHOP={name:"Dein Handy Doc",street:"Bahnhofstr. 12",zip:"72336",city:"Balingen",phone:"07433 9678444",hours:"Mo–Fr 9–18 Uhr, Sa 9–13 Uhr",google:"g.page/deinhandydoc/review"};
+const CK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><path d="M20 6L9 17l-5-5"/></svg>';
+function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function eur(n){return '€ '+Number(n||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmtDate(d){if(!d)return '—';return new Date(d).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});}
+function addMonths(ds,m){const x=new Date(ds);x.setMonth(x.getMonth()+(+m||0));return x.toISOString().slice(0,10);}
+function param(k){return new URLSearchParams(location.search).get(k);}
+
+function loadStore(){try{return JSON.parse(localStorage.getItem('reparado_v1'));}catch(e){return null;}}
+function findOrder(nr){const S=loadStore();if(!S||!S.ord)return null;
+  const o=S.ord.find(x=>x.nr.toLowerCase()===(nr||'').toLowerCase().trim());
+  if(!o)return null;const c=(S.cust||[]).find(x=>x.id===o.cid)||{name:'',tel:''};return {o,c};}
+
+/* Kundenfreundliche Schritte */
+const STEPS=[
+  {key:'angenommen',t:'Auftrag angenommen',s:'Wir haben Ihr Gerät erhalten.'},
+  {key:'bearbeitung',t:'In Bearbeitung',s:'Unsere Technik kümmert sich darum.'},
+  {key:'fertig',t:'Abholbereit',s:'Ihr Gerät ist repariert.'},
+  {key:'abgeschlossen',t:'Abgeschlossen',s:'Gerät abgeholt. Vielen Dank!'},
+];
+function stepIndex(status){return {offen:0,bearbeitung:1,warten:1,fertig:2,abgeholt:3}[status]??0;}
+
+function render(){
+  const wrap=document.getElementById('wrap');
+  const nr=param('nr');
+  if(!nr){ return lookup(wrap); }
+  const res=findOrder(nr);
+  if(!res){ wrap.innerHTML=`<h1>Nicht gefunden</h1><p class="sub">Zu „${esc(nr)}" konnten wir keinen Auftrag finden.</p>`; return lookup(wrap,true); }
+  const {o,c}=res;
+  const cur=stepIndex(o.status);
+  const warrUntil=o.pickedAt?addMonths(o.pickedAt,o.warranty):(o.readyAt?addMonths(o.readyAt,o.warranty):'');
+  const ready=o.status==='fertig', done=o.status==='abgeholt';
+
+  wrap.innerHTML=`
+    <h1>Hallo ${esc((c.name||'').split(' ')[0]||'')},</h1>
+    <p class="sub">hier ist der aktuelle Stand Ihrer Reparatur.</p>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div><div style="font-weight:800;font-size:18px">${esc(o.brand)} ${esc(o.model)}</div>
+          <div class="muted" style="font-size:14px">${esc(o.issue)} · Auftrag ${esc(o.nr)}</div></div>
+        <span class="badge ${(ready||done||o.status==='bearbeitung')?'solid':''}"><span class="d"></span>${STEPS[cur].t}</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="steps">
+        ${STEPS.map((st,i)=>{
+          const cls=i<cur?'done':(i===cur?'cur':'future');
+          const showWait=(o.status==='warten'&&i===1);
+          return `<div class="step ${cls}">
+            <div class="linewrap"><div class="cir">${i<cur?CK:(i+1)}</div><div class="bar"></div></div>
+            <div class="txt"><div class="t">${st.t}</div><div class="s">${i<=cur?st.s:''}</div>
+              ${showWait?`<div class="note">Wir warten aktuell auf ein passendes Ersatzteil und melden uns, sobald es eingetroffen ist.</div>`:''}
+            </div></div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    ${ready?`<div class="card" style="border:2px solid #0e7a3c">
+       <div style="font-weight:800;font-size:17px;margin-bottom:6px">Ihr Gerät ist abholbereit</div>
+       <div class="row"><span>Abholung</span><b>${SHOP.hours}</b></div>
+       <div class="row"><span>Adresse</span><b>${SHOP.street}, ${SHOP.zip} ${SHOP.city}</b></div>
+       <div class="row"><span>Endbetrag</span><b>${eur(o.price)}</b></div>
+     </div>`:''}
+
+    <div class="card">
+      <div class="row"><span>Voraussichtlicher Preis</span><b>${eur(o.price)}</b></div>
+      ${o.appt?`<div class="row"><span>Termin</span><b>${fmtDate(o.appt)}</b></div>`:''}
+      <div class="row"><span>Garantie</span><b>${o.warranty} Monate${warrUntil?' · bis '+fmtDate(warrUntil):''}</b></div>
+      <div class="row"><span>Status seit</span><b>${fmtDate(o.readyAt||o.created)}</b></div>
+    </div>
+
+    ${done?`<a class="cta" href="https://${SHOP.google}" target="_blank">Waren Sie zufrieden? Jetzt bewerten</a>`:
+      `<a class="cta" href="tel:${SHOP.phone.replace(/\\s/g,'')}">Rückfrage? ${SHOP.phone} anrufen</a>`}
+
+    <div class="foot">${SHOP.name} · ${SHOP.street} · ${SHOP.zip} ${SHOP.city}<br>
+      ${SHOP.phone} · <a class="plain" href="booking.html">Neuen Termin buchen</a></div>`;
+}
+
+function lookup(wrap,append){
+  const box=`<div class="card"><div style="font-weight:800;margin-bottom:4px">Reparatur verfolgen</div>
+     <p class="muted" style="font-size:14px">Geben Sie Ihre Auftragsnummer ein (z. B. REP-1108).</p>
+     <input class="in" id="nrIn" placeholder="REP-1108">
+     <button class="btn" onclick="lookupGo()">Status anzeigen</button></div>
+     <div class="foot">${SHOP.name} · ${SHOP.phone}</div>`;
+  if(append) wrap.insertAdjacentHTML('beforeend', box);
+  else wrap.innerHTML=`<h1>Reparatur-Status</h1><p class="sub">Sehen Sie jederzeit, wo Ihre Reparatur steht.</p>`+box;
+}
+function lookupGo(){const v=document.getElementById('nrIn').value.trim();if(!v)return;location.search='?nr='+encodeURIComponent(v);}
+
+render();
+</script>
+</body>
+</html>
