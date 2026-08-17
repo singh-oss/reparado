@@ -5,20 +5,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Reparado – Die einfache Software für Reparaturwerkstätten</title>
 <meta name="description" content="Reparado ist die schwarz-weiß-einfache Werkstatt-Software für Handy-Reparaturen: Aufträge, Kunden, Lager, Kasse und automatische Erinnerungen an Kunden & Team.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
-  :root{--ink:#12241b;--ink2:#6b6b6b;--line:#e6e6e6;--soft:#f6f6f6;--radius:16px}
+  :root{--ink:#0f2318;--ink2:#5f6b64;--line:#eaedeb;--soft:#f5f8f6;--radius:18px;--green:#0e7a3c;--green-d:#0b6733;--green-tint:#eaf4ee;--ring:0 0 0 3px rgba(14,122,60,.16);--shadow-sm:0 1px 2px rgba(16,40,27,.05),0 4px 12px rgba(16,40,27,.05)}
   *{box-sizing:border-box;margin:0;padding:0}
   html{scroll-behavior:smooth}
-  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:#fff;font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  body{font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:#fff;font-size:16px;line-height:1.55;letter-spacing:-.006em;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
   a{color:inherit;text-decoration:none}
+  ::selection{background:rgba(14,122,60,.14)}
   .wrap{max-width:1120px;margin:0 auto;padding:0 24px}
-  .btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:#fff;color:#0e7a3c;border-radius:12px;padding:13px 22px;font-weight:700;font-size:15px;cursor:pointer;transition:.14s}
-  .btn:hover{border-color:#0e7a3c}
-  .btn.pri{background:#0e7a3c;color:#fff;border-color:#0e7a3c}
-  .btn.pri:hover{opacity:.85}
-  .btn.big{padding:16px 30px;font-size:17px}
+  .btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:#fff;color:var(--green);border-radius:13px;padding:13px 22px;font-weight:700;font-size:15px;cursor:pointer;transition:.14s ease;box-shadow:0 1px 1.5px rgba(16,40,27,.04)}
+  .btn:hover{border-color:#cfe0d5;background:var(--green-tint)}
+  .btn:focus-visible{outline:none;box-shadow:var(--ring)}
+  .btn.pri{background:var(--green);color:#fff;border-color:var(--green);box-shadow:0 2px 4px rgba(11,103,51,.26),0 10px 24px rgba(14,122,60,.22)}
+  .btn.pri:hover{background:var(--green-d);border-color:var(--green-d)}
+  .btn.big{padding:16px 30px;font-size:17px;border-radius:14px}
 
-  header{position:sticky;top:0;z-index:40;background:rgba(255,255,255,.86);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  header{position:sticky;top:0;z-index:40;background:rgba(255,255,255,.72);backdrop-filter:saturate(180%) blur(16px);border-bottom:1px solid var(--line)}
   .nav{display:flex;align-items:center;gap:24px;height:70px}
   .logo{display:flex;align-items:center;gap:10px;font-weight:900;font-size:22px;letter-spacing:-.6px}
   .logo .dot{width:30px;height:30px;border-radius:9px;background:#0e7a3c;color:#fff;display:grid;place-items:center;font-size:17px}
@@ -29,7 +34,7 @@
   @media(max-width:820px){.nav .links{display:none}}
 
   .hero{padding:74px 0 40px;text-align:center}
-  .badge{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:30px;padding:7px 16px;font-size:13px;font-weight:700;color:#333;margin-bottom:26px}
+  .badge{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:30px;padding:7px 16px;font-size:13px;font-weight:700;color:var(--ink2);margin-bottom:26px;box-shadow:var(--shadow-sm)}
   .badge .d{width:7px;height:7px;border-radius:50%;background:#0e7a3c}
   h1{font-size:60px;line-height:1.03;letter-spacing:-2.4px;font-weight:900;max-width:900px;margin:0 auto}
   h1 .u{text-decoration:underline;text-decoration-thickness:4px;text-underline-offset:6px}
@@ -68,7 +73,8 @@
   .sec-h .s{color:var(--ink2);font-size:18px;margin-top:12px}
   .feat{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
   @media(max-width:820px){.feat{grid-template-columns:1fr}}
-  .card{border:1px solid var(--line);border-radius:var(--radius);padding:26px}
+  .card{border:1px solid var(--line);border-radius:var(--radius);padding:26px;box-shadow:var(--shadow-sm);transition:.16s ease}
+  .card:hover{box-shadow:0 2px 6px rgba(16,40,27,.06),0 14px 34px rgba(16,40,27,.07);transform:translateY(-2px)}
   .card .ic{width:46px;height:46px;border-radius:12px;background:#0e7a3c;color:#fff;display:grid;place-items:center;margin-bottom:16px}
   .card .ic svg{width:24px;height:24px}
   .maillist .ico svg{width:20px;height:20px}
