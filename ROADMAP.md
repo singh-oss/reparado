@@ -48,7 +48,7 @@ Wachstums-Motoren (Versandreparatur, B2B, Forecast) · **Echtes System** (DB, Au
 | L2 | **⚡ Auto-Angebot aus Anfrage** — Website-Anfrage → KI schreibt Angebot fertig, 1 Klick „senden" | Leap ★ | M | ★★★ | P1, L1 |
 | L6 | **⭐ Bewertungs-Booster** — nach Abholung nur zufriedene Kunden (Sentiment-Gate) um Google-Bewertung bitten | Leap | S–M | ★★★ | — |
 | L5 | **🔁 Reaktivierung** — KI findet fällige Kunden (Akku vor 18 Mon., Garantie läuft aus) → Outreach | Leap | M | ★★★ | — |
-| L9 | **💰 Echte Marge pro Auftrag** — Preis − Teilekosten − Zeit = echter Gewinn, Verlust-Reparaturen sichtbar | Leap | M | ★★★ | Teilekosten aus P2 |
+| ✅ L9 | **💰 Echte Marge pro Auftrag** — Preis − Teilekosten (EK aus Lager) − Arbeitszeit = Gewinn €/%, Verlust rot; Statistik-Kennzahlen · **FERTIG 18.8.** | Leap | M | ★★★ | Teilekosten aus P2 |
 
 ## Phase 3 — Warenwirtschaft & Teile-Intelligenz
 *Zusammenhängender Block; Marge & Bestellungen hängen daran.*
@@ -56,7 +56,7 @@ Wachstums-Motoren (Versandreparatur, B2B, Forecast) · **Echtes System** (DB, Au
 | # | Feature | Typ | Effort | Impact | Abhängig |
 |---|---|---|---|---|---|
 | ✅ P2 | **Warenwirtschaft** — Kategorien, Wareneingang, Inventur, Lagerbewegungen, Lieferanten, Lagerwert, niedrige Bestände (EK/VK) · **FERTIG 18.8.** (offen: Eingangsrechnungen/IMAP → mit Buchhaltung) | Parität 🔴 | L | ★★★ | — |
-| P5 | **Bestellwesen** — Lager- vs. Kundenbestellung, Lieferant je Bestellung, Bestellliste drucken, Filter/Status/Priorität | Parität 🟠 | M | ★★ | P2 |
+| ✅ P5 | **Bestellwesen** — Lager- vs. Kundenbestellung, Lieferant, Bestellliste drucken, Filter/Status/Priorität, Eingang→Lager, Nachbestellen bei Unterbestand · **FERTIG 18.8.** | Parität 🟠 | M | ★★ | P2 |
 | L10 | **🔎 Ersatzteil-Preisvergleich** über Lieferanten + Preishistorie | Leap | M | ★★ | P2 |
 | L11 | **♻️ Auto-Nachbestellung** bei niedrigem Bestand | Leap | S | ★★ | P2 |
 | P6 | **Ankauf/Verkauf-Tiefe** — Profit je Gerät, Lagerwert, Status Reserviert, Import | Parität 🟠 | M | ★ | — |
