@@ -499,7 +499,12 @@ function searchOrders(){ return visRole().filter(o=>!o.trashed); } /* Suche: ink
 function ordArchived(){ return visRole().filter(o=>o.archived&&!o.trashed); }
 function ordTrashed(){ return visRole().filter(o=>o.trashed); }
 /* ---- Systemeinstellungen (P8): Nummernschema, Pflichtfelder, AGB ---- */
-function ensureSettings(){ if(!S.settings){S.settings={orderPrefix:'REP-',quotePrefix:'AN-',required:{imei:false,mail:false,adr:false,sig:false},agb:'Für die Reparatur gelten unsere Allgemeinen Geschäftsbedingungen. Bei Datenverlust wird keine Haftung übernommen – bitte sichern Sie Ihre Daten vor der Abgabe. Die Gewährleistung bezieht sich auf die durchgeführte Reparatur und das eingesetzte Ersatzteil, nicht auf Folgeschäden durch Sturz, Feuchtigkeit oder unsachgemäße Handhabung. Nicht abgeholte Geräte werden nach 90 Tagen kostenpflichtig eingelagert.'};save();} const s=S.settings; if(!s.required)s.required={imei:false,mail:false,adr:false,sig:false}; if(!s.orderPrefix)s.orderPrefix='REP-'; if(!s.quotePrefix)s.quotePrefix='AN-'; if(s.hourlyRate===undefined)s.hourlyRate=60; if(s.autoReorder===undefined)s.autoReorder=false; return s; }
+function ensureSettings(){ if(!S.settings){S.settings={orderPrefix:'REP-',quotePrefix:'AN-',required:{imei:false,mail:false,adr:false,sig:false},agb:'Für die Reparatur gelten unsere Allgemeinen Geschäftsbedingungen. Bei Datenverlust wird keine Haftung übernommen – bitte sichern Sie Ihre Daten vor der Abgabe. Die Gewährleistung bezieht sich auf die durchgeführte Reparatur und das eingesetzte Ersatzteil, nicht auf Folgeschäden durch Sturz, Feuchtigkeit oder unsachgemäße Handhabung. Nicht abgeholte Geräte werden nach 90 Tagen kostenpflichtig eingelagert.'};save();} const s=S.settings; if(!s.required)s.required={imei:false,mail:false,adr:false,sig:false}; if(!s.orderPrefix)s.orderPrefix='REP-'; if(!s.quotePrefix)s.quotePrefix='AN-'; if(s.hourlyRate===undefined)s.hourlyRate=60; if(s.autoReorder===undefined)s.autoReorder=false; if(s.storageFeePerDay===undefined)s.storageFeePerDay=2; return s; }
+/* ---- Nicht-abgeholt-Workflow (L7) ---- */
+function uncollectedOrders(){const now=Date.now();return S.ord.filter(o=>o.status==='fertig'&&!o.trashed&&!o.archived&&o.readyAt).map(o=>{const days=Math.floor((now-new Date(o.readyAt).getTime())/(1000*60*60*24));return {o,days};}).filter(x=>x.days>=3).sort((a,b)=>b.days-a.days);}
+function uncLevel(days){if(days>=14)return{lbl:'Lagergebühr fällig',col:'#c0392b'};if(days>=7)return{lbl:'2. Erinnerung',col:'#e2681c'};return{lbl:'1. Erinnerung',col:'#d99a00'};}
+function uncRemind(id){const o=S.ord.find(x=>x.id===id);const c=cust(o.cid);S.mailLog.unshift({t:new Date().toISOString(),to:c.name,ch:'E-Mail',rule:'Abhol-Erinnerung',subj:'Ihr Gerät wartet auf Abholung · '+o.nr,how:'manuell'});o.lastPickupReminder=today();save();(views[current]||views.dashboard)();paintIcons();toast('Abhol-Erinnerung gesendet (Demo)');}
+function uncFee(id){const o=S.ord.find(x=>x.id===id);const days=Math.floor((Date.now()-new Date(o.readyAt).getTime())/(1000*60*60*24));const fee=Math.max(0,(days-14))*(ensureSettings().storageFeePerDay||2);o.storageFee=fee;save();(views[current]||views.dashboard)();paintIcons();toast('Lagergebühr aktiviert: '+eur(fee)+' ('+(days-14)+' Tage)');}
 /* ---- Marge pro Auftrag (L9) ---- */
 function orderPartsCost(o){return ((o&&o.parts)||[]).reduce((s,p)=>s+(+p.ek||0)*(+p.qty||0),0);}
 function orderLaborCost(o){const rate=ensureSettings().hourlyRate||0;return Math.round((+((o&&o.laborMin)||0))/60*rate*100)/100;}
@@ -605,6 +610,9 @@ views.dashboard=function(){
        <div><div style="font-size:22px;font-weight:800">${S.calls.filter(c=>c.task&&!c.done).length}</div><div style="opacity:.7;font-size:12px">Aufgaben für dich</div></div>
      </div>
    </div>
+   ${(function(){const unc=uncollectedOrders();return unc.length?`<div class="card" style="margin-top:16px;border:1px solid #e2681c"><div class="between"><b>Nicht abgeholte Geräte</b><span class="muted" style="font-size:12px">${unc.length} seit ≥3 Tagen abholbereit</span></div>
+     <div style="margin-top:8px">${unc.slice(0,5).map(x=>{const lv=uncLevel(x.days);return `<div class="listitem"><span class="pill" style="border-color:${lv.col};color:${lv.col}"><span class="d" style="background:${lv.col}"></span>${lv.lbl}</span><div style="flex:1;min-width:0"><b>${esc(cust(x.o.cid).name)} · ${esc(oDevLabel(x.o))}</b><div class="muted" style="font-size:12px">${x.o.nr} · seit ${x.days} Tagen fertig${x.o.storageFee?' · Lagergebühr '+eur(x.o.storageFee):''}</div></div>
+       <button class="btn sm" onclick="uncRemind('${x.o.id}')">Erinnern</button>${x.days>=14?`<button class="btn sm gho" onclick="uncFee('${x.o.id}')">Lagergebühr</button>`:''}<button class="btn sm gho" onclick="openOrder('${x.o.id}')">Öffnen</button></div>`;}).join('')}</div></div>`:'';})()}
    ${(S.feedback&&S.feedback.length)?`<div class="card" style="margin-top:16px"><div class="between"><b>Kundenstimmen</b><span class="muted" style="font-size:12px">${S.feedback.length} Rückmeldung${S.feedback.length>1?'en':''} · ${(S.feedback||[]).filter(f=>f.rating>=3).length} positiv → Google · ${(S.feedback||[]).filter(f=>f.rating<3).length} zur Bearbeitung</span></div>
      <div style="margin-top:8px">${S.feedback.slice(0,4).map(f=>`<div class="listitem"><span class="pill ${f.rating>=3?'solid':'soft'}"><span class="d"></span>${f.rating>=3?'Positiv':(f.rating===2?'Neutral':'Kritik')}</span><div style="flex:1;min-width:0"><b>${esc(f.nr||'—')}</b><div class="muted" style="font-size:13px">${esc(f.text||(f.rating>=3?'Auf Google weitergeleitet':'ohne Kommentar'))}</div></div><button class="btn sm gho" onclick="dismissFb('${f.id}')">Erledigt</button></div>`).join('')}</div></div>`:''}
    <div class="grid g2" style="margin-top:16px">
@@ -725,6 +733,7 @@ function openOrder(id){
      ${o.notes?`<div class="note" style="margin-top:12px">Notiz: ${esc(o.notes)}</div>`:''}
 
      ${margeCard(o)}
+     ${photoSection(o)}
 
      <label class="f" style="margin-top:18px">Status ändern</label>
      <div class="row" style="flex-wrap:wrap;gap:8px">${statusFlow().map(s=>`<button class="chip ${o.status===s?'on':''}" onclick="setStatus('${o.id}','${s}')" style="${o.status===s?`background:${statusColor(s)};border-color:${statusColor(s)};color:#fff`:''}">${esc(statusLabel(s))}</button>`).join('')}</div>
@@ -912,6 +921,7 @@ function noFinalize(){ noCollect();
   if(NO.editId){const o=S.ord.find(x=>x.id===NO.editId);if(o){Object.assign(o,{cid:c.id,devices:devs},noMirror(devs),{lock:NO.lock,lockval:NO.lockval,prio:NO.prio,appt:NO.terminMode==='termin'?NO.appt:'',due:NO.due,notes:NO.notes,technikerId:NO.technikerId,sig:NO.sig||o.sig});}save();toast('Auftrag gespeichert');NO=null;go('auftraege');return;}
   const nr=nextOrderNr();
   const o=Object.assign({id:uid('o'),nr,cid:c.id,devices:devs,lock:NO.lock,lockval:NO.lockval,status:'offen',prio:NO.prio,created:today(),due:NO.due,appt:NO.terminMode==='termin'?NO.appt:'',notes:NO.notes,readyAt:'',sig:NO.sig||'',source:'',technikerId:NO.technikerId},noMirror(devs));
+  if(NO.diagPhoto)o.photos=[NO.diagPhoto];
   S.ord.unshift(o); const rc=S.rules.find(x=>x.id==='r_confirm'); if(rc&&rc.on&&c.mail)logMail(o,rc,'automatisch (Anlage)');
   S.drafts=(S.drafts||[]).filter(x=>x.id!==NO.draftId); save();
   toast('Auftrag '+nr+' angelegt'+(devs.length>1?(' · '+devs.length+' Geräte'):'')); NO=null; go('auftraege');
@@ -1580,6 +1590,14 @@ function ordAddPartDo(orderId){const o=S.ord.find(x=>x.id===orderId);const pid=d
   save();closeAll();openOrder(orderId);refreshBadges();toast('Teil verbaut · Lager gebucht');}
 function ordDelPart(orderId,idx){const o=S.ord.find(x=>x.id===orderId);if(!o||!o.parts)return;const p=o.parts[idx];if(p&&p.partId){stockMove(p.partId,+p.qty,'zugang','Storno Verbau '+o.nr);}o.parts.splice(idx,1);save();openOrder(orderId);refreshBadges();toast('Teil entfernt · Lager zurückgebucht');}
 function ordSetLabor(orderId,min){const o=S.ord.find(x=>x.id===orderId);if(o){o.laborMin=Math.max(0,+min||0);save();openOrder(orderId);}}
+/* ---- Fotos am Auftrag (B2) + Live-Status-Fotos (L12) ---- */
+function imgToDataURL(file,max,q,cb){const rd=new FileReader();rd.onload=function(){const im=new Image();im.onload=function(){const cv=document.createElement('canvas');let w=im.width,h=im.height;if(w>=h&&w>max){h=Math.round(h*max/w);w=max;}else if(h>w&&h>max){w=Math.round(w*max/h);h=max;}cv.width=w;cv.height=h;cv.getContext('2d').drawImage(im,0,0,w,h);cb(cv.toDataURL('image/jpeg',q||0.82));};im.src=rd.result;};rd.readAsDataURL(file);}
+function ordAddPhoto(orderId,input){const f=input.files&&input.files[0];if(!f)return;imgToDataURL(f,800,0.82,function(url){const o=S.ord.find(x=>x.id===orderId);if(!o)return;o.photos=o.photos||[];o.photos.push(url);save();openOrder(orderId);toast('Foto hinzugefügt');});}
+function ordDelPhoto(orderId,idx){const o=S.ord.find(x=>x.id===orderId);if(o&&o.photos){o.photos.splice(idx,1);save();openOrder(orderId);}}
+function photoSection(o){const ph=o.photos||[];return `<label class="f" style="margin-top:16px">Fotos (${ph.length}) <span class="muted" style="font-weight:400">– Zustand, Schaden, Vorher/Nachher</span></label>
+  <div class="row" style="flex-wrap:wrap;gap:8px">${ph.map((p,i)=>`<div style="position:relative"><img src="${p}" style="width:74px;height:74px;object-fit:cover;border-radius:8px;border:1px solid var(--line)"><a onclick="ordDelPhoto('${o.id}',${i})" title="Entfernen" style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:#fff;border-radius:50%;width:18px;height:18px;display:grid;place-items:center;font-size:11px;cursor:pointer">✕</a></div>`).join('')}<label class="btn sm gho" style="cursor:pointer;align-self:center">+ Foto<input type="file" accept="image/*" capture="environment" style="display:none" onchange="ordAddPhoto('${o.id}',this)"></label></div>
+  ${ph.length?'<div class="muted" style="font-size:12px;margin-top:4px">Diese Fotos sieht der Kunde live auf seiner Status-Seite.</div>':''}`;
+}
 
 /* ============================ ANKAUF/VERKAUF ============================ */
 views.ankauf=function(){
@@ -1787,6 +1805,8 @@ views.kasse=function(){
   } else if(kasseTab==='pos'){
     body.innerHTML=`<div class="grid g2" style="grid-template-columns:1.4fr 1fr">
       <div class="card">
+        ${cart.some(i=>/REP-/.test(i.name))?`<div class="note" style="margin-bottom:12px;border:1px solid var(--green);background:var(--green-tint,#eaf4ee)"><b>Upsell-Tipp:</b> Nach der Reparatur freut sich der Kunde über Schutz.
+          <div class="row" style="margin-top:8px;flex-wrap:wrap;gap:8px">${[['Panzerglas',25],['Hülle',12],['Displayschutz',15]].map(x=>`<button class="btn sm pri" onclick="posAdd('${esc(x[0])}',${x[1]})">+ ${esc(x[0])} ${eur(x[1])}</button>`).join('')}</div></div>`:''}
         <div class="search" style="background:var(--soft)"><span class="ic" data-ic="search"></span><input placeholder="Artikel suchen …" oninput="posSearch(this.value)"></div>
         <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0">
           ${POS_ITEMS.map(x=>`<button class="chip" style="text-align:center;padding:14px 8px;border-radius:12px;display:block" onclick="posAdd('${esc(x[0])}',${x[1]})"><div style="font-weight:700">${esc(x[0])}</div><div class="muted" style="font-size:12px;margin-top:2px">${eur(x[1])}</div></button>`).join('')}

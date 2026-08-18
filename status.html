@@ -128,6 +128,9 @@ function render(){
        <div class="row"><span>Endbetrag</span><b>${eur(sTotal(o))}</b></div>
      </div>`:''}
 
+    ${(o.photos&&o.photos.length)?`<div class="card"><div style="font-weight:800;margin-bottom:8px">Fotos von der Werkstatt</div>
+       <div style="display:flex;flex-wrap:wrap;gap:8px">${o.photos.map(p=>`<img src="${p}" style="width:100px;height:100px;object-fit:cover;border-radius:10px;border:1px solid var(--line)">`).join('')}</div></div>`:''}
+
     <div class="card">
       <div class="row"><span>Voraussichtlicher Preis</span><b>${eur(sTotal(o))}</b></div>
       ${o.appt?`<div class="row"><span>Termin</span><b>${fmtDate(o.appt)}</b></div>`:''}
