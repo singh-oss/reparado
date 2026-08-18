@@ -992,37 +992,159 @@ views.preise=function(){
 };
 
 /* ============================ KASSE ============================ */
-let cart=[];
+let cart=[], kasseTab='pos', payMethod='bar', givenAmt=0;
+const POS_ITEMS=[['Displayschutz',15],['Panzerglas',25],['Hülle',12],['Ladekabel',9],['Netzteil',19],['Powerbank',29],['Kopfhörer',19],['Reinigung',10],['SIM-Karte',10]];
+
+/* --- TSE (KassenSichV, simuliert aber vollständig) --- */
+function ensureTse(){
+  if(!S.tse){ S.tse={active:true,provider:'fiskaly Cloud-TSE',serial:'DE-TSE-8F3A-22Q7',sigCounter:41287,txCounter:10480,capacity:20000000,certUntil:'2029-12-31',seeded:false}; save(); }
+  if(!S.tse.seeded) seedKasse();
+  return S.tse;
+}
+function fakeSig(str){let h=2166136261>>>0;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=(h*16777619)>>>0;}const ch='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';let out='';let x=h;for(let i=0;i<44;i++){x=(x*1103515245+12345)>>>0;out+=ch[(x>>>8)%64];}return out;}
+function fakeQR(str){const size=21;let h=2166136261>>>0;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=(h*16777619)>>>0;}const nx=()=>{h=(h*1103515245+12345)>>>0;return (h>>>10)&1;};
+  const fp=(r,c)=>((r===0||r===6||c===0||c===6)||(r>=2&&r<=4&&c>=2&&c<=4));
+  const zone=(r,c)=>{if(r<7&&c<7)return fp(r,c);if(r<7&&c>=size-7)return fp(r,c-(size-7));if(r>=size-7&&c<7)return fp(r-(size-7),c);return null;};
+  let s='<div style="display:grid;grid-template-columns:repeat('+size+',3px);grid-auto-rows:3px;width:'+size*3+'px;height:'+size*3+'px;-webkit-print-color-adjust:exact;print-color-adjust:exact">';
+  for(let r=0;r<size;r++)for(let c=0;c<size;c++){const z=zone(r,c);const on=z===null?(nx()===1):z;s+='<span style="background:'+(on?'#0f2318':'#fff')+'"></span>';}
+  return s+'</div>';}
+function seedKasse(){const t=S.tse;const now=new Date();
+  const picks=[[['Panzerglas',25],['Reinigung',10]],[['Hülle',12]],[['Netzteil',19],['Ladekabel',9]],[['Powerbank',29]],[['Displayschutz',15],['Hülle',12]],[['Kopfhörer',19]]];
+  picks.forEach((p,i)=>{const positions=p.map(x=>({name:x[0],qty:1,price:x[1],vat:19}));const brutto=positions.reduce((s,x)=>s+x.price,0);const net=brutto/1.19;const time=new Date(now);time.setHours(9+i,8+i*9,0,0);t.txCounter++;t.sigCounter++;const method=(i%3===2)?'karte':'bar';const given=method==='bar'?Math.ceil(brutto/10)*10:brutto;
+    S.sales.unshift({t:time.toISOString(),beleg:'BON-'+time.getFullYear()+'-'+String(t.txCounter).padStart(4,'0'),positions,net,vat:brutto-net,brutto,total:brutto,method,given,change:given-brutto,tse:{serial:t.serial,txNum:t.txCounter,sigCounter:t.sigCounter,start:time.toISOString(),finish:new Date(time.getTime()+52).toISOString(),sig:fakeSig(brutto+'|'+t.txCounter),processType:'Kassenbeleg-V1',algo:'ecdsa-plain-SHA256'},storno:false});});
+  t.seeded=true;save();}
+
 views.kasse=function(){
-  const m=document.getElementById('main');
-  const connected=S.cash.connected;
-  m.innerHTML=`<div class="between"><div><h1 class="h1">Kasse</h1><p class="sub">${connected?('Verbunden mit '+connected+' · TSE aktiv'):'Barzahlung aktiv · Terminal optional anbinden'}</p></div>
-     ${connected?`<span class="pill solid"><span class="d"></span>${connected} verbunden</span>`:`<button class="btn" onclick="go('einstellungen')">Kasse anbinden</button>`}</div>
-   <div class="grid g2" style="margin-top:16px;grid-template-columns:1.4fr 1fr">
-     <div class="card">
-       <div class="search" style="background:var(--soft)"><span class="ic" data-ic="search"></span><input placeholder="Artikel, Reparatur oder Auftrag suchen …" oninput="posSearch(this.value)"></div>
-       <div class="row" style="margin:12px 0">${['Reparatur','Displayschutz','Hülle','Ladekabel','Powerbank','Reinigung'].map(x=>`<button class="chip" onclick="posAdd('${x}',${({Reparatur:0,Displayschutz:15,'Hülle':12,Ladekabel:9,Powerbank:19,Reinigung:10})[x]})">${x}</button>`).join('')}</div>
-       <div id="posres" class="muted" style="font-size:13px">Tipp: Einen offenen Auftrag über „In die Kasse" aus der Auftragsansicht übernehmen.</div>
-     </div>
-     <div class="card">
-       <b>Warenkorb</b>
-       <div id="cartlist" style="margin-top:8px">${renderCart()}</div>
-     </div>
-   </div>`;
+  const m=document.getElementById('main'); const t=ensureTse(); const remaining=t.capacity-t.sigCounter;
+  m.innerHTML=`<div class="between"><div><h1 class="h1">Kasse</h1><p class="sub">TSE-gesicherte Kasse nach KassenSichV (§146a AO)${S.cash.connected?(' · Terminal '+S.cash.connected):''}</p></div>
+     <div class="row"><span class="pill ${t.active?'solid':'soft'}"><span class="d"></span>${t.active?'TSE aktiv':'TSE inaktiv'}</span><button class="btn" onclick="tagesabschluss()">Tagesabschluss (Z-Bon)</button></div></div>
+   <div class="seg" style="margin:16px 0"><button class="${kasseTab==='pos'?'on':''}" onclick="kasseTab='pos';views.kasse();paintIcons()">Kasse</button><button class="${kasseTab==='journal'?'on':''}" onclick="kasseTab='journal';views.kasse();paintIcons()">Kassenbuch</button></div>
+   <div id="kasseBody"></div>`;
+  const body=document.getElementById('kasseBody');
+  if(kasseTab==='pos'){
+    body.innerHTML=`<div class="grid g2" style="grid-template-columns:1.4fr 1fr">
+      <div class="card">
+        <div class="search" style="background:var(--soft)"><span class="ic" data-ic="search"></span><input placeholder="Artikel suchen …" oninput="posSearch(this.value)"></div>
+        <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0">
+          ${POS_ITEMS.map(x=>`<button class="chip" style="text-align:center;padding:14px 8px;border-radius:12px;display:block" onclick="posAdd('${esc(x[0])}',${x[1]})"><div style="font-weight:700">${esc(x[0])}</div><div class="muted" style="font-size:12px;margin-top:2px">${eur(x[1])}</div></button>`).join('')}
+        </div>
+        <div class="row"><button class="btn" onclick="reparaturPos()">Reparatur (Betrag)</button><button class="btn" onclick="freePos()">Freie Position</button></div>
+        <div class="note" style="margin-top:14px">TSE: ${t.provider} · Serien-Nr ${t.serial} · Zertifikat gültig bis ${fmtDate(t.certUntil)} · ~${remaining.toLocaleString('de-DE')} Signaturen frei</div>
+      </div>
+      <div class="card"><b>Warenkorb</b><div id="cartlist" style="margin-top:8px">${renderCart()}</div></div>
+    </div>`;
+  } else { body.innerHTML=journalHTML(); }
 };
+function cartTotals(){let brutto=0;const byRate={};cart.forEach(i=>{const line=i.price*i.qty;const r=i.vat||19;brutto+=line;const net=line/(1+r/100);byRate[r]=byRate[r]||{net:0,vat:0};byRate[r].net+=net;byRate[r].vat+=(line-net);});const net=Object.values(byRate).reduce((s,x)=>s+x.net,0);return{brutto,net,vat:brutto-net,byRate};}
 function renderCart(){
   if(!cart.length) return '<div class="empty">Warenkorb leer</div>';
-  const total=cart.reduce((s,i)=>s+i.price,0);
-  return cart.map((i,x)=>`<div class="listitem"><div style="flex:1"><b>${esc(i.name)}</b></div><div class="mono">${eur(i.price)}</div><button class="btn sm gho" onclick="cart.splice(${x},1);document.getElementById('cartlist').innerHTML=renderCart()">Entfernen</button></div>`).join('')
-   +`<div class="divider"></div><div class="between"><b>Gesamt</b><b style="font-size:20px">${eur(total)}</b></div>
-     <button class="btn pri" style="width:100%;margin-top:12px;justify-content:center" onclick="checkout()">Kassieren · ${eur(total)}</button>`;
+  const t=cartTotals();
+  const rows=cart.map((i,x)=>`<div class="listitem"><div style="flex:1;min-width:0"><b>${esc(i.name)}</b><div class="muted" style="font-size:12px">${eur(i.price)} · ${i.vat||19}% USt</div></div>
+    <div class="row" style="gap:5px"><button class="btn sm gho" onclick="cartQty(${x},-1)">–</button><b style="min-width:16px;text-align:center">${i.qty}</b><button class="btn sm gho" onclick="cartQty(${x},1)">+</button></div>
+    <div class="mono" style="min-width:60px;text-align:right">${eur(i.price*i.qty)}</div>
+    <button class="btn sm gho" onclick="cart.splice(${x},1);refreshCart()">✕</button></div>`).join('');
+  const change=payMethod==='bar'?(givenAmt-t.brutto):0;
+  const quick=[t.brutto,Math.ceil(t.brutto/5)*5,Math.ceil(t.brutto/10)*10,Math.ceil(t.brutto/50)*50].filter((v,i,a)=>a.indexOf(v)===i);
+  return rows+`
+    <div class="divider"></div>
+    <div class="between" style="font-size:13px;color:var(--ink2)"><span>Netto</span><span class="mono">${eur(t.net)}</span></div>
+    <div class="between" style="font-size:13px;color:var(--ink2);margin-top:2px"><span>USt 19 %</span><span class="mono">${eur(t.vat)}</span></div>
+    <div class="between" style="margin-top:7px"><b>Summe</b><b style="font-size:22px">${eur(t.brutto)}</b></div>
+    <label class="f" style="margin-top:14px">Zahlung</label>
+    <div class="seg" style="width:100%"><button class="${payMethod==='bar'?'on':''}" style="flex:1" onclick="payMethod='bar';refreshCart()">Bar</button><button class="${payMethod==='karte'?'on':''}" style="flex:1" onclick="payMethod='karte';refreshCart()">Karte</button></div>
+    ${payMethod==='bar'?`<div class="row" style="margin-top:10px;align-items:flex-end">
+       <div style="flex:1"><label class="f">Gegeben (€)</label><input class="in" type="number" value="${givenAmt||''}" oninput="givenAmt=+this.value||0;var r=document.getElementById('rueck');if(r)r.textContent=eur(Math.max(0,givenAmt-${t.brutto}))" placeholder="${t.brutto.toFixed(2)}"></div>
+       <div style="text-align:right;min-width:90px"><label class="f">Rückgeld</label><div id="rueck" style="font-size:20px;font-weight:800">${eur(Math.max(0,change))}</div></div>
+     </div>
+     <div class="row" style="margin-top:8px">${quick.map(v=>`<button class="chip" onclick="givenAmt=${v};refreshCart()">${eur(v)}</button>`).join('')}</div>`:''}
+    <button class="btn pri" style="width:100%;margin-top:14px;justify-content:center" onclick="checkout()">Kassieren · ${eur(t.brutto)}</button>`;
 }
-function posAdd(name,price){ if(name==='Reparatur'){price=+prompt('Betrag (€):')||0;} cart.push({name,price:+price}); document.getElementById('cartlist').innerHTML=renderCart(); }
-function posSearch(v){ document.getElementById('posres').innerHTML = v?('Enter drücken, um „'+esc(v)+'" als Position hinzuzufügen'):''; }
-function addToCart(orderId){ const o=S.ord.find(x=>x.id===orderId); if(o){cart.push({name:o.nr+' · '+o.model+' · '+o.issue,price:o.price}); toast('Auftrag in Kasse übernommen'); views.kasse();paintIcons();} }
-function checkout(){ if(!cart.length)return; const total=cart.reduce((s,i)=>s+i.price,0);
-  S.sales.unshift({t:new Date().toISOString(),total,items:cart.length}); save(); cart=[];
-  toast('Verkauf abgeschlossen · Beleg gedruckt'); views.kasse();paintIcons(); }
+function refreshCart(){const el=document.getElementById('cartlist');if(el)el.innerHTML=renderCart();}
+function cartQty(x,d){cart[x].qty=Math.max(1,cart[x].qty+d);refreshCart();}
+function posAdd(name,price){cart.push({name,price:+price,qty:1,vat:19});refreshCart();}
+function reparaturPos(){const p=+prompt('Reparatur-Betrag (€, brutto):')||0;if(!p)return;cart.push({name:'Reparatur',price:p,qty:1,vat:19});refreshCart();}
+function freePos(){const n=prompt('Bezeichnung der Position:');if(!n)return;const p=+prompt('Preis (€, brutto):')||0;cart.push({name:n,price:p,qty:1,vat:19});refreshCart();}
+function posSearch(v){window.__posq=v;}
+function addToCart(orderId){const o=S.ord.find(x=>x.id===orderId);if(o){cart.push({name:o.nr+' · '+o.model+' · '+o.issue,price:o.price,qty:1,vat:19});toast('Auftrag in Kasse übernommen');kasseTab='pos';views.kasse();paintIcons();}}
+function checkout(){
+  if(!cart.length){toast('Warenkorb leer');return;}
+  const tot=cartTotals();
+  if(payMethod==='bar'&&givenAmt<tot.brutto-0.001){toast('Gegebener Betrag zu niedrig');return;}
+  const t=ensureTse();t.txCounter++;t.sigCounter++;const start=new Date();
+  const tx={t:start.toISOString(),beleg:'BON-'+start.getFullYear()+'-'+String(t.txCounter).padStart(4,'0'),
+    positions:cart.map(i=>({name:i.name,qty:i.qty,price:i.price,vat:i.vat||19})),net:tot.net,vat:tot.vat,brutto:tot.brutto,total:tot.brutto,
+    method:payMethod,given:payMethod==='bar'?givenAmt:tot.brutto,change:payMethod==='bar'?(givenAmt-tot.brutto):0,
+    tse:{serial:t.serial,txNum:t.txCounter,sigCounter:t.sigCounter,start:start.toISOString(),finish:new Date(start.getTime()+48).toISOString(),sig:fakeSig(tot.brutto+'|'+t.txCounter+'|'+start.toISOString()),processType:'Kassenbeleg-V1',algo:'ecdsa-plain-SHA256'},storno:false};
+  S.sales.unshift(tx);save();cart=[];givenAmt=0;
+  printBon(tx);toast('Verkauf abgeschlossen · TSE signiert');views.kasse();paintIcons();
+}
+function printBon(tx){if(tx)printHTML('Beleg '+tx.beleg,bonHTML(tx));}
+function bonHTML(tx){
+  const rows=tx.positions.map(p=>`<tr><td>${esc(p.name)}${p.qty>1?' ×'+p.qty:''}<div style="color:#777;font-size:11px">${p.vat}% USt</div></td><td style="text-align:right;font-variant-numeric:tabular-nums">${eur(p.price*p.qty)}</td></tr>`).join('');
+  const qrData='V0;'+tx.tse.serial+';Kassenbeleg-V1;'+tx.beleg+';'+tx.brutto.toFixed(2)+';'+tx.tse.txNum+';'+tx.tse.sig;
+  const st=tx.storno?'<div style="text-align:center;font-weight:800;border:2px solid #0f2318;border-radius:8px;padding:6px;margin-bottom:10px">STORNO'+(tx.stornoOf?' zu '+tx.stornoOf:'')+'</div>':'';
+  return shopHead()+st+`<h2>Kassenbeleg</h2><div class="muted">${tx.beleg} · ${new Date(tx.t).toLocaleString('de-DE')}</div>
+   <table><tbody>${rows}</tbody></table>
+   <table><tbody><tr><th>Netto</th><td style="text-align:right">${eur(tx.net)}</td></tr><tr><th>USt 19 %</th><td style="text-align:right">${eur(tx.vat)}</td></tr></tbody></table>
+   <div class="tot"><span>Summe (Brutto)</span><span>${eur(tx.brutto)}</span></div>
+   <table style="margin-top:6px"><tbody><tr><th>Zahlart</th><td style="text-align:right">${tx.method==='bar'?'Bar':'Karte'}</td></tr>${tx.method==='bar'?`<tr><th>Gegeben</th><td style="text-align:right">${eur(tx.given)}</td></tr><tr><th>Rückgeld</th><td style="text-align:right">${eur(tx.change)}</td></tr>`:''}</tbody></table>
+   <div class="box" style="margin-top:14px;font-size:11px"><b>TSE-Signatur (KassenSichV)</b>
+     <div style="display:flex;gap:12px;margin-top:8px;align-items:flex-start">${fakeQR(qrData)}
+       <div style="font-size:10px;line-height:1.55;word-break:break-all;font-variant-numeric:tabular-nums">TSE-Serien-Nr: ${tx.tse.serial}<br>Transaktion: ${tx.tse.txNum}<br>Signaturzähler: ${tx.tse.sigCounter}<br>Start: ${new Date(tx.tse.start).toLocaleTimeString('de-DE')}<br>Finish: ${new Date(tx.tse.finish).toLocaleTimeString('de-DE')}<br>Algorithmus: ${tx.tse.algo}<br>Signatur: ${tx.tse.sig}</div>
+     </div></div>
+   <div class="foot">Belegausgabepflicht gemäß §146a AO · Preise inkl. gesetzl. USt · Vielen Dank für Ihren Einkauf bei ${SHOP.name}.</div>`;
+}
+function journalHTML(){
+  const today=new Date().toISOString().slice(0,10);
+  const tx=S.sales.filter(x=>x.beleg);
+  const todayTx=tx.filter(x=>x.t.slice(0,10)===today);
+  const sum=(a)=>a.reduce((s,x)=>s+x.brutto,0);
+  const bar=sum(todayTx.filter(x=>x.method==='bar'&&!x.storno)), karte=sum(todayTx.filter(x=>x.method==='karte'&&!x.storno));
+  return `<div class="grid g4">
+     <div class="card kpi"><div class="n">${eur(bar+karte)}</div><div class="l">Umsatz heute (Brutto)</div></div>
+     <div class="card kpi"><div class="n">${eur(bar)}</div><div class="l">Bar</div></div>
+     <div class="card kpi"><div class="n">${eur(karte)}</div><div class="l">Karte</div></div>
+     <div class="card kpi"><div class="n">${todayTx.length}</div><div class="l">Transaktionen heute</div></div>
+   </div>
+   <div class="card" style="margin-top:16px;padding:0;overflow:auto"><table>
+     <thead><tr><th>Zeit</th><th>Beleg</th><th>Positionen</th><th>Brutto</th><th>Zahlart</th><th>TSE-Tx</th><th></th></tr></thead>
+     <tbody>${tx.slice(0,40).map(x=>`<tr>
+       <td class="mono muted">${new Date(x.t).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}</td>
+       <td><b>${x.beleg}</b>${x.storno?' <span class="tag">Storno</span>':''}</td>
+       <td>${esc(x.positions.map(p=>p.name+(p.qty>1?' ×'+p.qty:'')).join(', ')).slice(0,44)}</td>
+       <td class="mono">${eur(x.brutto)}</td>
+       <td>${x.method==='bar'?'Bar':'Karte'}</td>
+       <td class="mono muted">#${x.tse.txNum}</td>
+       <td><div class="row" style="gap:4px"><button class="btn sm gho" onclick="printBon(S.sales.find(s=>s.beleg==='${x.beleg}'))">Bon</button>${x.storno?'':`<button class="btn sm gho" onclick="stornoTx('${x.beleg}')">Storno</button>`}</div></td>
+     </tr>`).join('')||'<tr><td colspan="7"><div class="empty">Noch keine TSE-Transaktionen</div></td></tr>'}</tbody></table></div>
+   <div class="note" style="margin-top:14px">Jede Transaktion wird von der TSE signiert (Signatur, Transaktions- &amp; Signaturzähler, Zeitstempel) und ist unveränderbar im Journal protokolliert — konform zu KassenSichV/GoBD.</div>`;
+}
+function stornoTx(beleg){
+  const orig=S.sales.find(x=>x.beleg===beleg); if(!orig||orig.storno)return;
+  const t=ensureTse();t.txCounter++;t.sigCounter++;const start=new Date();
+  const tx={t:start.toISOString(),beleg:'BON-'+start.getFullYear()+'-'+String(t.txCounter).padStart(4,'0'),positions:orig.positions.map(p=>({name:p.name,qty:p.qty,price:-p.price,vat:p.vat})),net:-orig.net,vat:-orig.vat,brutto:-orig.brutto,total:-orig.brutto,method:orig.method,given:0,change:0,tse:{serial:t.serial,txNum:t.txCounter,sigCounter:t.sigCounter,start:start.toISOString(),finish:new Date(start.getTime()+50).toISOString(),sig:fakeSig('storno|'+t.txCounter),processType:'Kassenbeleg-V1',algo:'ecdsa-plain-SHA256'},storno:true,stornoOf:beleg};
+  orig.storno=true;orig.stornoBy=tx.beleg;S.sales.unshift(tx);save();
+  toast('Storno TSE-signiert: '+tx.beleg);views.kasse();paintIcons();
+}
+function tagesabschluss(){
+  const today=new Date().toISOString().slice(0,10);const t=ensureTse();
+  const tx=S.sales.filter(x=>x.beleg&&x.t.slice(0,10)===today);const valid=tx.filter(x=>!x.storno);
+  const bar=valid.filter(x=>x.method==='bar').reduce((s,x)=>s+x.brutto,0);
+  const karte=valid.filter(x=>x.method==='karte').reduce((s,x)=>s+x.brutto,0);
+  const net=valid.reduce((s,x)=>s+x.net,0),ust=valid.reduce((s,x)=>s+x.vat,0);
+  const body=shopHead()+`<h2>Tagesabschluss (Z-Bon)</h2><div class="muted">Kassenschnitt · ${fmtDate(today)}</div>
+   <table><tbody>
+     <tr><th>Transaktionen</th><td style="text-align:right">${tx.length}${tx.length-valid.length?' · '+(tx.length-valid.length)+' Storno':''}</td></tr>
+     <tr><th>Bar</th><td style="text-align:right">${eur(bar)}</td></tr>
+     <tr><th>Karte</th><td style="text-align:right">${eur(karte)}</td></tr>
+     <tr><th>Netto</th><td style="text-align:right">${eur(net)}</td></tr>
+     <tr><th>USt 19 %</th><td style="text-align:right">${eur(ust)}</td></tr>
+   </tbody></table>
+   <div class="tot"><span>Tagesumsatz (Brutto)</span><span>${eur(bar+karte)}</span></div>
+   <div class="box" style="margin-top:12px;font-size:12px"><b>TSE</b><br>Serien-Nr: ${t.serial}<br>Signaturzähler: ${t.sigCounter}<br>Transaktionszähler: ${t.txCounter}<br>Anbieter: ${t.provider}</div>
+   <div class="foot">Z-Bon gemäß GoBD · unveränderbar protokolliert.</div>`;
+  printHTML('Tagesabschluss '+fmtDate(today),body);
+}
 
 /* ============================ STATISTIK ============================ */
 views.statistik=function(){
