@@ -68,9 +68,9 @@ Wachstums-Motoren (Versandreparatur, B2B, Forecast) · **Echtes System** (DB, Au
 | # | Feature | Typ | Effort | Impact |
 |---|---|---|---|---|
 | ✅ L12 | **🖼️ Live-Status mit Foto-Updates** (Werkstattfotos auf der Kunden-Statusseite) · **FERTIG 18.8.** | Leap | M | ★★ |
-| L13 | **📱 Digitale Geräte-Akte per QR** (Historie/Garantie/frühere Reparaturen) | Leap | M | ★★ |
+| ✅ L13 | **📱 Digitale Geräte-Akte per QR** (QR im Drawer + Reparatur-Historie auf Statusseite) · **FERTIG 18.8.** | Leap | M | ★★ |
 | L14 | **🖥️ Self-Check-in-Terminal** (Kiosk-Modus ausbauen zur Selbstannahme) | Leap | S–M | ★★ |
-| L15 | **🛡️ Garantie-Portal** für Kunden (Status sehen, Fall melden) | Leap | M | ★ |
+| ✅ L15 | **🛡️ Garantie-Portal** (Kunde sieht Garantie, meldet Fall → Dashboard-Inbox) · **FERTIG 18.8.** | Leap | M | ★ |
 | ✅ L7 | **📦 „Nicht abgeholt"-Workflow** (eskalierende Stufen + Lagergebühr) · **FERTIG 18.8.** | Leap | S–M | ★★ |
 | ✅ L8 | **🛒 Upsell an der Kasse** (Zubehör bei Reparatur im Warenkorb) · **FERTIG 18.8.** | Leap | S | ★ |
 | ✅ B2 | **Fotos am Auftrag** (Upload+Galerie im Drawer, aus Diagnose übernommen) · **FERTIG 18.8.** | Leap | S–M | ★★ |
@@ -80,9 +80,9 @@ Wachstums-Motoren (Versandreparatur, B2B, Forecast) · **Echtes System** (DB, Au
 | L16 | **🧠 KI-Tagesbriefing** (Chef-Cockpit — aus Agenten-Büro übernehmen) | Leap | M | ★★ |
 | P10 | **Repair-Widget-Konfig** — Preise/Styling, iframe-Embed, **WordPress-Plugin**, Standardpreise | Parität 🟠 | M–L | ★★ |
 | P14 | **Kasse-Politur** — Barcode/IMEI-Scan, Artikelkatalog+Kategorien, Berichte, Meistverkauft | Parität 🟡 | M | ★ |
-| P13 | **Kunden-Politur** — Pagination, A→Z, Detailseite | Parität 🟡 | S | ★ |
+| ✅ P13 | **Kunden-Politur** — Suche, A→Z-Sortierung, Pagination · **FERTIG 18.8.** | Parität 🟡 | S | ★ |
 | P16 | **Detaillierte Statistik** — Monatsvergleich, Reparatur/Verkauf/Ankauf | Parität 🟡 | S–M | ★ |
-| P15 | **Top-Bar-Werkzeuge** — Schnell-Kasse, Benachrichtigungs-Center, globaler Scanner | Parität 🟡 | S | ★ |
+| ✅ P15 | **Top-Bar-Werkzeuge** — Scanner-Fokus, Schnell-Kasse, Benachrichtigungs-Zähler · **FERTIG 18.8.** | Parität 🟡 | S | ★ |
 | P9 | **Benutzer & Berechtigungen granular** (frei definierbare Rechte) | Parität 🟠 | M | ★ |
 | P7 | **Benachrichtigungen** — E-Mail-Vorlagen-Editor, SMS, SMTP-Konfig | Parität 🟠 | M | ★★ |
 
