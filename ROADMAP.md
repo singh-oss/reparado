@@ -50,7 +50,7 @@ Wachstums-Motoren (Versandreparatur, B2B, Forecast) · **Echtes System** (DB, Au
 | ✅ L5 | **🔁 Reaktivierung** — KI-Chancen (Garantie endet / Akku fällig / lange nicht da) in CRM, Ansprechen/Alle anschreiben · **FERTIG 18.8.** | Leap | M | ★★★ | — |
 | ✅ L9 | **💰 Echte Marge pro Auftrag** — Preis − Teilekosten (EK aus Lager) − Arbeitszeit = Gewinn €/%, Verlust rot; Statistik-Kennzahlen · **FERTIG 18.8.** | Leap | M | ★★★ | Teilekosten aus P2 |
 
-## Phase 3 — Warenwirtschaft & Teile-Intelligenz
+## Phase 3 — Warenwirtschaft & Teile-Intelligenz — ✅ KOMPLETT (18.8.)
 *Zusammenhängender Block; Marge & Bestellungen hängen daran.*
 
 | # | Feature | Typ | Effort | Impact | Abhängig |
@@ -59,8 +59,8 @@ Wachstums-Motoren (Versandreparatur, B2B, Forecast) · **Echtes System** (DB, Au
 | ✅ P5 | **Bestellwesen** — Lager- vs. Kundenbestellung, Lieferant, Bestellliste drucken, Filter/Status/Priorität, Eingang→Lager, Nachbestellen bei Unterbestand · **FERTIG 18.8.** | Parität 🟠 | M | ★★ | P2 |
 | ✅ L10 | **🔎 Ersatzteil-Preisvergleich** über Lieferanten + Preishistorie · **FERTIG 18.8.** | Leap | M | ★★ | P2 |
 | ✅ L11 | **♻️ Auto-Nachbestellung** bei niedrigem Bestand (Setting + Sammelknopf) · **FERTIG 18.8.** | Leap | S | ★★ | P2 |
-| P6 | **Ankauf/Verkauf-Tiefe** — Profit je Gerät, Lagerwert, Status Reserviert, Import | Parität 🟠 | M | ★ | — |
-| P4 | **Wunsch-Handy-Liste** — Kundenmerkliste + Auto-Benachrichtigung bei Ankauf | Parität 🟠 | S | ★ | P6 |
+| ✅ P6 | **Ankauf/Verkauf-Tiefe** — Zustand, Profit €/%, Status verfügbar/reserviert/verkauft, Lagerwert, Filter · **FERTIG 18.8.** | Parität 🟠 | M | ★ | — |
+| ✅ P4 | **Wunsch-Handy-Liste** — Kundenmerkliste + Auto-Treffer bei Ankauf · **FERTIG 18.8.** | Parität 🟠 | S | ★ | P6 |
 
 ## Phase 4 — Kundenerlebnis & Alltags-Politur
 *Bindung + die restliche Parität.*
