@@ -39,7 +39,7 @@ Wachstums-Motoren (Versandreparatur, B2B, Forecast) · **Echtes System** (DB, Au
 | ✅ P8 | **Systemeinstellungen** — Nummernschema (REP-/AN-), Pflichtfelder (E-Mail/Adresse/IMEI/Unterschrift), AGB-Text auf Beleg · **FERTIG 18.8.** | Parität 🟠 | S–M | ★★ | — |
 | ✅ P12 | **Auftragsliste-Politur** — Inline-Status (farbig), Sortierung, Bulk-Auswahl, **Archiv**, **Papierkorb** (+Wiederherstellen/endgültig löschen) · **FERTIG 18.8.** | Parität 🟡 | M | ★★ | — |
 
-## Phase 2 — Die 3 Killer-Wedges (das Wow, das verkauft)
+## Phase 2 — Die 3 Killer-Wedges (das Wow, das verkauft) — ✅ KOMPLETT (18.8.)
 *Nutzt euren KI-Vorsprung — RepairDash kann das nicht.*
 
 | # | Feature | Typ | Effort | Impact | Abhängig |
@@ -47,7 +47,7 @@ Wachstums-Motoren (Versandreparatur, B2B, Forecast) · **Echtes System** (DB, Au
 | ✅ L1 | **📸 Foto-Diagnose** — Gerät fotografieren → KI erkennt Schaden, schlägt Reparatur+Teil+Preis vor · **FERTIG 18.8.** (Sim/Prototyp) | Leap ★ | M | ★★★ | erweitert KI-Diagnose |
 | ✅ L2 | **⚡ Auto-Angebot aus Diagnose** — Diagnose/Foto → 1-Klick fertiges Angebot (Gerät/Reparatur/Preis vorbefüllt) · **FERTIG 18.8.** | Leap ★ | M | ★★★ | P1, L1 |
 | ✅ L6 | **⭐ Bewertungs-Booster** — Statusseite mit Sentiment-Gate (zufrieden→Google, kritisch→intern), Feedback-Inbox, Dashboard-Karte · **FERTIG 18.8.** | Leap | S–M | ★★★ | — |
-| L5 | **🔁 Reaktivierung** — KI findet fällige Kunden (Akku vor 18 Mon., Garantie läuft aus) → Outreach | Leap | M | ★★★ | — |
+| ✅ L5 | **🔁 Reaktivierung** — KI-Chancen (Garantie endet / Akku fällig / lange nicht da) in CRM, Ansprechen/Alle anschreiben · **FERTIG 18.8.** | Leap | M | ★★★ | — |
 | ✅ L9 | **💰 Echte Marge pro Auftrag** — Preis − Teilekosten (EK aus Lager) − Arbeitszeit = Gewinn €/%, Verlust rot; Statistik-Kennzahlen · **FERTIG 18.8.** | Leap | M | ★★★ | Teilekosten aus P2 |
 
 ## Phase 3 — Warenwirtschaft & Teile-Intelligenz
