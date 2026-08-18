@@ -105,7 +105,7 @@ Wachstums-Motoren (Versandreparatur, B2B, Forecast) · **Echtes System** (DB, Au
 | L1 | **📸 Foto-Diagnose (KI)** — Schaden fotografieren → KI erkennt Reparatur+Teil+Preis | Leap | 2 | M | ★★★ | Schnelles Angebot, online & an der Theke |
 | B2 | **Fotos am Auftrag (Vorher/Nachher, Schaden, Zubehör)** — beliebig viele Bilder je Auftrag, Galerie im Auftrag | Leap | 3 | S–M | ★★ | Beweis der Arbeit, interne Doku, Zubehör-Nachweis |
 | L12 | **🖼️ Live-Status mit Foto-Updates** — Kunde sieht Technikerfotos auf der Statusseite | Leap | 4 | M | ★★ | Vertrauen, killt „ist-es-fertig"-Anrufe |
-| B3 | **Produktbilder im Katalog** — Bild je Modell/Ersatzteil (Warenwirtschaft & Kasse) | Parität | 3 | S | ★ | schnellere Erkennung an der Kasse/im Lager |
+| B3 | **Modell-/Produktbilder** — Bild je Gerätetyp/Modell/Ersatzteil; **angezeigt beim Modell-Auswählen** (Auftragsformular + Buchungs-/Anfrage-Widget) und in Kasse & Lager | Parität | 1–3 | S–M | ★★ | visuelle, schnellere Geräteauswahl (wie RepairDash) + Erkennung an Kasse/Lager |
 | B4 | **Logo & Briefpapier-Bilder** — eigenes Logo auf Belegen/Etiketten/Angeboten | Parität | 1 | S | ★ | Marken-Auftritt, White-Label |
 | B5 | **Foto vom Personalausweis/Kaufbeleg (Ankauf)** — bei Gebraucht-Ankauf Ident-/Herkunftsnachweis | Leap | 3 | S | ★★ | **Rechtssicherheit Ankauf** (Hehlerei-Schutz, §) |
 
