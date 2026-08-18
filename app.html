@@ -1017,6 +1017,8 @@ function seedKasse(){const t=S.tse;const now=new Date();
     S.sales.unshift({t:time.toISOString(),beleg:'BON-'+time.getFullYear()+'-'+String(t.txCounter).padStart(4,'0'),positions,net,vat:brutto-net,brutto,total:brutto,method,given,change:given-brutto,tse:{serial:t.serial,txNum:t.txCounter,sigCounter:t.sigCounter,start:time.toISOString(),finish:new Date(time.getTime()+52).toISOString(),sig:fakeSig(brutto+'|'+t.txCounter),processType:'Kassenbeleg-V1',algo:'ecdsa-plain-SHA256'},storno:false});});
   t.seeded=true;save();}
 
+function tseConnect(){const t=ensureTse();const k=document.getElementById('tse_key');const p=document.getElementById('tse_prov');t.apiKey=(k&&k.value)||'tse_live_demo';if(p)t.provider=p.value;t.active=true;if(!t.serial)t.serial='DE-TSE-8F3A-22Q7';save();toast('TSE verbunden: '+t.provider);views.einstellungen();paintIcons();}
+function tseDisconnect(){const t=ensureTse();t.active=false;save();toast('TSE getrennt – Kassieren gesperrt');views.einstellungen();paintIcons();}
 views.kasse=function(){
   const m=document.getElementById('main'); const t=ensureTse(); const remaining=t.capacity-t.sigCounter;
   m.innerHTML=`<div class="between"><div><h1 class="h1">Kasse</h1><p class="sub">TSE-gesicherte Kasse nach KassenSichV (§146a AO)${S.cash.connected?(' · Terminal '+S.cash.connected):''}</p></div>
@@ -1024,7 +1026,9 @@ views.kasse=function(){
    <div class="seg" style="margin:16px 0"><button class="${kasseTab==='pos'?'on':''}" onclick="kasseTab='pos';views.kasse();paintIcons()">Kasse</button><button class="${kasseTab==='journal'?'on':''}" onclick="kasseTab='journal';views.kasse();paintIcons()">Kassenbuch</button></div>
    <div id="kasseBody"></div>`;
   const body=document.getElementById('kasseBody');
-  if(kasseTab==='pos'){
+  if(kasseTab==='pos'&&!t.active){
+    body.innerHTML=`<div class="card" style="text-align:center;padding:40px"><b style="font-size:17px">TSE nicht verbunden</b><p class="muted" style="margin:8px auto 16px;max-width:420px">Nach KassenSichV (§146a AO) ist eine verbundene TSE zum Kassieren Pflicht. Verbinde deine TSE in den Einstellungen.</p><button class="btn pri" onclick="go('einstellungen')">TSE verbinden</button></div>`;
+  } else if(kasseTab==='pos'){
     body.innerHTML=`<div class="grid g2" style="grid-template-columns:1.4fr 1fr">
       <div class="card">
         <div class="search" style="background:var(--soft)"><span class="ic" data-ic="search"></span><input placeholder="Artikel suchen …" oninput="posSearch(this.value)"></div>
@@ -1071,6 +1075,7 @@ function posSearch(v){window.__posq=v;}
 function addToCart(orderId){const o=S.ord.find(x=>x.id===orderId);if(o){cart.push({name:o.nr+' · '+o.model+' · '+o.issue,price:o.price,qty:1,vat:19});toast('Auftrag in Kasse übernommen');kasseTab='pos';views.kasse();paintIcons();}}
 function checkout(){
   if(!cart.length){toast('Warenkorb leer');return;}
+  if(!ensureTse().active){toast('TSE nicht verbunden – Kassieren gesperrt (KassenSichV)');go('einstellungen');return;}
   const tot=cartTotals();
   if(payMethod==='bar'&&givenAmt<tot.brutto-0.001){toast('Gegebener Betrag zu niedrig');return;}
   const t=ensureTse();t.txCounter++;t.sigCounter++;const start=new Date();
@@ -1220,12 +1225,23 @@ views.einstellungen=function(){
        <div><label class="f">Öffnungszeiten</label><input class="in" value="${SHOP.hours}"></div></div>
        <div class="note" style="margin-top:12px">Beleg, Etikett, Kostenvoranschlag und Garantie-Nachweis lassen sich direkt aus jedem Auftrag drucken.</div>
      </div>
+     <div class="card"><b>TSE-Anbindung (Kasse)</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Technische Sicherheitseinrichtung nach KassenSichV (§146a AO) – verpflichtend zum Kassieren.</p>
+       ${(function(){const t=ensureTse();return `
+       <label class="f">Anbieter</label>
+       <select class="in" id="tse_prov">${['fiskaly Cloud-TSE','Swissbit Hardware-TSE','Epson TSE-Server','Deutsche Fiskal'].map(p=>`<option${t.provider===p?' selected':''}>${p}</option>`).join('')}</select>
+       <label class="f" style="margin-top:12px">Zugangsschlüssel / API-Key</label>
+       <input class="in" id="tse_key" value="${esc(t.apiKey||'')}" placeholder="tse_live_…">
+       <div class="row" style="margin-top:12px">${t.active?`<span class="pill solid"><span class="d"></span>Verbunden · ${t.serial}</span><button class="btn" onclick="tseDisconnect()">Trennen</button>`:`<button class="btn pri" onclick="tseConnect()">Verbinden</button><span class="muted" style="font-size:13px">Ohne TSE ist Kassieren gesperrt.</span>`}</div>
+       ${t.active?`<div class="note" style="margin-top:10px">${t.provider} · Zertifikat gültig bis ${fmtDate(t.certUntil)} · ${(t.capacity-t.sigCounter).toLocaleString('de-DE')} Signaturen frei</div>`:''}`;})()}
+     </div>
      <div class="card"><b>Buchhaltung</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Verfahren, Kontenrahmen, DATEV und Beleg-Postfach.</p>
        ${(function(){const a=ensureAcct();return `
        <label class="f">Verfahren</label>
        <div class="seg" style="width:100%"><button class="${a.mode==='euer'?'on':''}" style="flex:1" onclick="S.acct.mode='euer';save();views.einstellungen();paintIcons()">Einfache Buchführung (EÜR)</button><button class="${a.mode==='doppik'?'on':''}" style="flex:1" onclick="S.acct.mode='doppik';save();views.einstellungen();paintIcons()">Doppelte Buchführung</button></div>
        <div class="grid g2" style="margin-top:12px"><div><label class="f">Kontenrahmen</label><select class="in" onchange="S.acct.skr=this.value;save()"><option${a.skr==='SKR03'?' selected':''}>SKR03</option><option${a.skr==='SKR04'?' selected':''}>SKR04</option></select></div>
        <div><label class="f">Beleg-Postfach</label><div class="integ" style="padding:8px 12px;justify-content:space-between"><span style="font-size:13px">E-Mail-Eingang</span><button class="switch ${a.mailConnected?'on':''}" onclick="S.acct.mailConnected=!S.acct.mailConnected;save();views.einstellungen();paintIcons()"><i></i></button></div></div></div>
+       <label class="f" style="margin-top:12px">E-Mail-Rechnungen automatisch verbuchen</label>
+       <div class="integ" style="padding:8px 12px;justify-content:space-between"><span style="font-size:13px">Ab Konfidenz <select onchange="S.acct.autoThreshold=+this.value;save()" style="border:0;background:transparent;font-weight:700;color:var(--green)">${[90,95,98].map(v=>`<option${a.autoThreshold===v?' selected':''}>${v}</option>`).join('')}</select> % · ohne Klick buchen</span><button class="switch ${a.autoBook?'on':''}" onclick="S.acct.autoBook=!S.acct.autoBook;save();views.einstellungen();paintIcons()"><i></i></button></div>
        <div class="row" style="margin-top:12px"><span class="pill ${a.datev.connected?'solid':'soft'}"><span class="d"></span>${a.datev.connected?'DATEV verbunden':'DATEV nicht verbunden'}</span><button class="btn" onclick="go('buchhaltung');buchTab='datev';views.buchhaltung();paintIcons()">Buchhaltung öffnen</button></div>`;})()}
      </div>
      <div class="card"><b>Benutzer & Rollen</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Mehrere Mitarbeiter, klare Rechte.</p>
@@ -1276,7 +1292,7 @@ function globalSearch(v){ if(!v){go(current);return;} v=v.toLowerCase();
 let buchTab='overview';
 const KONTEN={erloese:{nr:'8400',label:'Erlöse 19%'},wareneinkauf:{nr:'3400',label:'Wareneingang'},miete:{nr:'4210',label:'Raum/Miete'},telefon:{nr:'4920',label:'Telefon/Internet'},buero:{nr:'4930',label:'Bürobedarf'},versicherung:{nr:'4360',label:'Versicherungen'},werbung:{nr:'4600',label:'Werbung'},kfz:{nr:'4530',label:'Kfz-Kosten'},bank:{nr:'1200',label:'Bank'},kasse:{nr:'1000',label:'Kasse'},kreditor:{nr:'1600',label:'Verbindlichk.'},ust:{nr:'1776',label:'USt 19%'},vst:{nr:'1576',label:'Vorsteuer 19%'}};
 const CAT_LABEL={erloese:'Erlöse',wareneinkauf:'Wareneinkauf',miete:'Miete',telefon:'Telefon/Internet',buero:'Bürobedarf',versicherung:'Versicherung',werbung:'Werbung',kfz:'Kfz'};
-function defaultAcct(){return {mode:'euer',skr:'SKR03',datev:{connected:false,beraterNr:'',mandantNr:''},mailConnected:true,seeded:false};}
+function defaultAcct(){return {mode:'euer',skr:'SKR03',datev:{connected:false,beraterNr:'',mandantNr:''},mailConnected:true,autoBook:true,autoThreshold:95,seeded:false};}
 function ensureAcct(){ if(!S.acct){S.acct=defaultAcct();save();} if(!S.acct.seeded)seedAcct(); return S.acct; }
 function seedAcct(){
   const a=S.acct; const dm=(o)=>{const x=new Date();x.setDate(x.getDate()+o);return x.toISOString().slice(0,10);};
@@ -1284,20 +1300,35 @@ function seedAcct(){
   const addEin=(off,text,gross)=>{const net=gross/1.19;B.push({id:'bk'+(n++),date:dm(off),text,gross,net,vat:gross-net,vatRate:19,dir:'ein',catKey:'erloese',src:'reparatur',status:'gebucht'});};
   const addAus=(off,text,gross,catKey,rate,src)=>{rate=rate==null?19:rate;const net=rate?gross/(1+rate/100):gross;B.push({id:'bk'+(n++),date:dm(off),text,gross,net,vat:gross-net,vatRate:rate,dir:'aus',catKey,src:src||'manual',status:'gebucht'});};
   [[-1,'Reparatur REP-1108 · Galaxy S22 Display',250],[-1,'Kassenumsatz Tag',166],[-2,'Reparatur REP-1106 · Ladebuchse',75],[-2,'Reparatur · iPhone 14 Display',179],[-3,'Reparatur · Akkutausch',69],[-3,'Kassenumsatz Tag',231],[-4,'Reparatur · Displaytausch',129],[-4,'Reparatur · Backcover iPhone 15',179],[-5,'Reparatur · Display Pro',269],[-5,'Kassenumsatz Tag',142],[-6,'Reparatur · Kameraglas',59],[-6,'Reparatur · Displaytausch S23',209],[-7,'Reparatur · Displaytausch iPhone 15',249],[-7,'Kassenumsatz Tag',204],[-8,'Reparatur · Akku + Display',198],[-9,'Reparatur · Displaytausch',149],[-9,'Kassenumsatz Tag',187],[-10,'Reparatur · Wasserschaden-Reinigung',120],[-10,'Reparatur · Akkutausch',69],[-11,'Reparatur · Displaytausch',159],[-12,'Kassenumsatz Tag',176],[-12,'Reparatur · Backcover',175],[-13,'Reparatur · Display + Akku',299]].forEach(e=>addEin(e[0],e[1],e[2]));
-  addAus(-4,'Foneday · Ersatzteile RE-24020',412.00,'wareneinkauf',19,'email');
-  addAus(-7,'GSMparts · Displays 2026-5501',588.00,'wareneinkauf',19,'email');
-  addAus(-1,'Miete Werkstatt',950.00,'miete',0,'email');
-  addAus(-6,'Deutsche Telekom · Juli',79.90,'telefon',19,'email');
-  addAus(-11,'Allianz · Betriebshaftpflicht',48.50,'versicherung',19,'email');
   S.bookings=B;
   S.belege=[
-   {id:'bl1',from:'Foneday B.V.',email:'billing@foneday.com',subject:'Ihre Rechnung RE-24188 – Ersatzteile',date:dm(0),invNo:'RE-24188',gross:342.00,vatRate:19,catKey:'wareneinkauf',due:dm(14),confidence:97,status:'neu',source:'email'},
-   {id:'bl2',from:'Deutsche Telekom',email:'rechnung@telekom.de',subject:'Ihre Telekom Rechnung August 2026',date:dm(0),invNo:'2026-8801921',gross:79.90,vatRate:19,catKey:'telefon',due:dm(10),confidence:99,status:'neu',source:'email'},
-   {id:'bl3',from:'Hausverwaltung Balingen',email:'buchhaltung@hv-balingen.de',subject:'Miete Gewerbe September',date:dm(-1),invNo:'M-2026-09',gross:950.00,vatRate:0,catKey:'miete',due:dm(3),confidence:95,status:'neu',source:'email'},
-   {id:'bl4',from:'GSMparts GmbH',email:'invoice@gsmparts.de',subject:'Rechnung 2026-5567 – Display-Lieferung',date:dm(-1),invNo:'2026-5567',gross:588.00,vatRate:19,catKey:'wareneinkauf',due:dm(13),confidence:96,status:'neu',source:'email'}
+   {id:'bl1',from:'Foneday B.V.',email:'billing@foneday.com',subject:'Ihre Rechnung RE-24188 – Ersatzteile',date:dm(-2),invNo:'RE-24188',gross:342.00,vatRate:19,catKey:'wareneinkauf',due:dm(12),confidence:97,status:'neu',source:'email'},
+   {id:'bl2',from:'Deutsche Telekom',email:'rechnung@telekom.de',subject:'Ihre Telekom Rechnung August 2026',date:dm(-1),invNo:'2026-8801921',gross:79.90,vatRate:19,catKey:'telefon',due:dm(9),confidence:99,status:'neu',source:'email'},
+   {id:'bl3',from:'Hausverwaltung Balingen',email:'buchhaltung@hv-balingen.de',subject:'Miete Gewerbe',date:dm(-3),invNo:'M-2026-08',gross:950.00,vatRate:0,catKey:'miete',due:dm(2),confidence:96,status:'neu',source:'email'},
+   {id:'bl4',from:'GSMparts GmbH',email:'invoice@gsmparts.de',subject:'Rechnung 2026-5567 – Display-Lieferung',date:dm(-5),invNo:'2026-5567',gross:588.00,vatRate:19,catKey:'wareneinkauf',due:dm(8),confidence:96,status:'neu',source:'email'},
+   {id:'bl5',from:'Allianz Versicherung',email:'post@allianz.de',subject:'Betriebshaftpflicht Beitrag',date:dm(-6),invNo:'AZ-2026-4471',gross:48.50,vatRate:19,catKey:'versicherung',due:dm(4),confidence:98,status:'neu',source:'email'},
+   {id:'bl6',from:'Handyzubehör24',email:'noreply@handyzubehoer24.de',subject:'Rechnung (Scan) – teils unleserlich',date:dm(-1),invNo:'unklar',gross:64.90,vatRate:19,catKey:'buero',due:dm(9),confidence:71,status:'neu',source:'email'}
   ];
   S.belege.forEach(b=>{b.net=b.vatRate?b.gross/(1+b.vatRate/100):b.gross;b.vat=b.gross-b.net;});
+  if(a.autoBook) S.belege.filter(b=>b.status==='neu'&&b.confidence>=a.autoThreshold).forEach(b=>autoBookBeleg(b));
   a.seeded=true; save();
+}
+const SUPPLIERS=[['Foneday B.V.','wareneinkauf',19,['Ersatzteil-Lieferung','Display-Charge','Akku-Set']],['GSMparts GmbH','wareneinkauf',19,['Display-Lieferung','Ersatzteile']],['Amazon Business','buero',19,['Büromaterial','Verpackung']],['Vodafone GmbH','telefon',19,['Mobilfunkrechnung']],['ARAL','kfz',19,['Tankbeleg']],['Meta Ads','werbung',19,['Werbeanzeigen']]];
+function autoBookBeleg(b){
+  b.net=b.vatRate?b.gross/(1+b.vatRate/100):b.gross;b.vat=b.gross-b.net;
+  S.bookings.unshift({id:uid('bk'),date:b.date,text:b.from+' · '+b.invNo,gross:b.gross,net:b.net,vat:b.vat,vatRate:b.vatRate,dir:'aus',catKey:b.catKey,src:'email-auto',belegRef:b.invNo,status:'gebucht'});
+  b.status='auto'; b.bookedAt=today();
+}
+function receiveEmailInvoice(){
+  const a=ensureAcct(); const s=SUPPLIERS[Math.floor(Math.random()*SUPPLIERS.length)];
+  const gross=Math.round((45+Math.random()*420)*100)/100;
+  const conf=[99,98,97,96,95,94,79][Math.floor(Math.random()*7)];
+  const b={id:uid('bl'),from:s[0],email:'rechnung@'+s[0].toLowerCase().replace(/[^a-z]/g,'')+'.de',subject:'Rechnung · '+s[3][Math.floor(Math.random()*s[3].length)],date:today(),invNo:'RE-'+(10000+Math.floor(Math.random()*89999)),gross,vatRate:s[2],catKey:s[1],due:today(),confidence:conf,status:'neu',source:'email'};
+  b.net=b.gross/(1+b.vatRate/100);b.vat=b.gross-b.net;
+  S.belege.unshift(b);
+  if(a.autoBook&&conf>=a.autoThreshold){autoBookBeleg(b);save();toast('E-Mail-Rechnung erkannt & automatisch verbucht: '+b.from+' · '+eur(b.gross));}
+  else{save();toast('E-Mail-Rechnung erkannt ('+conf+'%) – zur Prüfung');}
+  buchTab='belege';views.buchhaltung();paintIcons();refreshBadges();
 }
 views.buchhaltung=function(){
   const a=ensureAcct(); const m=document.getElementById('main');
@@ -1328,7 +1359,7 @@ function buchOverview(){
     <div class="card kpi"><div class="n">${eur(ueberschuss)}</div><div class="l">${a.mode==='euer'?'Überschuss (EÜR)':'Gewinn'}</div></div>
     <div class="card kpi"><div class="n">${eur(zahllast)}</div><div class="l">USt-Zahllast</div></div>
    </div>
-   ${inbox.length?`<div class="card" style="margin-top:16px;border:1px solid var(--green)"><div class="between"><div><b>${inbox.length} neue Rechnung(en) im Posteingang</b><div class="muted" style="font-size:13px">Automatisch aus deinem E-Mail-Postfach erkannt – ein Klick zum Verbuchen.</div></div><button class="btn pri" onclick="buchTab='belege';views.buchhaltung();paintIcons()">Belege prüfen</button></div></div>`:''}
+   <div class="card" style="margin-top:16px;border:1px solid var(--green)"><div class="between"><div><b>${S.belege.filter(b=>b.status==='auto').length} Rechnung(en) automatisch verbucht${inbox.length?' · '+inbox.length+' zur Prüfung':''}</b><div class="muted" style="font-size:13px">E-Mail-Rechnungen werden ohne Klick erkannt und direkt gebucht.</div></div><button class="btn pri" onclick="buchTab='belege';views.buchhaltung();paintIcons()">Belege ansehen</button></div></div>
    <div class="grid g2" style="margin-top:16px">
      <div class="card"><b>USt-Voranmeldung (Monat)</b>
        <div class="between" style="margin-top:12px;font-size:14px"><span>Umsatzsteuer (Erlöse 19 %)</span><b class="mono">${eur(ustEin)}</b></div>
@@ -1339,17 +1370,14 @@ function buchOverview(){
    </div>`;
 }
 function buchBelege(){
-  const inbox=S.belege.filter(b=>b.status==='neu');const done=S.belege.filter(b=>b.status==='gebucht');
-  return `<div class="between"><div><b>E-Mail-Posteingang · erkannte Rechnungen</b><div class="muted" style="font-size:13px">Postfach ${S.acct.mailConnected?'verbunden':'nicht verbunden'} · Rechnungen werden automatisch per KI/OCR erkannt.</div></div><button class="btn" onclick="uploadBeleg()">Beleg hochladen</button></div>
-   <div class="card" style="margin-top:14px;padding:0">${inbox.length?inbox.map(b=>`
-     <div class="listitem" style="padding:14px 16px;cursor:pointer" onclick="belegDetail('${b.id}')">
-       <div class="avatar out">${initials(b.from)}</div>
-       <div style="flex:1;min-width:0"><b>${esc(b.from)}</b> <span class="tag">Rechnung erkannt · ${b.confidence}%</span><div class="muted" style="font-size:13px">${esc(b.subject)} · ${esc(b.invNo)}</div></div>
-       <div style="text-align:right;min-width:110px"><b>${eur(b.gross)}</b><div class="muted" style="font-size:12px">${CAT_LABEL[b.catKey]} · ${KONTEN[b.catKey].nr}</div></div>
-       <button class="btn sm pri" onclick="event.stopPropagation();buchenBeleg('${b.id}')">Buchen</button>
-     </div>`).join(''):'<div class="empty">Posteingang leer – alle Rechnungen verbucht.</div>'}</div>
-   ${done.length?`<div class="muted" style="font-size:13px;margin:16px 0 8px">Zuletzt verbucht</div><div class="card" style="padding:0">${done.slice(0,5).map(b=>`<div class="listitem" style="padding:12px 16px"><div style="flex:1"><b>${esc(b.from)}</b> · ${esc(b.invNo)}<div class="muted" style="font-size:13px">${eur(b.gross)} · ${CAT_LABEL[b.catKey]}</div></div><span class="pill soft"><span class="d"></span>gebucht</span></div>`).join('')}</div>`:''}
-   <div class="note" style="margin-top:14px">So funktioniert's: Dein E-Mail-Postfach wird angebunden; eingehende Rechnungen (PDF) werden automatisch erkannt (Lieferant, Betrag, USt, Konto) und landen hier. „Buchen" überträgt sie direkt in deine Buchhaltung — im ${S.acct.mode==='euer'?'EÜR':'Doppik'}-Verfahren.</div>`;
+  const a=S.acct; const review=S.belege.filter(b=>b.status==='neu'); const posted=S.belege.filter(b=>b.status==='auto'||b.status==='gebucht');
+  return `<div class="between"><div><b>E-Mail-Rechnungen</b><div class="muted" style="font-size:13px">Postfach ${a.mailConnected?'verbunden':'nicht verbunden'} · ${a.autoBook?'Auto-Verbuchung ab '+a.autoThreshold+' % Konfidenz':'Auto-Verbuchung aus'}</div></div>
+     <div class="row"><button class="btn pri" onclick="receiveEmailInvoice()">Neue E-Mail simulieren</button><button class="btn gho" onclick="uploadBeleg()">Beleg hochladen</button></div></div>
+   ${review.length?`<div class="card" style="margin-top:14px;border:1px solid var(--green)"><b>Zur Prüfung (${review.length})</b><div class="muted" style="font-size:13px;margin-bottom:4px">Konfidenz unter Schwelle – bitte kurz bestätigen.</div>
+     ${review.map(b=>`<div class="listitem" style="cursor:pointer" onclick="belegDetail('${b.id}')"><div class="avatar out">${initials(b.from)}</div><div style="flex:1;min-width:0"><b>${esc(b.from)}</b> <span class="tag">${b.confidence}%</span><div class="muted" style="font-size:13px">${esc(b.subject)} · ${esc(b.invNo)}</div></div><div style="text-align:right;min-width:100px"><b>${eur(b.gross)}</b><div class="muted" style="font-size:12px">${CAT_LABEL[b.catKey]} · ${KONTEN[b.catKey].nr}</div></div><button class="btn sm pri" onclick="event.stopPropagation();buchenBeleg('${b.id}')">Buchen</button></div>`).join('')}</div>`:''}
+   <div class="card" style="margin-top:16px;padding:0"><div style="padding:14px 16px 2px"><b>Automatisch verbucht</b></div>
+     ${posted.length?posted.slice(0,14).map(b=>`<div class="listitem" style="padding:12px 16px"><div class="avatar out">${initials(b.from)}</div><div style="flex:1;min-width:0"><b>${esc(b.from)}</b> · ${esc(b.invNo)}<div class="muted" style="font-size:13px">${eur(b.gross)} · ${CAT_LABEL[b.catKey]} · Konto ${KONTEN[b.catKey].nr}</div></div><span class="pill ${b.status==='auto'?'solid':'soft'}"><span class="d"></span>${b.status==='auto'?'automatisch':'manuell'}</span></div>`).join(''):'<div class="empty">Noch nichts verbucht</div>'}</div>
+   <div class="note" style="margin-top:14px">Eingehende Rechnungen werden automatisch erkannt (Lieferant, Betrag, USt, Konto) und – ab ${a.autoThreshold} % Konfidenz – <b>ohne Klick direkt verbucht</b> (${a.mode==='euer'?'EÜR':'Doppik'}). Nur unsichere Belege landen zur kurzen Prüfung. Einstellbar unter Einstellungen → Buchhaltung.</div>`;
 }
 function belegPrevText(gross,rate,catKey){const net=rate?gross/(1+rate/100):gross;const vat=gross-net;
   if(S.acct.mode==='euer')return 'Ausgabe '+eur(gross)+' · '+CAT_LABEL[catKey]+(vat?' · Vorsteuer '+eur(vat):' · steuerfrei');
