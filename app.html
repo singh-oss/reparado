@@ -581,6 +581,65 @@ function refreshBadges(){
   const bn=document.getElementById('bg-notif'); if(bn){const n=((S.requests||[]).length)+((S.feedback||[]).length)+((S.warrantyClaims||[]).length)+(typeof uncollectedOrders==='function'?uncollectedOrders().length:0)+((S.drafts||[]).length); bn.textContent=n; bn.style.display=n?'':'none';}
 }
 
+/* ---- KI-Tagesbriefing / Chef-Cockpit (L16) ---- */
+function dailyBriefing(){
+  const items=[];
+  const unc=(typeof uncollectedOrders==='function')?uncollectedOrders():[];
+  if(unc.length)items.push({txt:unc.length+' Gerät'+(unc.length>1?'e':'')+' seit ≥3 Tagen nicht abgeholt',go:"go('dashboard')",lvl:'warn'});
+  const expQ=(S.quotes||[]).filter(q=>q.status==='offen'&&q.validUntil&&q.validUntil<=dPlus(3)&&q.validUntil>=today());
+  if(expQ.length)items.push({txt:expQ.length+' Angebot'+(expQ.length>1?'e':'')+' läuft in den nächsten Tagen ab',go:"go('angebote')",lvl:'warn'});
+  const low=(S.parts||[]).filter(p=>p.stock<=p.min);
+  if(low.length)items.push({txt:low.length+' Ersatzteil'+(low.length>1?'e':'')+' unter Mindestbestand',go:"go('lager')",lvl:'warn'});
+  const wc=(S.warrantyClaims||[]).length; if(wc)items.push({txt:wc+' offene'+(wc>1?' Garantiefälle':'r Garantiefall'),go:"go('dashboard')",lvl:'warn'});
+  const fbn=(S.feedback||[]).filter(f=>f.rating<3).length; if(fbn)items.push({txt:fbn+' kritische Kundenstimme'+(fbn>1?'n':''),go:"go('dashboard')",lvl:'warn'});
+  const req=(S.requests||[]).length; if(req)items.push({txt:req+' neue Website-Anfrage'+(req>1?'n':''),go:"go('angebote')",lvl:'info'});
+  const react=(typeof reactivationOps==='function')?reactivationOps().length:0; if(react)items.push({txt:react+' Reaktivierungs-Chance'+(react>1?'n':''),go:"go('kunden')",lvl:'info'});
+  const heute=visibleOrders().filter(o=>o.appt===today()).length; if(heute)items.push({txt:heute+' Termin'+(heute>1?'e':'')+' heute',go:"go('kalender')",lvl:'info'});
+  const wk=new Date();wk.setDate(wk.getDate()-7);const wkStr=wk.toISOString().slice(0,10);
+  const doneW=S.ord.filter(o=>(o.status==='abgeholt'||o.status==='fertig')&&(o.pickedAt||o.readyAt||'')>=wkStr);
+  const margeW=doneW.reduce((s,o)=>s+(typeof orderMargin==='function'?orderMargin(o):(+o.price||0)),0);
+  return {items:items.slice(0,7), margeW, count:doneW.length};
+}
+/* ---- Techniker-Playbook (L3) ---- */
+const PLAYBOOKS={
+ display:{title:'Displaytausch',steps:['Gerät ausschalten, Schaden dokumentieren','Schrauben lösen (Pentalobe/Torx)','Display mit Wärme + Saugnapf/Plektren vorsichtig lösen','Akkustecker trennen, DANN Displaystecker abziehen','Neues Display anstecken – Funktionstest VOR dem Verkleben','Verkleben, zusammenbauen, True-Tone/Kalibrierung'],tools:['Heißluft/iOpener','Saugnapf','Plektren','Pentalobe/Torx','Spudger'],time:'30–45 Min',pitfalls:['Akku IMMER zuerst trennen','Face-ID-/Touch-Flexkabel nicht knicken','vor Verklebung testen']},
+ akku:{title:'Akkutausch',steps:['Gerät auf <25 % entladen','Öffnen, Akkustecker trennen','Klebestreifen langsam ziehen / mit Alkohol lösen','Neuen Akku einsetzen und anstecken','Funktionstest, dann verkleben'],tools:['Heißluft','Spudger','Klebestreifen','Pinzette'],time:'20–35 Min',pitfalls:['Akku nicht knicken/durchstechen – Brandgefahr','Klebestreifen nicht abreißen lassen','Original-Kapazität prüfen']},
+ lade:{title:'Ladebuchse',steps:['Öffnen, Akku trennen','Ladeflex/Buchse ausbauen','Ladeport reinigen, auf Korrosion prüfen','Neue Buchse einsetzen','Ladetest inkl. Strommessung'],tools:['Spudger','Torx','Multimeter','Heißluft'],time:'30–50 Min',pitfalls:['Kontakte nicht verbiegen','Feuchtigkeit/Korrosion als Ursache ausschließen']},
+ kamera:{title:'Kamera / Kameraglas',steps:['Öffnen, Akku trennen','Kameramodul/Glas ausbauen','Neues Teil einsetzen','Fokus- und Blitztest'],tools:['Spudger','Pinzette','Heißluft'],time:'20–40 Min',pitfalls:['Staub vor dem Verschließen entfernen','Steckverbinder sauber setzen']},
+ backcover:{title:'Backcover / Rückglas',steps:['Erwärmen, Kleber lösen','Glasreste vollständig entfernen','Neues Rückglas verkleben','Dichtung/Kleberahmen erneuern'],tools:['Heißluft','Plektren','Klebeschablone'],time:'40–70 Min',pitfalls:['Glassplitter – Schutzbrille tragen','Kamera-/Blitzabdeckung übernehmen']},
+ wasser:{title:'Wasserschaden-Behandlung',steps:['NICHT laden/einschalten','Öffnen, Board ausbauen','Ultraschallreinigung / Isopropanol','Korrosion prüfen, Bauteile checken','Trocknen, testen'],tools:['Ultraschallbad','Isopropanol','Mikroskop','Multimeter'],time:'60–120 Min',pitfalls:['Datenverlust-Hinweis dokumentieren','Folgeschäden möglich – Kunde informieren']},
+};
+function playbookFor(rep){const r=(rep||'').toLowerCase();if(r.indexOf('display')>=0)return PLAYBOOKS.display;if(r.indexOf('akku')>=0)return PLAYBOOKS.akku;if(r.indexOf('lade')>=0)return PLAYBOOKS.lade;if(r.indexOf('kamera')>=0)return PLAYBOOKS.kamera;if(r.indexOf('backcover')>=0||r.indexOf('rückglas')>=0||r.indexOf('rueckglas')>=0)return PLAYBOOKS.backcover;if(r.indexOf('wasser')>=0)return PLAYBOOKS.wasser;return null;}
+function playbook(id){const o=S.ord.find(x=>x.id===id);if(!o)return;const dev=oDevices(o)[0]||{};const pb=playbookFor(dev.reparatur||o.issue);
+  openModal(`<div class="dhead"><b style="flex:1">Reparatur-Anleitung${pb?' · '+pb.title:''}</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+   <div class="dbody"><div class="muted" style="font-size:13px">${esc(oDevLabel(o))} · ${esc(oIssueLabel(o))}</div>
+   ${pb?`<label class="f" style="margin-top:12px">Schritte</label><ol style="margin:0;padding-left:18px;line-height:1.8">${pb.steps.map(s=>`<li>${esc(s)}</li>`).join('')}</ol>
+   <div class="grid g2" style="margin-top:12px"><div><label class="f">Werkzeug</label><div class="row" style="flex-wrap:wrap;gap:6px">${pb.tools.map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div></div><div><label class="f">Richtzeit</label><div style="font-weight:700">${pb.time}</div></div></div>
+   <label class="f" style="margin-top:12px">Achtung</label><ul style="margin:0;padding-left:18px;line-height:1.7">${pb.pitfalls.map(p=>`<li>${esc(p)}</li>`).join('')}</ul>
+   <div class="note" style="margin-top:12px">KI-Anleitung (Prototyp, regelbasiert) – macht Azubis produktiv & senkt Fehler. Später gerätespezifisch mit Bildern/Video.</div>`:`<div class="empty" style="margin-top:12px">Für „${esc(dev.reparatur||o.issue||'—')}" liegt noch keine Anleitung vor. Standard: Sichtprüfung → Funktionstest → passende Anleitung.</div>`}</div>`);
+}
+/* ---- Self-Check-in-Terminal (L14) ---- */
+function selfCheckin(){ensureCat();const ov=document.createElement('div');ov.id='checkinOv';ov.style.cssText='position:fixed;inset:0;z-index:300;background:#f5f8f6;overflow:auto;padding:24px';
+  ov.innerHTML=`<div style="max-width:560px;margin:0 auto">
+   <div style="text-align:center;margin-bottom:18px"><div style="font-size:24px;font-weight:800;color:#0e7a3c">${esc(SHOP.name)}</div><div class="muted">Gerät selbst anmelden</div></div>
+   <div class="card"><label class="f">Ihr Name</label><input class="in" id="ci_name">
+     <div class="grid g2" style="margin-top:10px"><div><label class="f">Telefon</label><input class="in" id="ci_tel" value="+49 "></div><div><label class="f">E-Mail (optional)</label><input class="in" id="ci_mail"></div></div>
+     <div class="grid g2" style="margin-top:10px"><div><label class="f">Marke</label><select class="in" id="ci_brand">${catBrands().map(b=>`<option>${esc(b)}</option>`).join('')}</select></div><div><label class="f">Modell</label><input class="in" id="ci_model" list="ci_models" placeholder="Modell"></div></div>
+     <datalist id="ci_models">${catBrands().flatMap(b=>catModelNames(b)).map(m=>`<option>${esc(m)}</option>`).join('')}</datalist>
+     <label class="f" style="margin-top:10px">Was ist das Problem?</label><textarea class="in" id="ci_issue" rows="2" placeholder="z. B. Display gesprungen"></textarea>
+     <label class="f" style="margin-top:10px">Unterschrift (Auftrag &amp; Datensicherungs-Hinweis)</label><div class="sigwrap" style="border:1px solid var(--line);border-radius:10px;background:#fff"><canvas id="sig" width="500" height="130"></canvas></div>
+     <div class="note" style="margin-top:10px">Mit der Abgabe bestätige ich die Auftragserteilung. Für Datenverlust wird keine Haftung übernommen; bitte vorher sichern.</div>
+     <div class="row" style="margin-top:14px;gap:8px"><button class="btn gho" style="flex:1" onclick="clearSig()">Unterschrift löschen</button><button class="btn" style="flex:1" onclick="checkinCancel()">Abbrechen</button><button class="btn pri" style="flex:1" onclick="checkinDo()">Gerät abgeben</button></div>
+   </div></div>`;
+  document.body.appendChild(ov);setTimeout(initSig,30);}
+function checkinCancel(){const o=document.getElementById('checkinOv');if(o)o.remove();}
+function checkinDo(){const g=id=>(document.getElementById(id)||{}).value||'';const name=g('ci_name').trim(),tel=g('ci_tel').trim(),model=g('ci_model').trim(),issue=g('ci_issue').trim();if(!name||tel.replace(/\D/g,'').length<5){toast('Bitte Name und Telefonnummer');return;}if(!model||!issue){toast('Bitte Gerät und Problem angeben');return;}
+  const brand=g('ci_brand');let c=S.cust.find(x=>x.tel&&x.tel.replace(/\D/g,'')===tel.replace(/\D/g,'')&&tel.replace(/\D/g,'').length>5);if(!c){c={id:uid('c'),name,tel,mail:g('ci_mail'),adr:''};S.cust.push(c);}
+  const sigC=document.getElementById('sig');const sig=(window.__sigDirty&&sigC)?sigC.toDataURL('image/png'):'';
+  const price=priceFor(brand,model,issue);const devs=[{typ:'Smartphone',brand,model,imei:'',fach:'',ref:'',reparatur:issue,qual:'Original',price:+price||0,warranty:6}];
+  const nr=nextOrderNr();const o=Object.assign({id:uid('o'),nr,cid:c.id,devices:devs,lock:'Keine',lockval:'',status:'offen',prio:'Standard',created:today(),due:dPlus(3),appt:'',notes:'Self-Check-in am Terminal',readyAt:'',sig,source:'checkin',technikerId:''},noMirror(devs));
+  S.ord.unshift(o);save();refreshBadges();
+  document.getElementById('checkinOv').innerHTML=`<div style="max-width:560px;margin:60px auto;text-align:center"><div style="width:70px;height:70px;border-radius:50%;background:#0e7a3c;color:#fff;display:grid;place-items:center;margin:0 auto 18px;font-size:32px">✓</div><div style="font-size:24px;font-weight:800">Danke, ${esc(name.split(' ')[0])}!</div><p class="muted" style="margin:8px 0 4px">Ihr Gerät ist angemeldet.</p><div style="font-weight:800;font-size:20px">${nr}</div><p class="muted" style="font-size:13px;margin-top:8px">Status verfolgen: reparado.de/status/${nr}</p><button class="btn pri" style="margin-top:18px" onclick="checkinCancel()">Fertig</button></div>`;}
 /* ============================ DASHBOARD ============================ */
 views.dashboard=function(){
   const m=document.getElementById('main');
@@ -596,8 +655,12 @@ views.dashboard=function(){
   ];
   m.innerHTML=`
    <div class="between"><div><h1 class="h1">Guten Tag</h1><p class="sub">${SHOP.name} · ${fmtDate(today())}</p></div>
-     <div class="row"><button class="btn" onclick="newOrder()">Neuer Auftrag</button><button class="btn" onclick="newQuote()">Angebot</button><button class="btn" onclick="go('kasse')">Kasse öffnen</button><button class="btn pri" onclick="startDemo()">Demo-Tour</button></div></div>
-   <div class="grid g4" style="margin-top:18px">
+     <div class="row"><button class="btn" onclick="newOrder()">Neuer Auftrag</button><button class="btn" onclick="newQuote()">Angebot</button><button class="btn" onclick="selfCheckin()">Self-Check-in</button><button class="btn" onclick="go('kasse')">Kasse öffnen</button><button class="btn pri" onclick="startDemo()">Demo-Tour</button></div></div>
+   ${curRole()==='inhaber'?(function(){const b=dailyBriefing();return `<div class="card" style="margin-top:16px;background:#0e7a3c;color:#fff">
+     <div class="between"><b style="font-size:16px">Dein Tagesbriefing</b><span style="opacity:.8;font-size:12px">${fmtDate(today())}</span></div>
+     <div style="margin-top:8px">${b.items.length?b.items.map(it=>`<div class="row" style="padding:7px 0;border-bottom:1px solid rgba(255,255,255,.18);cursor:pointer" onclick="${it.go}"><span style="flex:1">${it.lvl==='warn'?'⚠ ':'• '}${esc(it.txt)}</span><span style="opacity:.7">›</span></div>`).join(''):'<div style="opacity:.85">Alles im grünen Bereich – nichts Dringendes heute.</div>'}</div>
+     <div style="margin-top:10px;opacity:.9;font-size:13px">Diese Woche: ${b.count} Reparaturen erledigt · Marge ${eur(b.margeW)}</div></div>`;})():''}
+   <div class="grid g4" style="margin-top:16px">
      ${curRole()==='inhaber'?`<div class="card kpi"><div class="n">${eur(monthRev)}</div><div class="l">Umsatz diesen Monat</div><div class="t">Reparaturen führen</div></div>`:`<div class="card kpi"><div class="n">${src.filter(o=>o.status==='abgeholt'&&isThisMonth(o.pickedAt||o.readyAt||o.created)).length}</div><div class="l">Erledigt diesen Monat</div><div class="t">Weiter so</div></div>`}
      <div class="card kpi"><div class="n">${offen}</div><div class="l">Offene Aufträge</div><div class="t">${fertig} abholbereit</div></div>
      <div class="card kpi"><div class="n">${heute}</div><div class="l">Termine heute</div><div class="t">Kalender ansehen</div></div>
@@ -750,6 +813,7 @@ function openOrder(id){
      <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px">
        <button class="btn" onclick="sendReminderFor('${o.id}')">Erinnerung senden</button>
        <button class="btn" onclick="printKVA('${o.id}')">Kostenvoranschlag</button>
+       <button class="btn" onclick="playbook('${o.id}')">Reparatur-Anleitung</button>
        <button class="btn" onclick="printReceipt('${o.id}')">Beleg / Quittung</button>
        <button class="btn" onclick="printLabel('${o.id}')">Etikett drucken</button>
        <button class="btn" onclick="printWarranty('${o.id}')">Garantie-Beleg</button>
