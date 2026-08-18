@@ -188,6 +188,7 @@
       <a data-view="auftraege"><span class="ic" data-ic="clip"></span> Aufträge <span class="badge" id="bg-auf">0</span></a>
       <a data-view="kalender"><span class="ic" data-ic="cal"></span> Kalender</a>
       <a data-view="kunden"><span class="ic" data-ic="user"></span> Kunden</a>
+      <a data-view="versicherung"><span class="ic" data-ic="shield"></span> Versicherung <span class="badge" id="bg-ins">0</span></a>
       <div class="grouplbl">Werkstatt</div>
       <a data-view="erinnerungen"><span class="ic" data-ic="bell"></span> Erinnerungen <span class="badge" id="bg-rem">0</span></a>
       <a data-view="bestellungen"><span class="ic" data-ic="box"></span> Bestellungen</a>
@@ -266,7 +267,7 @@ const SHOP = {name:"Dein Handy Doc", city:"Balingen", street:"Bahnhofstr. 12", z
 const KEY='reparado_v1';
 let S = load();
 
-function load(){ try{const r=JSON.parse(localStorage.getItem(KEY)); if(r&&r.v===6) return r;}catch(e){} const s=seed(); save(s); return s; }
+function load(){ try{const r=JSON.parse(localStorage.getItem(KEY)); if(r&&r.v===7) return r;}catch(e){} const s=seed(); save(s); return s; }
 function save(x){ localStorage.setItem(KEY, JSON.stringify(x||S)); }
 function uid(p){ return p+Math.random().toString(36).slice(2,7); }
 
@@ -319,7 +320,15 @@ function seed(){
   [['c5','Apple','iPhone 13','Displaytausch',149,'Express'],['c6','Samsung','Galaxy A14','Akkutausch',59,'Standard'],['c9','Apple','iPhone 12','Kameraglas',49,'Standard']].forEach((t,i)=>ord.unshift({id:'ot'+i,nr:'REP-'+(1116+i),cid:t[0],brand:t[1],model:t[2],imei:'',issue:t[3],qual:'Original',price:t[4],status:'offen',prio:t[5],created:d(0),due:d(0),notes:'Terminkunde heute',appt:d(0),readyAt:'',pickedAt:'',warranty:6,sig:'',source:''}));
   // Verkäufe (Kasse) diesen Monat
   const sales=[];for(let s=0;s<22;s++)sales.push({t:new Date(d(0)+'T'+String(9+(s%8)).padStart(2,'0')+':15:00').toISOString(),total:[15,12,9,25,19,39,10,29][s%8],items:1+(s%3)});
-  return {v:6, cust, ord, parts, orders, sold:[], counter:1119, rules: defaultRules(), sales, cash:{connected:''}, mailLog:[], calls:seedCalls(), phone:defaultPhone(), users:defaultUsers(), userId:'u1'};
+  // --- Wertgarantie: bestehende Versicherungsfälle in verschiedenen Stadien (für die Vorführung) ---
+  const wgCases=[['o1111','eingereicht',30],['o1108','freigegeben',0],['o1106','abgerechnet',0],['o1113','geprueft',50]];
+  wgCases.forEach(([id,st,sb],i)=>{const o=ord.find(x=>x.id===id);if(o)o.ins={on:true,provider:'Wertgarantie',vertrag:'WG-88'+(42150+i*137),selbst:sb,status:st,claimNr:st!=='geprueft'?'WG-CLM-'+(o.nr.replace(/\D/g,''))+'-26':'',submittedAt:st!=='geprueft'?d(-2):'',approvedAt:(st==='freigegeben'||st==='abgerechnet')?d(-1):'',note:''};});
+  // Von Wertgarantie zugewiesene Reparaturen (Vermittlung an den Fachhandelspartner)
+  const wgLeads=[
+    {id:'wl1',name:'Sandra Böhm',tel:'+49 151 22887744',brand:'Apple',model:'iPhone 14',issue:'Displaytausch (Sturzschaden)',vertrag:'WG-8840012',selbst:0,recv:d(0)},
+    {id:'wl2',name:'Murat Yıldız',tel:'+49 160 5566778',brand:'Samsung',model:'Galaxy S23',issue:'Displaytausch (Glasbruch)',vertrag:'WG-8839551',selbst:25,recv:d(0)},
+  ];
+  return {v:7, cust, ord, parts, orders, sold:[], counter:1119, rules: defaultRules(), sales, cash:{connected:''}, mailLog:[], calls:seedCalls(), phone:defaultPhone(), users:defaultUsers(), userId:'u1', insurance:defaultInsurance(), wgLeads};
 }
 function defaultPhone(){return {active:true, mode:'overflow',
   greeting:'Herzlich willkommen bei Dein Handy Doc. Ich bin die digitale Assistentin. Wie kann ich Ihnen helfen?',
@@ -490,6 +499,7 @@ function refreshBadges(){
   document.getElementById('bg-rem').textContent=computeQueue().length;
   const bc=document.getElementById('bg-call'); if(bc) bc.textContent=(S.calls||[]).filter(c=>c.task&&!c.done).length;
   const bb=document.getElementById('bg-beleg'); if(bb) bb.textContent=(S.belege||[]).filter(x=>x.status==='neu').length;
+  const bi=document.getElementById('bg-ins'); if(bi){const n=S.ord.filter(o=>o.ins&&o.ins.on&&['geprueft','eingereicht','freigegeben'].includes(o.ins.status)).length+((S.wgLeads||[]).length); bi.textContent=n; bi.style.display=n?'':'none';}
 }
 
 /* ============================ DASHBOARD ============================ */
@@ -600,6 +610,8 @@ function openOrder(id){
 
      <label class="f" style="margin-top:18px">Status ändern</label>
      <div class="row">${STFLOW.map(s=>`<button class="chip ${o.status===s?'on':''}" onclick="setStatus('${o.id}','${s}')">${STATUS[s].lbl}</button>`).join('')}</div>
+
+     ${insPanel(o)}
 
      <div class="divider"></div>
      <label class="f">Aktionen</label>
@@ -1121,7 +1133,12 @@ function posAdd(name,price){cart.push({name,price:+price,qty:1,vat:19});refreshC
 function reparaturPos(){const p=+prompt('Reparatur-Betrag (€, brutto):')||0;if(!p)return;cart.push({name:'Reparatur',price:p,qty:1,vat:19});refreshCart();}
 function freePos(){const n=prompt('Bezeichnung der Position:');if(!n)return;const p=+prompt('Preis (€, brutto):')||0;cart.push({name:n,price:p,qty:1,vat:19});refreshCart();}
 function posSearch(v){window.__posq=v;}
-function addToCart(orderId){const o=S.ord.find(x=>x.id===orderId);if(o){cart.push({name:o.nr+' · '+o.model+' · '+o.issue,price:o.price,qty:1,vat:19});toast('Auftrag in Kasse übernommen');kasseTab='pos';views.kasse();paintIcons();}}
+function addToCart(orderId){const o=S.ord.find(x=>x.id===orderId);if(o){
+  const insCovered=o.ins&&o.ins.on&&['freigegeben','abgerechnet'].includes(o.ins.status);
+  const price=insCovered?(+o.ins.selbst||0):o.price;
+  const name=o.nr+' · '+o.model+' · '+o.issue+(insCovered?' (Wertgarantie – Selbstbeteiligung)':'');
+  cart.push({name,price,qty:1,vat:19});
+  toast(insCovered?'Wertgarantie-Fall: Kunde zahlt nur Selbstbeteiligung':'Auftrag in Kasse übernommen');kasseTab='pos';views.kasse();paintIcons();}}
 function checkout(){
   if(!cart.length){toast('Warenkorb leer');return;}
   if(!ensureTse().active){toast('TSE nicht verbunden – Kassieren gesperrt (KassenSichV)');go('einstellungen');return;}
@@ -1293,6 +1310,15 @@ views.einstellungen=function(){
        <div class="integ" style="padding:8px 12px;justify-content:space-between"><span style="font-size:13px">Ab Konfidenz <select onchange="S.acct.autoThreshold=+this.value;save()" style="border:0;background:transparent;font-weight:700;color:var(--green)">${[90,95,98].map(v=>`<option${a.autoThreshold===v?' selected':''}>${v}</option>`).join('')}</select> % · ohne Klick buchen</span><button class="switch ${a.autoBook?'on':''}" onclick="S.acct.autoBook=!S.acct.autoBook;save();views.einstellungen();paintIcons()"><i></i></button></div>
        <div class="row" style="margin-top:12px"><span class="pill ${a.datev.connected?'solid':'soft'}"><span class="d"></span>${a.datev.connected?'DATEV verbunden':'DATEV nicht verbunden'}</span><button class="btn" onclick="go('buchhaltung');buchTab='datev';views.buchhaltung();paintIcons()">Buchhaltung öffnen</button></div>`;})()}
      </div>
+     <div class="card"><b>Wertgarantie (Versicherung)</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Als Fachhandelspartner Reparaturfälle versicherter Kunden einreichen, Freigaben erhalten und direkt mit Wertgarantie abrechnen. Prototyp – Portal-Anbindung simuliert.</p>
+       ${(function(){const w=ensureInsurance();return `
+       <div class="integ" style="justify-content:space-between"><div style="display:flex;gap:12px;align-items:center"><div class="lg">${ic('shield')}</div><div><b>Wertgarantie Fachhandelsportal</b><div class="muted" style="font-size:12px">${w.active&&w.connected?'Verbunden · Partner-Nr. '+esc(w.partnerNr):'Nicht verbunden'}</div></div></div>
+         <button class="switch ${w.active&&w.connected?'on':''}" onclick="S.insurance.active=!S.insurance.active;save();views.einstellungen();paintIcons()"><i></i></button></div>
+       <label class="f" style="margin-top:12px">Fachhandelspartner-Nummer</label>
+       <input class="in" id="wg_partner" value="${esc(w.partnerNr||'')}" placeholder="FH-72336-4471">
+       <div class="row" style="margin-top:12px">${w.connected?`<span class="pill solid"><span class="d"></span>Verbunden</span><button class="btn" onclick="wgDisconnect()">Trennen</button>`:`<button class="btn pri" onclick="wgConnect()">Verbinden</button><span class="muted" style="font-size:13px">Vertragsprüfung &amp; Schadensmeldung im Auftrag.</span>`}
+         <button class="btn" onclick="go('versicherung')">Versicherungsfälle öffnen</button></div>`;})()}
+     </div>
      <div class="card"><b>Benutzer & Rollen</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Geschäftsführung hat Vollzugriff. Mitarbeiter sehen keine Umsätze, Statistik, Buchhaltung oder das Kassenbuch.</p>
        ${S.users.map(u=>`<div class="listitem"><div class="avatar ${u.role==='inhaber'?'':'out'}">${initials(u.name)}</div><div style="flex:1;min-width:0"><b>${esc(u.name)}${u.id===S.userId?' <span class="tag">Du</span>':''}</b><div class="muted" style="font-size:12px">${ROLE_LABEL[u.role]} · ${u.role==='inhaber'?'Vollzugriff':'operativ (kein Umsatz)'}</div></div>
          <select class="in" style="width:auto;padding:6px 10px" onchange="setUserRole('${u.id}',this.value)"><option value="inhaber"${u.role==='inhaber'?' selected':''}>Geschäftsführung</option><option value="mitarbeiter"${u.role==='mitarbeiter'?' selected':''}>Mitarbeiter</option></select>
@@ -1302,6 +1328,128 @@ views.einstellungen=function(){
    </div>`;
 };
 function connectCash(p){ S.cash.connected=p; save(); toast(p+' verbunden – Kartenzahlung aktiv'); views.einstellungen();paintIcons(); }
+
+/* ============================ VERSICHERUNG (Wertgarantie) ============================ */
+function defaultInsurance(){return {connected:true,provider:'Wertgarantie',partnerNr:'FH-72336-4471',active:true};}
+function ensureInsurance(){ if(!S.insurance){S.insurance=defaultInsurance();save();} if(!S.wgLeads)S.wgLeads=[]; return S.insurance; }
+function wgConnect(){const w=ensureInsurance();const p=document.getElementById('wg_partner');w.partnerNr=(p&&p.value.trim())||w.partnerNr||'FH-72336-4471';w.connected=true;w.active=true;save();toast('Wertgarantie verbunden');views.einstellungen();paintIcons();}
+function wgDisconnect(){const w=ensureInsurance();w.connected=false;save();toast('Wertgarantie getrennt');views.einstellungen();paintIcons();}
+function insErstattung(o){return Math.max(0,(+o.price||0)-(+((o.ins&&o.ins.selbst)||0)));}
+const WG_LBL={geprueft:['Vertrag geprüft','soft'],eingereicht:['Bei Wertgarantie eingereicht','soft'],freigegeben:['Freigegeben','solid'],abgelehnt:['Abgelehnt','soft'],abgerechnet:['Abgerechnet','solid']};
+function insBadge(st){const x=WG_LBL[st]||['—','soft'];return `<span class="pill ${x[1]}"><span class="d"></span>${x[0]}</span>`;}
+function insPanel(o){
+  ensureInsurance();
+  if(!o.ins||!o.ins.on){
+    return `<div class="divider"></div><label class="f">Versicherung</label>
+     <div class="integ" style="justify-content:space-between"><div style="display:flex;gap:10px;align-items:center"><div class="lg">${ic('shield')}</div><div><b>Wertgarantie</b><div class="muted" style="font-size:12px">Geräteversicherung des Kunden? Fall einreichen.</div></div></div>
+     <button class="btn sm" onclick="insStart('${o.id}')">Als Wertgarantie-Fall</button></div>`;
+  }
+  const w=o.ins; const gf=curRole()==='inhaber'; let actions='';
+  if(w.status==='geprueft') actions=`<button class="btn pri" onclick="insSubmit('${o.id}')">Schadensmeldung an Wertgarantie senden</button>`;
+  else if(w.status==='eingereicht') actions=`<span class="muted" style="font-size:13px;align-self:center">Warten auf Freigabe …</span><button class="btn" onclick="insApprove('${o.id}')">Freigabe erhalten</button><button class="btn gho" onclick="insReject('${o.id}')">Abgelehnt</button>`;
+  else if(w.status==='freigegeben') actions=`<button class="btn pri" onclick="insBill('${o.id}')">Mit Wertgarantie abrechnen</button>`;
+  else if(w.status==='abgerechnet') actions=`<span class="muted" style="font-size:13px;align-self:center">Erstattung ${eur(insErstattung(o))} abgerechnet.</span>`;
+  else if(w.status==='abgelehnt') actions=`<span class="muted" style="font-size:13px;align-self:center">Kunde zahlt selbst.</span><button class="btn" onclick="insSubmit('${o.id}')">Erneut einreichen</button>`;
+  return `<div class="divider"></div>
+   <div class="between"><label class="f" style="margin:0">Versicherung · Wertgarantie</label>${insBadge(w.status)}</div>
+   <div class="card" style="background:var(--soft);border:0;margin-top:8px">
+     <div class="grid g2">
+       <div><label class="f">Vertragsnummer</label><div style="font-weight:700">${esc(w.vertrag||'—')}</div></div>
+       <div><label class="f">Schaden-Nr.</label><div style="font-weight:700">${esc(w.claimNr||'—')}</div></div>
+       <div><label class="f">Selbstbeteiligung (Kunde)</label><div style="font-weight:700">${eur(w.selbst)}</div></div>
+       <div><label class="f">${gf?'Erstattung Wertgarantie':'Übernahme'}</label><div style="font-weight:800">${gf?eur(insErstattung(o)):((w.status==='freigegeben'||w.status==='abgerechnet')?'übernommen':'—')}</div></div>
+     </div>
+     <div class="row" style="margin-top:12px;flex-wrap:wrap;gap:8px">${actions}
+       <button class="btn" onclick="insDoc('${o.id}')">Schadensmeldung anzeigen</button>
+       <button class="btn gho" onclick="insRemove('${o.id}')">Entfernen</button></div>
+   </div>`;
+}
+function insStart(id){const o=S.ord.find(x=>x.id===id);if(!o)return;
+  openModal(`<div class="dhead"><b style="flex:1">Wertgarantie-Fall anlegen</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+   <div class="dbody"><p class="muted" style="font-size:13px">Gerät: ${esc(o.brand)} ${esc(o.model)} · ${esc(o.issue)} · voraussichtlich ${eur(o.price)}</p>
+   <label class="f">Vertragsnummer des Kunden</label><input class="in" id="wg_vertrag" placeholder="WG-8842156">
+   <label class="f" style="margin-top:10px">Selbstbeteiligung (€)</label><input class="in" id="wg_selbst" type="number" value="0" placeholder="0">
+   <div class="note" style="margin-top:10px">Reparado prüft den Vertrag im Wertgarantie-Fachhandelsportal und legt den Schadenfall an. Der Kunde zahlt nur die Selbstbeteiligung – den Rest rechnen Sie direkt mit Wertgarantie ab.</div>
+   <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn gho" onclick="closeAll()">Abbrechen</button><button class="btn pri" onclick="insSave('${id}')">Vertrag prüfen &amp; anlegen</button></div></div>`);
+}
+function insSave(id){const o=S.ord.find(x=>x.id===id);const vi=document.getElementById('wg_vertrag');const v=(vi&&vi.value||'').trim();const sb=+((document.getElementById('wg_selbst')||{}).value)||0;
+  if(!v){toast('Bitte Vertragsnummer eingeben');return;}
+  o.ins={on:true,provider:'Wertgarantie',vertrag:v,selbst:sb,status:'geprueft',claimNr:'',submittedAt:'',approvedAt:'',note:''};
+  save();closeAll();toast('Vertrag gültig – Wertgarantie-Fall angelegt');openOrder(id);refreshBadges();
+}
+function insSubmit(id){const o=S.ord.find(x=>x.id===id);if(!o.ins)return;o.ins.status='eingereicht';o.ins.claimNr='WG-CLM-'+(o.nr.replace(/\D/g,'')||'0')+'-'+String(new Date().getFullYear()).slice(2);o.ins.submittedAt=today();save();toast('Schadensmeldung an Wertgarantie gesendet');afterIns(id);}
+function insApprove(id){const o=S.ord.find(x=>x.id===id);if(!o.ins)return;o.ins.status='freigegeben';o.ins.approvedAt=today();save();toast('Wertgarantie hat die Reparatur freigegeben');afterIns(id);}
+function insReject(id){const o=S.ord.find(x=>x.id===id);if(!o.ins)return;o.ins.status='abgelehnt';save();toast('Fall abgelehnt – Kunde zahlt selbst');afterIns(id);}
+function insBill(id){const o=S.ord.find(x=>x.id===id);if(!o.ins)return;o.ins.status='abgerechnet';save();toast('Mit Wertgarantie abgerechnet: '+eur(insErstattung(o)));afterIns(id);}
+function insRemove(id){const o=S.ord.find(x=>x.id===id);if(!o.ins)return;if(!confirm('Wertgarantie-Fall entfernen?'))return;o.ins=null;save();toast('Versicherungsfall entfernt');afterIns(id);}
+function afterIns(id){refreshBadges();const dr=document.getElementById('drawer');if(dr&&dr.classList.contains('show'))openOrder(id);if(current==='versicherung')views.versicherung();paintIcons();}
+function insDoc(id){const o=S.ord.find(x=>x.id===id);const c=cust(o.cid);const w=o.ins||{};
+  printHTML('Schadensmeldung '+o.nr, shopHead()+`<h2>Schadensmeldung · Wertgarantie</h2>
+    <div class="muted">Fachhandelspartner ${SHOP.name} · Partner-Nr. ${esc(ensureInsurance().partnerNr)} · ${fmtDate(today())}</div>
+    <table><tbody>
+     <tr><th>Versicherungsnehmer</th><td>${esc(c.name)}</td></tr>
+     <tr><th>Vertragsnummer</th><td class="mono">${esc(w.vertrag||'—')}</td></tr>
+     <tr><th>Gerät</th><td>${esc(o.brand)} ${esc(o.model)}${o.imei?' · IMEI '+esc(o.imei):''}</td></tr>
+     <tr><th>Schaden</th><td>${esc(o.issue)}</td></tr>
+     <tr><th>Schaden-Nr.</th><td class="mono">${esc(w.claimNr||'(wird bei Einreichung vergeben)')}</td></tr>
+    </tbody></table>
+    <table><thead><tr><th>Position</th><th style="text-align:right">Betrag</th></tr></thead><tbody>
+     <tr><td>Reparatur ${esc(o.issue)} (${esc(o.qual)})</td><td style="text-align:right" class="mono">${eur(o.price)}</td></tr>
+     <tr><td>Selbstbeteiligung Kunde</td><td style="text-align:right" class="mono">− ${eur(w.selbst||0)}</td></tr>
+    </tbody></table>
+    <div class="tot"><span>Erstattung Wertgarantie</span><span>${eur(insErstattung(o))}</span></div>
+    <div class="foot">Erstellt über das Wertgarantie-Fachhandelsportal (Prototyp). Freigabe ${w.approvedAt?'am '+fmtDate(w.approvedAt):'ausstehend'}.<br>${SHOP.name} · ${SHOP.street} · ${SHOP.zip} ${SHOP.city}</div>`);
+}
+function insRowAction(o){const st=o.ins.status;
+  if(st==='geprueft')return `<button class="btn sm pri" onclick="event.stopPropagation();insSubmit('${o.id}')">Einreichen</button>`;
+  if(st==='eingereicht')return `<button class="btn sm" onclick="event.stopPropagation();insApprove('${o.id}')">Freigabe</button>`;
+  if(st==='freigegeben')return `<button class="btn sm pri" onclick="event.stopPropagation();insBill('${o.id}')">Abrechnen</button>`;
+  return '';
+}
+function guessPrice(l){const i=(l.issue||'').toLowerCase();if(i.includes('akku'))return 69;if(i.includes('display')||i.includes('glas'))return 159;if(i.includes('kamera'))return 59;return 99;}
+function wgAcceptLead(id){const l=(S.wgLeads||[]).find(x=>x.id===id);if(!l)return;
+  let c=S.cust.find(x=>x.tel===l.tel); if(!c){c={id:uid('c'),name:l.name,tel:l.tel,mail:'',adr:''};S.cust.push(c);}
+  const nr='REP-'+(S.counter++);
+  const o={id:uid('o'),nr,cid:c.id,brand:l.brand,model:l.model,issue:l.issue,qual:'Original',price:guessPrice(l),status:'offen',prio:'Standard',created:today(),due:today(),appt:'',notes:'Von Wertgarantie vermittelt',imei:'',readyAt:'',warranty:SHOP.warranty,sig:'',source:'wertgarantie',
+    ins:{on:true,provider:'Wertgarantie',vertrag:l.vertrag,selbst:l.selbst||0,status:'geprueft',claimNr:'',submittedAt:'',approvedAt:'',note:''}};
+  S.ord.unshift(o); S.wgLeads=S.wgLeads.filter(x=>x.id!==id); save();
+  toast('Auftrag '+nr+' angelegt (Wertgarantie)'); views.versicherung(); refreshBadges();
+}
+function wgDismissLead(id){S.wgLeads=(S.wgLeads||[]).filter(x=>x.id!==id);save();views.versicherung();refreshBadges();toast('Vermittlung abgelehnt');}
+views.versicherung=function(){
+  ensureInsurance();
+  const m=document.getElementById('main');
+  const gf=curRole()==='inhaber';
+  const wg=S.insurance;
+  const cases=S.ord.filter(o=>o.ins&&o.ins.on);
+  const offen=cases.filter(o=>['geprueft','eingereicht'].includes(o.ins.status)).length;
+  const freig=cases.filter(o=>o.ins.status==='freigegeben').length;
+  const ausstehend=cases.filter(o=>o.ins.status==='freigegeben').reduce((s,o)=>s+insErstattung(o),0);
+  const erstattetM=cases.filter(o=>o.ins.status==='abgerechnet'&&isThisMonth(o.ins.approvedAt||o.readyAt||o.created)).reduce((s,o)=>s+insErstattung(o),0);
+  const leads=S.wgLeads||[];
+  m.innerHTML=`<div class="between"><div><h1 class="h1">Versicherung</h1><p class="sub">Wertgarantie-Fälle, Freigaben und Abrechnung</p></div>
+     <span class="pill ${wg.active&&wg.connected?'solid':'soft'}"><span class="d"></span>${wg.active&&wg.connected?'Wertgarantie verbunden':'Nicht verbunden'}</span></div>
+   <div class="grid g4" style="margin-top:16px">
+     <div class="card kpi"><div class="n">${offen}</div><div class="l">Offene Fälle</div><div class="t">geprüft &amp; eingereicht</div></div>
+     <div class="card kpi"><div class="n">${freig}</div><div class="l">Freigegeben</div><div class="t">abrechenbar</div></div>
+     ${gf?`<div class="card kpi"><div class="n">${eur(ausstehend)}</div><div class="l">Ausstehende Erstattung</div><div class="t">von Wertgarantie</div></div>
+     <div class="card kpi"><div class="n">${eur(erstattetM)}</div><div class="l">Erstattet diesen Monat</div><div class="t">bereits abgerechnet</div></div>`:`<div class="card kpi"><div class="n">${cases.length}</div><div class="l">Fälle gesamt</div><div class="t">Wertgarantie</div></div>
+     <div class="card kpi"><div class="n">${leads.length}</div><div class="l">Neue Vermittlungen</div><div class="t">von Wertgarantie</div></div>`}
+   </div>
+   ${leads.length?`<div class="card" style="margin-top:16px"><div class="between"><b>Von Wertgarantie zugewiesene Reparaturen</b><span class="pill soft"><span class="d"></span>${leads.length} neu</span></div>
+     <p class="muted" style="font-size:13px;margin:4px 0 12px">Versicherte Kunden, die Wertgarantie an Ihre Werkstatt vermittelt hat. „Annehmen" legt einen Auftrag mit hinterlegtem Versicherungsfall an.</p>
+     ${leads.map(l=>`<div class="listitem"><div class="avatar out">${initials(l.name)}</div><div style="flex:1;min-width:0"><b>${esc(l.name)}</b><div class="muted" style="font-size:12px">${esc(l.brand)} ${esc(l.model)} · ${esc(l.issue)} · Vertrag ${esc(l.vertrag)}${l.selbst?' · SB '+eur(l.selbst):''}</div></div>
+       <button class="btn sm pri" onclick="wgAcceptLead('${l.id}')">Annehmen</button><button class="btn sm gho" onclick="wgDismissLead('${l.id}')">Ablehnen</button></div>`).join('')}
+   </div>`:''}
+   <div class="card" style="margin-top:16px;padding:0;overflow:auto"><table>
+     <thead><tr><th>Auftrag</th><th>Kunde</th><th>Gerät</th><th>Vertrag</th><th style="text-align:right">Reparatur</th><th style="text-align:right">SB</th>${gf?'<th style="text-align:right">Erstattung</th>':''}<th>Status</th><th></th></tr></thead>
+     <tbody>${cases.length?cases.map(o=>`<tr onclick="openOrder('${o.id}')" style="cursor:pointer">
+       <td><b>${o.nr}</b></td><td>${esc(cust(o.cid).name)}</td><td>${esc(o.brand)} ${esc(o.model)}</td><td class="mono">${esc(o.ins.vertrag)}</td>
+       <td style="text-align:right" class="mono">${eur(o.price)}</td><td style="text-align:right" class="mono">${eur(o.ins.selbst)}</td>${gf?`<td style="text-align:right" class="mono">${eur(insErstattung(o))}</td>`:''}
+       <td>${insBadge(o.ins.status)}</td><td style="text-align:right">${insRowAction(o)}</td></tr>`).join(''):`<tr><td colspan="${gf?9:8}"><div class="empty">Noch keine Versicherungsfälle. Markieren Sie einen Auftrag im Reparaturauftrag als „Wertgarantie-Fall".</div></td></tr>`}</tbody>
+   </table></div>
+   <div class="note" style="margin-top:14px">Ablauf: Vertrag prüfen → Schadensmeldung einreichen → Freigabe von Wertgarantie → reparieren → mit Wertgarantie abrechnen. Der Kunde zahlt an der Kasse nur die Selbstbeteiligung.</div>`;
+};
 
 /* ============================ ONLINE-BUCHUNGEN EINLESEN ============================ */
 function pullBookings(){
