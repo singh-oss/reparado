@@ -35,7 +35,7 @@ Wachstums-Motoren (Versandreparatur, B2B, Forecast) · **Echtes System** (DB, Au
 | # | Feature | Typ | Effort | Impact | Abhängig |
 |---|---|---|---|---|---|
 | ✅ P1 | **Selbst-pflegbarer Katalog** — Gerätetypen→Marken→Modelle, Reparaturarten, Basispreise, Preise pro Modell überschreibbar, Qualitätsoptionen, **Modellbilder (B3)** · **FERTIG 18.8.** | Parität 🔴 | L | ★★★ | — (Basis für Preise, Angebote, Widget) |
-| P3 | **Konfigurierbare Status + Automatisierungen** — Status anlegen/sortieren/Farbe/Icon, je Status Auto-E-Mail/SMS mit Vorlage | Parität 🔴 | M–L | ★★★ | — |
+| ✅ P3 | **Konfigurierbare Status + Automatisierungen** — Status anlegen/sortieren/Farbe/aktivieren, je Status Auto-E-Mail/SMS mit Vorlage · **FERTIG 18.8.** | Parität 🔴 | M–L | ★★★ | — |
 | P8 | **Systemeinstellungen** — Reparatur-Nummernschema, Pflichtfelder wählbar, AGB-Text | Parität 🟠 | S–M | ★★ | — |
 | P12 | **Auftragsliste-Politur** — Inline-Status in der Liste, Sortierung, Bulk-Auswahl, Filter (Termin/Versand/Express), Spalten Fach/Referenz/Termin, **Archiv**, **Papierkorb** | Parität 🟡 | M | ★★ | — |
 
