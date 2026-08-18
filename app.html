@@ -147,6 +147,20 @@
   .cb.ki{align-self:flex-end;background:#0e7a3c;color:#fff;border-bottom-right-radius:4px}
   .cb.anr{align-self:flex-start;background:var(--soft);border-bottom-left-radius:4px}
   .cb .lbl{font-size:11px;font-weight:700;opacity:.6;margin-bottom:2px}
+  #loginScreen{position:fixed;inset:0;z-index:200;background:linear-gradient(160deg,#eaf4ee,#fff 60%);display:none;align-items:center;justify-content:center;padding:20px}
+  #loginScreen.show{display:flex}
+  .loginbox{background:#fff;border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);padding:34px 30px;width:100%;max-width:420px;text-align:center}
+  .loginbrand{display:inline-flex;align-items:center;gap:10px;font-weight:800;font-size:22px;letter-spacing:-.5px;margin-bottom:2px}
+  .loginbrand .dot{width:30px;height:30px;border-radius:9px;background:var(--green);color:#fff;display:grid;place-items:center;font-size:15px;font-weight:800}
+  .usertile{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px;background:#fff;cursor:pointer;transition:.14s}
+  .usertile:hover{border-color:var(--green);background:var(--green-tint)}
+  .loginhint{margin-top:18px;font-size:12px;color:var(--ink2)}
+  .pindots{display:flex;gap:12px;justify-content:center;margin:18px 0}
+  .pindots i{width:14px;height:14px;border-radius:50%;border:2px solid #cfd8d3;transition:.1s}
+  .pindots i.on{background:var(--green);border-color:var(--green)}
+  .pinpad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:250px;margin:0 auto}
+  .pinpad button{border:1px solid var(--line);background:#fff;border-radius:14px;padding:15px;font-size:20px;font-weight:700;cursor:pointer;transition:.1s}
+  .pinpad button:hover{background:var(--green-tint);border-color:var(--green)}
   .sigwrap{border:1px solid var(--line);border-radius:10px;background:#fff}
   .sigwrap canvas{width:100%;height:150px;display:block;touch-action:none;border-radius:10px}
   .hamb{display:none}
@@ -188,13 +202,7 @@
       <a data-view="einstellungen"><span class="ic" data-ic="gear"></span> Einstellungen</a>
     </div>
     <div class="divider"></div>
-    <div class="row" style="padding:0 8px">
-      <div class="avatar">DH</div>
-      <div style="min-width:0">
-        <div style="font-weight:700;font-size:13px">Dein Handy Doc</div>
-        <div class="muted" style="font-size:12px">Balingen</div>
-      </div>
-    </div>
+    <div id="sideUser" class="row" style="padding:0 8px;justify-content:space-between"></div>
   </aside>
 
   <div class="main">
@@ -209,6 +217,12 @@
   </div>
 </div>
 
+<div id="loginScreen"><div class="loginbox">
+  <div class="loginbrand"><span class="dot">R</span> Reparado</div>
+  <div class="muted" style="margin-bottom:20px">Anmeldung · Dein Handy Doc</div>
+  <div id="loginStep"></div>
+  <div class="loginhint">Demo-PINs · Geschäftsführung <b>1234</b> · Mitarbeiter <b>0000</b></div>
+</div></div>
 <div class="scrim" id="scrim" onclick="closeAll()"></div>
 <div class="drawer" id="drawer"></div>
 <div class="modal" id="modal"><div class="box" id="modalbox"></div></div>
@@ -228,6 +242,8 @@ const ICONS={
  tag:'<path d="M3 3h8l10 10-8 8L3 11V3z"/><circle cx="7.5" cy="7.5" r="1.4"/>',
  rcpt:'<rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 8h6M9 12h6M9 16h4"/>',
  book:'<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19a2 2 0 0 1 2-2h13"/>',
+ logout:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>',
+ chevron:'<path d="M9 6l6 6-6 6"/>',
  chart:'<path d="M3 21h18"/><rect x="6" y="10" width="3" height="8"/><rect x="11" y="6" width="3" height="12"/><rect x="16" y="13" width="3" height="5"/>',
  gear:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1l2.1-2.1M17 7l2.1-2.1"/>',
  plus:'<path d="M12 5v14M5 12h14"/>',
@@ -250,7 +266,7 @@ const SHOP = {name:"Dein Handy Doc", city:"Balingen", street:"Bahnhofstr. 12", z
 const KEY='reparado_v1';
 let S = load();
 
-function load(){ try{const r=JSON.parse(localStorage.getItem(KEY)); if(r&&r.v===5) return r;}catch(e){} const s=seed(); save(s); return s; }
+function load(){ try{const r=JSON.parse(localStorage.getItem(KEY)); if(r&&r.v===6) return r;}catch(e){} const s=seed(); save(s); return s; }
 function save(x){ localStorage.setItem(KEY, JSON.stringify(x||S)); }
 function uid(p){ return p+Math.random().toString(36).slice(2,7); }
 
@@ -303,7 +319,7 @@ function seed(){
   [['c5','Apple','iPhone 13','Displaytausch',149,'Express'],['c6','Samsung','Galaxy A14','Akkutausch',59,'Standard'],['c9','Apple','iPhone 12','Kameraglas',49,'Standard']].forEach((t,i)=>ord.unshift({id:'ot'+i,nr:'REP-'+(1116+i),cid:t[0],brand:t[1],model:t[2],imei:'',issue:t[3],qual:'Original',price:t[4],status:'offen',prio:t[5],created:d(0),due:d(0),notes:'Terminkunde heute',appt:d(0),readyAt:'',pickedAt:'',warranty:6,sig:'',source:''}));
   // Verkäufe (Kasse) diesen Monat
   const sales=[];for(let s=0;s<22;s++)sales.push({t:new Date(d(0)+'T'+String(9+(s%8)).padStart(2,'0')+':15:00').toISOString(),total:[15,12,9,25,19,39,10,29][s%8],items:1+(s%3)});
-  return {v:5, cust, ord, parts, orders, sold:[], counter:1119, rules: defaultRules(), sales, cash:{connected:''}, mailLog:[], calls:seedCalls(), phone:defaultPhone()};
+  return {v:6, cust, ord, parts, orders, sold:[], counter:1119, rules: defaultRules(), sales, cash:{connected:''}, mailLog:[], calls:seedCalls(), phone:defaultPhone(), users:defaultUsers(), userId:'u1'};
 }
 function defaultPhone(){return {active:true, mode:'overflow',
   greeting:'Herzlich willkommen bei Dein Handy Doc. Ich bin die digitale Assistentin. Wie kann ich Ihnen helfen?',
@@ -429,7 +445,39 @@ function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>'
 /* ============================ ROUTER ============================ */
 const views={};
 let current='dashboard';
-function go(v){ current=v;
+/* ---- Benutzer & Rollen ---- */
+function defaultUsers(){return [{id:'u1',name:'Murat Öz',role:'inhaber',pin:'1234'},{id:'u2',name:'Lena Weber',role:'mitarbeiter',pin:'0000'},{id:'u3',name:'Tom Fischer',role:'mitarbeiter',pin:'0000'}];}
+const ROLE_LABEL={inhaber:'Geschäftsführung',mitarbeiter:'Mitarbeiter'};
+const MA_HIDDEN=['statistik','buchhaltung','einstellungen','ankauf'];
+function curUser(){return (S.users||[]).find(u=>u.id===S.userId)||null;}
+function curRole(){const u=curUser();return u?u.role:'inhaber';}
+function canView(v){return curRole()==='inhaber'?true:!MA_HIDDEN.includes(v);}
+function applyNavRole(){
+  document.querySelectorAll('#nav a').forEach(a=>{a.style.display=canView(a.dataset.view)?'':'none';});
+  document.querySelectorAll('#nav .grouplbl').forEach(lbl=>{let el=lbl.nextElementSibling,vis=false;while(el&&!el.classList.contains('grouplbl')){if(el.tagName==='A'&&el.style.display!=='none'){vis=true;break;}el=el.nextElementSibling;}lbl.style.display=vis?'':'none';});
+  renderSideUser();
+}
+function renderSideUser(){const el=document.getElementById('sideUser');if(!el)return;const u=curUser();
+  el.innerHTML=`<div class="row" style="min-width:0;gap:10px"><div class="avatar">${initials(u?u.name:'—')}</div><div style="min-width:0"><div style="font-weight:700;font-size:13px">${esc(u?u.name:'—')}</div><div class="muted" style="font-size:12px">${u?ROLE_LABEL[u.role]:''}</div></div></div><button class="btn sm gho" title="Abmelden / Benutzer wechseln" onclick="logout()"><span style="width:16px;height:16px">${ic('logout',16)}</span></button>`;
+}
+function logout(){S.userId=null;save();showLogin();}
+let _loginPin='', _loginUser=null;
+function showLogin(){_loginUser=null;_loginPin='';loginRenderUsers();document.getElementById('loginScreen').classList.add('show');}
+function hideLogin(){document.getElementById('loginScreen').classList.remove('show');}
+function loginRenderUsers(){document.getElementById('loginStep').innerHTML=`<div class="muted" style="font-size:13px;margin-bottom:12px">Wer bist du?</div>`+(S.users||[]).map(u=>`<button class="usertile" onclick="loginPick('${u.id}')"><div class="avatar">${initials(u.name)}</div><div style="flex:1"><div style="font-weight:700">${esc(u.name)}</div><div class="muted" style="font-size:12px">${ROLE_LABEL[u.role]}</div></div><span class="ic" data-ic="chevron"></span></button>`).join('');paintIcons();}
+function loginPick(id){_loginUser=(S.users||[]).find(u=>u.id===id);_loginPin='';loginRenderPin();}
+function loginRenderPin(){const dots=[0,1,2,3].map(i=>`<i class="${i<_loginPin.length?'on':''}"></i>`).join('');
+  document.getElementById('loginStep').innerHTML=`<div class="row" style="justify-content:center;gap:10px;margin-bottom:4px"><div class="avatar">${initials(_loginUser.name)}</div><b>${esc(_loginUser.name)}</b></div>
+   <div class="muted" style="font-size:13px">PIN eingeben</div><div class="pindots">${dots}</div>
+   <div class="pinpad">${[1,2,3,4,5,6,7,8,9].map(n=>`<button onclick="pinDigit('${n}')">${n}</button>`).join('')}<button onclick="loginRenderUsers()" style="font-size:13px">Zurück</button><button onclick="pinDigit('0')">0</button><button onclick="pinBack()">←</button></div>`;
+}
+function pinDigit(d){if(_loginPin.length>=4)return;_loginPin+=d;loginRenderPin();if(_loginPin.length===4)setTimeout(tryLogin,120);}
+function pinBack(){_loginPin=_loginPin.slice(0,-1);loginRenderPin();}
+function tryLogin(){if(_loginPin===_loginUser.pin){S.userId=_loginUser.id;save();hideLogin();applyNavRole();go('dashboard');toast('Angemeldet als '+_loginUser.name);}else{_loginPin='';loginRenderPin();toast('Falsche PIN');}}
+function addUser(){const name=prompt('Name des Mitarbeiters:');if(!name)return;const pin=((prompt('4-stellige PIN:','0000')||'0000').replace(/\D/g,'')+'0000').slice(0,4);S.users.push({id:uid('u'),name,role:'mitarbeiter',pin});save();views.einstellungen();paintIcons();toast('Mitarbeiter angelegt: '+name);}
+function removeUser(id){if(id===S.userId)return;const u=S.users.find(x=>x.id===id);if(!u)return;if(!confirm('Benutzer '+u.name+' entfernen?'))return;S.users=S.users.filter(x=>x.id!==id);save();views.einstellungen();paintIcons();toast('Benutzer entfernt');}
+function setUserRole(id,role){const u=S.users.find(x=>x.id===id);if(!u)return;if(u.role==='inhaber'&&role==='mitarbeiter'&&S.users.filter(x=>x.role==='inhaber').length<=1){toast('Mindestens eine Geschäftsführung nötig');views.einstellungen();return;}u.role=role;save();if(id===S.userId)applyNavRole();views.einstellungen();paintIcons();toast('Rolle geändert');}
+function go(v){ if(!canView(v)){toast('Keine Berechtigung');v='dashboard';} current=v;
   document.querySelectorAll('#nav a').forEach(a=>a.classList.toggle('active',a.dataset.view===v));
   document.getElementById('side').classList.remove('show');
   window.scrollTo(0,0);
@@ -460,7 +508,7 @@ views.dashboard=function(){
    <div class="between"><div><h1 class="h1">Guten Tag</h1><p class="sub">${SHOP.name} · ${fmtDate(today())}</p></div>
      <div class="row"><button class="btn" onclick="newOrder()">Neuer Auftrag</button><button class="btn" onclick="go('kasse')">Kasse öffnen</button><button class="btn pri" onclick="startDemo()">Demo-Tour</button></div></div>
    <div class="grid g4" style="margin-top:18px">
-     <div class="card kpi"><div class="n">${eur(monthRev)}</div><div class="l">Umsatz diesen Monat</div><div class="t">Reparaturen führen</div></div>
+     ${curRole()==='inhaber'?`<div class="card kpi"><div class="n">${eur(monthRev)}</div><div class="l">Umsatz diesen Monat</div><div class="t">Reparaturen führen</div></div>`:`<div class="card kpi"><div class="n">${S.ord.filter(o=>o.status==='abgeholt'&&isThisMonth(o.pickedAt||o.readyAt||o.created)).length}</div><div class="l">Erledigt diesen Monat</div><div class="t">Weiter so</div></div>`}
      <div class="card kpi"><div class="n">${offen}</div><div class="l">Offene Aufträge</div><div class="t">${fertig} abholbereit</div></div>
      <div class="card kpi"><div class="n">${heute}</div><div class="l">Termine heute</div><div class="t">Kalender ansehen</div></div>
      <div class="card kpi"><div class="n">${q.length}</div><div class="l">Geplante Erinnerungen</div><div class="t">Kunde &amp; Werkstatt</div></div>
@@ -1021,9 +1069,10 @@ function tseConnect(){const t=ensureTse();const k=document.getElementById('tse_k
 function tseDisconnect(){const t=ensureTse();t.active=false;save();toast('TSE getrennt – Kassieren gesperrt');views.einstellungen();paintIcons();}
 views.kasse=function(){
   const m=document.getElementById('main'); const t=ensureTse(); const remaining=t.capacity-t.sigCounter;
+  const gf=curRole()==='inhaber'; if(!gf)kasseTab='pos';
   m.innerHTML=`<div class="between"><div><h1 class="h1">Kasse</h1><p class="sub">TSE-gesicherte Kasse nach KassenSichV (§146a AO)${S.cash.connected?(' · Terminal '+S.cash.connected):''}</p></div>
-     <div class="row"><span class="pill ${t.active?'solid':'soft'}"><span class="d"></span>${t.active?'TSE aktiv':'TSE inaktiv'}</span><button class="btn" onclick="tagesabschluss()">Tagesabschluss (Z-Bon)</button></div></div>
-   <div class="seg" style="margin:16px 0"><button class="${kasseTab==='pos'?'on':''}" onclick="kasseTab='pos';views.kasse();paintIcons()">Kasse</button><button class="${kasseTab==='journal'?'on':''}" onclick="kasseTab='journal';views.kasse();paintIcons()">Kassenbuch</button></div>
+     <div class="row"><span class="pill ${t.active?'solid':'soft'}"><span class="d"></span>${t.active?'TSE aktiv':'TSE inaktiv'}</span>${gf?`<button class="btn" onclick="tagesabschluss()">Tagesabschluss (Z-Bon)</button>`:''}</div></div>
+   ${gf?`<div class="seg" style="margin:16px 0"><button class="${kasseTab==='pos'?'on':''}" onclick="kasseTab='pos';views.kasse();paintIcons()">Kasse</button><button class="${kasseTab==='journal'?'on':''}" onclick="kasseTab='journal';views.kasse();paintIcons()">Kassenbuch</button></div>`:'<div style="height:16px"></div>'}
    <div id="kasseBody"></div>`;
   const body=document.getElementById('kasseBody');
   if(kasseTab==='pos'&&!t.active){
@@ -1244,10 +1293,11 @@ views.einstellungen=function(){
        <div class="integ" style="padding:8px 12px;justify-content:space-between"><span style="font-size:13px">Ab Konfidenz <select onchange="S.acct.autoThreshold=+this.value;save()" style="border:0;background:transparent;font-weight:700;color:var(--green)">${[90,95,98].map(v=>`<option${a.autoThreshold===v?' selected':''}>${v}</option>`).join('')}</select> % · ohne Klick buchen</span><button class="switch ${a.autoBook?'on':''}" onclick="S.acct.autoBook=!S.acct.autoBook;save();views.einstellungen();paintIcons()"><i></i></button></div>
        <div class="row" style="margin-top:12px"><span class="pill ${a.datev.connected?'solid':'soft'}"><span class="d"></span>${a.datev.connected?'DATEV verbunden':'DATEV nicht verbunden'}</span><button class="btn" onclick="go('buchhaltung');buchTab='datev';views.buchhaltung();paintIcons()">Buchhaltung öffnen</button></div>`;})()}
      </div>
-     <div class="card"><b>Benutzer & Rollen</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Mehrere Mitarbeiter, klare Rechte.</p>
-       <div class="listitem"><div class="avatar">DH</div><div style="flex:1"><b>Inhaber</b><div class="muted" style="font-size:12px">Vollzugriff</div></div><span class="tag">Admin</span></div>
-       <div class="listitem"><div class="avatar">MA</div><div style="flex:1"><b>Mitarbeiter</b><div class="muted" style="font-size:12px">Aufträge & Kasse</div></div><span class="tag">Techniker</span></div>
-       <button class="btn" style="margin-top:12px" onclick="toast('Einladung versendet')">Mitarbeiter einladen</button>
+     <div class="card"><b>Benutzer & Rollen</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Geschäftsführung hat Vollzugriff. Mitarbeiter sehen keine Umsätze, Statistik, Buchhaltung oder das Kassenbuch.</p>
+       ${S.users.map(u=>`<div class="listitem"><div class="avatar ${u.role==='inhaber'?'':'out'}">${initials(u.name)}</div><div style="flex:1;min-width:0"><b>${esc(u.name)}${u.id===S.userId?' <span class="tag">Du</span>':''}</b><div class="muted" style="font-size:12px">${ROLE_LABEL[u.role]} · ${u.role==='inhaber'?'Vollzugriff':'operativ (kein Umsatz)'}</div></div>
+         <select class="in" style="width:auto;padding:6px 10px" onchange="setUserRole('${u.id}',this.value)"><option value="inhaber"${u.role==='inhaber'?' selected':''}>Geschäftsführung</option><option value="mitarbeiter"${u.role==='mitarbeiter'?' selected':''}>Mitarbeiter</option></select>
+         ${u.id===S.userId?'':`<button class="btn sm gho" onclick="removeUser('${u.id}')">Entfernen</button>`}</div>`).join('')}
+       <button class="btn" style="margin-top:12px" onclick="addUser()">Mitarbeiter anlegen</button>
      </div>
    </div>`;
 };
@@ -1798,7 +1848,7 @@ function demoDone(){ if(_demoStop)return; const el=document.getElementById('demo
 
 /* ============================ BOOT ============================ */
 paintIcons();
-(function(){ensureAcct(); const n=pullBookings(); go('dashboard');
+(function(){ensureAcct(); const n=pullBookings(); go('dashboard'); applyNavRole(); if(!curUser())showLogin();
   if(n) setTimeout(()=>toast(n+' neue Online-Buchung'+(n>1?'en':'')+' übernommen'),500);
 })();
 window.addEventListener('focus',()=>{const n=pullBookings(); if(n){go(current);toast(n+' neue Online-Buchung'+(n>1?'en':'')+' übernommen');}});
