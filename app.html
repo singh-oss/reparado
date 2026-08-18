@@ -212,7 +212,9 @@
       <button class="btn gho hamb" onclick="document.getElementById('side').classList.toggle('show')"><span class="ic" data-ic="menu"></span></button>
       <div class="search"><span class="ic" data-ic="search"></span><input id="gsearch" placeholder="Auftrag, Kunde, Telefon, IMEI …" oninput="globalSearch(this.value)"></div>
       <div class="sp"></div>
-      <button class="btn" onclick="go('erinnerungen')"><span class="ic" data-ic="bell"></span></button>
+      <button class="btn gho" title="Scannen (Barcode / IMEI)" onclick="var g=document.getElementById('gsearch');g.value='';g.focus();toast('Bereit zum Scannen – Barcode/IMEI einlesen')"><span class="ic" data-ic="label"></span></button>
+      <button class="btn gho" title="Kasse öffnen" onclick="go('kasse')"><span class="ic" data-ic="cart"></span></button>
+      <button class="btn gho" title="Benachrichtigungen" onclick="go('dashboard')" style="position:relative"><span class="ic" data-ic="bell"></span><span class="badge" id="bg-notif" style="position:absolute;top:-4px;right:-4px;display:none">0</span></button>
       <button class="btn pri" onclick="newOrder()"><span class="ic" data-ic="plus"></span> Neuer Auftrag</button>
     </div>
     <div class="content" id="main"></div>
@@ -576,6 +578,7 @@ function refreshBadges(){
   const ba=document.getElementById('bg-ang'); if(ba){const n=(S.quotes||[]).filter(q=>['entwurf','offen','angenommen'].includes(q.status)).length+((S.requests||[]).length); ba.textContent=n; ba.style.display=n?'':'none';}
   const bl=document.getElementById('bg-lager'); if(bl){const n=(S.parts||[]).filter(p=>p.stock<=p.min).length; bl.textContent=n; bl.style.display=n?'':'none';}
   const bo=document.getElementById('bg-best'); if(bo){const n=(S.orders||[]).filter(b=>b.status!=='geliefert'&&b.status!=='storniert').length; bo.textContent=n; bo.style.display=n?'':'none';}
+  const bn=document.getElementById('bg-notif'); if(bn){const n=((S.requests||[]).length)+((S.feedback||[]).length)+((S.warrantyClaims||[]).length)+(typeof uncollectedOrders==='function'?uncollectedOrders().length:0)+((S.drafts||[]).length); bn.textContent=n; bn.style.display=n?'':'none';}
 }
 
 /* ============================ DASHBOARD ============================ */
@@ -613,6 +616,8 @@ views.dashboard=function(){
    ${(function(){const unc=uncollectedOrders();return unc.length?`<div class="card" style="margin-top:16px;border:1px solid #e2681c"><div class="between"><b>Nicht abgeholte Geräte</b><span class="muted" style="font-size:12px">${unc.length} seit ≥3 Tagen abholbereit</span></div>
      <div style="margin-top:8px">${unc.slice(0,5).map(x=>{const lv=uncLevel(x.days);return `<div class="listitem"><span class="pill" style="border-color:${lv.col};color:${lv.col}"><span class="d" style="background:${lv.col}"></span>${lv.lbl}</span><div style="flex:1;min-width:0"><b>${esc(cust(x.o.cid).name)} · ${esc(oDevLabel(x.o))}</b><div class="muted" style="font-size:12px">${x.o.nr} · seit ${x.days} Tagen fertig${x.o.storageFee?' · Lagergebühr '+eur(x.o.storageFee):''}</div></div>
        <button class="btn sm" onclick="uncRemind('${x.o.id}')">Erinnern</button>${x.days>=14?`<button class="btn sm gho" onclick="uncFee('${x.o.id}')">Lagergebühr</button>`:''}<button class="btn sm gho" onclick="openOrder('${x.o.id}')">Öffnen</button></div>`;}).join('')}</div></div>`:'';})()}
+   ${(S.warrantyClaims&&S.warrantyClaims.length)?`<div class="card" style="margin-top:16px;border:1px solid #8b5cf6"><div class="between"><b>Garantiefälle (Kundenmeldungen)</b><span class="muted" style="font-size:12px">${S.warrantyClaims.length} offen</span></div>
+     <div style="margin-top:8px">${S.warrantyClaims.slice(0,4).map(w=>`<div class="listitem"><span class="pill" style="border-color:#8b5cf6;color:#8b5cf6"><span class="d" style="background:#8b5cf6"></span>Garantie</span><div style="flex:1;min-width:0"><b>${esc(w.nr||'—')}</b><div class="muted" style="font-size:13px">${esc(w.text||'ohne Beschreibung')}</div></div><button class="btn sm gho" onclick="dismissWarranty('${w.id}')">Erledigt</button></div>`).join('')}</div></div>`:''}
    ${(S.feedback&&S.feedback.length)?`<div class="card" style="margin-top:16px"><div class="between"><b>Kundenstimmen</b><span class="muted" style="font-size:12px">${S.feedback.length} Rückmeldung${S.feedback.length>1?'en':''} · ${(S.feedback||[]).filter(f=>f.rating>=3).length} positiv → Google · ${(S.feedback||[]).filter(f=>f.rating<3).length} zur Bearbeitung</span></div>
      <div style="margin-top:8px">${S.feedback.slice(0,4).map(f=>`<div class="listitem"><span class="pill ${f.rating>=3?'solid':'soft'}"><span class="d"></span>${f.rating>=3?'Positiv':(f.rating===2?'Neutral':'Kritik')}</span><div style="flex:1;min-width:0"><b>${esc(f.nr||'—')}</b><div class="muted" style="font-size:13px">${esc(f.text||(f.rating>=3?'Auf Google weitergeleitet':'ohne Kommentar'))}</div></div><button class="btn sm gho" onclick="dismissFb('${f.id}')">Erledigt</button></div>`).join('')}</div></div>`:''}
    <div class="grid g2" style="margin-top:16px">
@@ -757,6 +762,7 @@ function openOrder(id){
      <label class="f">Status-Link für den Kunden</label>
      <div class="row"><input class="in" style="flex:1" readonly value="${track}"><button class="btn" onclick="navigator.clipboard&&navigator.clipboard.writeText('${track}');toast('Link kopiert')">Kopieren</button><button class="btn" onclick="window.open('status.html?nr=${o.nr}','_blank')">Ansehen</button></div>
      ${o.status==='abgeholt'?`<div class="row" style="margin-top:10px;align-items:center;gap:10px"><button class="btn" onclick="askReview('${o.id}')">${o.reviewAsked?'Bewertung erneut anfragen':'Bewertung anfragen'}</button><span class="muted" style="font-size:12px">${o.reviewAsked?'bereits angefragt':'Zufriedene Kunden werden zu Google geleitet, kritische bleiben intern.'}</span></div>`:''}
+     <div class="row" style="margin-top:12px;align-items:center;gap:12px"><div>${qrSVG(track,110)}</div><div><label class="f">Geräte-Akte (QR)</label><div class="muted" style="font-size:13px">Auf Etikett/Gerät kleben. Kunde &amp; Werkstatt scannen für Status, Fotos, Garantie und Reparatur-Historie.</div></div></div>
 
      <div class="divider"></div>
      <div class="row" style="justify-content:flex-end;gap:8px">${o.archived?`<button class="btn gho" onclick="restoreOrder('${o.id}')">Aus Archiv holen</button>`:`<button class="btn gho" onclick="archiveOrder('${o.id}')">Archivieren</button>`}<button class="btn gho" onclick="trashOrder('${o.id}')">In den Papierkorb</button></div>
@@ -1125,6 +1131,9 @@ function pullRequests(){let arr=[];try{arr=JSON.parse(localStorage.getItem('repa
 function pullFeedback(){let arr=[];try{arr=JSON.parse(localStorage.getItem('reparado_feedback')||'[]');}catch(e){}if(!arr.length)return 0;S.feedback=S.feedback||[];arr.forEach(f=>{S.feedback.unshift(Object.assign({id:uid('fb')},f,{ts:f.ts?(typeof f.ts==='number'?new Date(f.ts).toISOString():f.ts):new Date().toISOString()}));});localStorage.removeItem('reparado_feedback');save();return arr.length;}
 function dismissFb(id){S.feedback=(S.feedback||[]).filter(f=>f.id!==id);save();views.dashboard();paintIcons();toast('Erledigt');}
 function askReview(id){const o=S.ord.find(x=>x.id===id);if(!o)return;o.reviewAsked=true;const c=cust(o.cid);S.mailLog.unshift({t:new Date().toISOString(),to:c.name,ch:'E-Mail',rule:'Bewertungsanfrage',subj:'Wie war Ihre Reparatur? '+o.nr,how:'manuell'});save();openOrder(id);toast('Bewertungs-Anfrage an Kunden gesendet (Demo)');}
+/* ---- Garantie-Portal (L15): Kundenmeldungen ---- */
+function pullWarranty(){let arr=[];try{arr=JSON.parse(localStorage.getItem('reparado_warranty')||'[]');}catch(e){}if(!arr.length)return 0;S.warrantyClaims=S.warrantyClaims||[];arr.forEach(w=>{S.warrantyClaims.unshift(Object.assign({id:uid('wc')},w,{ts:w.ts?(typeof w.ts==='number'?new Date(w.ts).toISOString():w.ts):new Date().toISOString()}));});localStorage.removeItem('reparado_warranty');save();return arr.length;}
+function dismissWarranty(id){S.warrantyClaims=(S.warrantyClaims||[]).filter(w=>w.id!==id);save();views.dashboard();paintIcons();toast('Erledigt');}
 
 /* ============================ DRUCK (Etikett, Beleg, Garantie, KVA) ============================ */
 const PRINTCSS=`*{box-sizing:border-box;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#0e7a3c}
@@ -1250,17 +1259,23 @@ function reactCard(){const ops=reactivationOps();if(!ops.length)return '';
   </div>`;
 }
 function quickCustomer2(){const name=prompt('Name des Kunden:');if(!name)return;const tel=prompt('Telefon:')||'';const mail=prompt('E-Mail (optional):')||'';S.cust.push({id:uid('c'),name,tel,mail,adr:''});save();views.kunden();paintIcons();toast('Kunde angelegt');}
+let kundenSearch='', kundenSort='neu', kundenPage=0;
+function kundenList(){let list=S.cust.slice();const q=(kundenSearch||'').toLowerCase();if(q)list=list.filter(c=>[c.name,c.tel,c.mail,c.adr].join(' ').toLowerCase().indexOf(q)>=0);if(kundenSort==='az')list.sort((a,b)=>(a.name||'').localeCompare(b.name||''));else if(kundenSort==='za')list.sort((a,b)=>(b.name||'').localeCompare(a.name||''));else list.reverse();return list;}
+function renderKundenTable(){const el=document.getElementById('kundenTable');if(!el)return;const list=kundenList();const per=15;const pages=Math.max(1,Math.ceil(list.length/per));if(kundenPage>=pages)kundenPage=pages-1;if(kundenPage<0)kundenPage=0;const pl=list.slice(kundenPage*per,kundenPage*per+per);
+  el.innerHTML=`<div class="card" style="padding:0;overflow:auto"><table><thead><tr><th>Name</th><th>Telefon</th><th>E-Mail</th><th>Adresse</th><th>Aufträge</th></tr></thead>
+   <tbody>${pl.length?pl.map(c=>`<tr onclick="custProfile('${c.id}')" style="cursor:pointer"><td><div class="row"><div class="avatar">${initials(c.name)}</div><b>${esc(c.name)}</b></div></td><td class="mono">${esc(c.tel)||'—'}</td><td>${esc(c.mail)||'—'}</td><td class="muted">${esc(c.adr)||'—'}</td><td>${S.ord.filter(o=>o.cid===c.id).length}</td></tr>`).join(''):'<tr><td colspan="5"><div class="empty">Keine Kunden gefunden.</div></td></tr>'}</tbody></table></div>
+   ${pages>1?`<div class="row" style="margin-top:12px;justify-content:center;gap:10px;align-items:center"><button class="btn sm gho" ${kundenPage===0?'disabled':''} onclick="kundenPage--;renderKundenTable()">Zurück</button><span class="muted" style="font-size:13px">Seite ${kundenPage+1} / ${pages} · ${list.length} Kunden</span><button class="btn sm gho" ${kundenPage>=pages-1?'disabled':''} onclick="kundenPage++;renderKundenTable()">Weiter</button></div>`:''}`;
+  paintIcons();
+}
 views.kunden=function(){
   const m=document.getElementById('main');
   m.innerHTML=`<div class="between"><div><h1 class="h1">Kunden</h1><p class="sub">${S.cust.length} Kunden</p></div>
      <div class="row"><button class="btn" onclick="toast('CSV importiert (Demo)')">CSV Import</button><button class="btn pri" onclick="quickCustomer2()">Neuer Kunde</button></div></div>
    ${reactCard()}
-   <div class="card" style="margin-top:16px;padding:0;overflow:auto"><table>
-     <thead><tr><th>Name</th><th>Telefon</th><th>E-Mail</th><th>Adresse</th><th>Aufträge</th></tr></thead>
-     <tbody>${S.cust.map(c=>`<tr onclick="custProfile('${c.id}')">
-       <td><div class="row"><div class="avatar">${initials(c.name)}</div><b>${esc(c.name)}</b></div></td>
-       <td class="mono">${esc(c.tel)||'—'}</td><td>${esc(c.mail)||'—'}</td><td class="muted">${esc(c.adr)||'—'}</td>
-       <td>${S.ord.filter(o=>o.cid===c.id).length}</td></tr>`).join('')}</tbody></table></div>`;
+   <div class="row" style="margin:14px 0;gap:8px;flex-wrap:wrap;align-items:center"><div class="search" style="background:var(--soft);flex:1;min-width:220px"><span class="ic" data-ic="search"></span><input placeholder="Kunde suchen (Name, Telefon, E-Mail)…" value="${esc(kundenSearch)}" oninput="kundenSearch=this.value;kundenPage=0;renderKundenTable()"></div>
+     <button class="chip ${kundenSort==='neu'?'on':''}" onclick="kundenSort='neu';views.kunden();paintIcons()">Neueste</button><button class="chip ${kundenSort==='az'?'on':''}" onclick="kundenSort='az';views.kunden();paintIcons()">A→Z</button><button class="chip ${kundenSort==='za'?'on':''}" onclick="kundenSort='za';views.kunden();paintIcons()">Z→A</button></div>
+   <div id="kundenTable"></div>`;
+  renderKundenTable();
 };
 function custProfile(id){
   const c=cust(id); const os=S.ord.filter(o=>o.cid===id);
@@ -2776,7 +2791,7 @@ function demoDone(){ if(_demoStop)return; const el=document.getElementById('demo
 
 /* ============================ BOOT ============================ */
 paintIcons();
-(function(){ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); ensureInv(); ensureProc(); ensureTrade(); const n=pullBookings(); const nq=pullRequests(); pullFeedback(); go('dashboard'); applyNavRole(); if(!curUser())showLogin();
+(function(){ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); ensureInv(); ensureProc(); ensureTrade(); const n=pullBookings(); const nq=pullRequests(); pullFeedback(); pullWarranty(); go('dashboard'); applyNavRole(); if(!curUser())showLogin();
   if(nq) setTimeout(()=>toast(nq+' neue Website-Anfrage'+(nq>1?'n':'')),900);
   if(n) setTimeout(()=>toast(n+' neue Online-Buchung'+(n>1?'en':'')+' übernommen'),500);
 })();

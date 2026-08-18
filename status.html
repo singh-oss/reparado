@@ -131,6 +131,10 @@ function render(){
     ${(o.photos&&o.photos.length)?`<div class="card"><div style="font-weight:800;margin-bottom:8px">Fotos von der Werkstatt</div>
        <div style="display:flex;flex-wrap:wrap;gap:8px">${o.photos.map(p=>`<img src="${p}" style="width:100px;height:100px;object-fit:cover;border-radius:10px;border:1px solid var(--line)">`).join('')}</div></div>`:''}
 
+    ${(function(){const start=o.pickedAt||o.readyAt;const until=start?addMonths(start,o.warranty):'';const active=until&&until>=new Date().toISOString().slice(0,10)&&o.warranty;if(!active)return '';const dLeft=Math.max(0,Math.round((new Date(until)-new Date())/86400000));return `<div class="card" id="warrcard" style="border:1px solid #0e7a3c"><div style="font-weight:800;margin-bottom:4px">Garantie aktiv</div><p class="muted" style="font-size:14px;margin-bottom:10px">Ihre Reparatur ist noch ${dLeft} Tage (bis ${fmtDate(until)}) durch unsere Gewährleistung gedeckt.</p><button class="btn" style="width:100%" onclick="warrClaim()">Garantiefall melden</button></div>`;})()}
+
+    ${(function(){const h=deviceHistory(o);return h.length?`<div class="card"><div style="font-weight:800;margin-bottom:8px">Frühere Reparaturen an diesem Gerät</div>${h.map(x=>`<div class="row"><span>${fmtDate(x.readyAt||x.created)} · ${esc(sIssue(x))}</span><b>${eur(sTotal(x))}</b></div>`).join('')}<div class="muted" style="font-size:12px;margin-top:8px">Digitale Geräte-Akte · scannen Sie den QR am Gerät für den Verlauf.</div></div>`:'';})()}
+
     <div class="card">
       <div class="row"><span>Voraussichtlicher Preis</span><b>${eur(sTotal(o))}</b></div>
       ${o.appt?`<div class="row"><span>Termin</span><b>${fmtDate(o.appt)}</b></div>`:''}
@@ -163,6 +167,9 @@ function rate(n){const c=document.getElementById('revcard');if(!c)return;
 }
 function logRev(n,t){let arr=[];try{arr=JSON.parse(localStorage.getItem('reparado_feedback')||'[]');}catch(e){}arr.push({nr:param('nr'),rating:n,text:t,ts:Date.now()});localStorage.setItem('reparado_feedback',JSON.stringify(arr));}
 function sendFb(n){const t=(document.getElementById('fbtext')||{}).value||'';logRev(n,t.trim());document.getElementById('revcard').innerHTML='<div style="font-weight:800;font-size:17px">Danke für Ihr Feedback!</div><p class="muted" style="font-size:14px;margin-top:6px">Wir kümmern uns darum und melden uns bei Ihnen.</p>';}
+function deviceHistory(o){const St=loadStore();if(!St||!St.ord)return [];return St.ord.filter(x=>x.cid===o.cid&&x.id!==o.id&&!x.trashed&&((x.imei&&o.imei&&x.imei===o.imei)||sDevLabel(x)===sDevLabel(o))).sort((a,b)=>(b.created||'').localeCompare(a.created||''));}
+function warrClaim(){document.getElementById('warrcard').innerHTML='<div style="font-weight:800">Garantiefall melden</div><p class="muted" style="font-size:14px;margin:6px 0 10px">Beschreiben Sie kurz das Problem – wir melden uns.</p><textarea class="in" id="wctext" rows="3" placeholder="Was ist mit dem Gerät?"></textarea><button class="btn" style="width:100%;margin-top:10px;background:#0e7a3c;color:#fff;border-color:#0e7a3c" onclick="warrSend()">Garantiefall senden</button>';}
+function warrSend(){const t=(document.getElementById('wctext')||{}).value||'';let arr=[];try{arr=JSON.parse(localStorage.getItem('reparado_warranty')||'[]');}catch(e){}arr.push({nr:param('nr'),text:t.trim(),ts:Date.now()});localStorage.setItem('reparado_warranty',JSON.stringify(arr));document.getElementById('warrcard').innerHTML='<div style="font-weight:800">Garantiefall aufgenommen</div><p class="muted" style="font-size:14px;margin-top:6px">Danke! Wir prüfen den Fall und melden uns zeitnah bei Ihnen.</p>';}
 
 render();
 </script>
