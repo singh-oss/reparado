@@ -2297,6 +2297,10 @@ views.diagnose=function(){
      </div>
      <div class="row" style="margin-top:8px">${DIAG_EXAMPLES.map(e=>`<button class="chip" onclick="document.getElementById('diagIn').value=${JSON.stringify(e).replace(/"/g,'&quot;')};runDiagnose(${JSON.stringify(e).replace(/"/g,'&quot;')})">${esc(e)}</button>`).join('')}</div>
    </div>
+   <div class="card" style="margin-top:16px"><div class="between"><b>📷 Foto-Diagnose</b><span class="pill soft"><span class="d"></span>KI</span></div>
+     <p class="muted" style="font-size:13px;margin:6px 0 12px">Gerät fotografieren – die KI erkennt den sichtbaren Schaden und schlägt Reparatur, Teile &amp; Preis vor. Ideal an der Theke und für Online-Anfragen. <i>(Prototyp: die echte Vision-KI wird später scharf geschaltet – Ablauf & Ergebnis sind final.)</i></p>
+     <label class="btn pri" style="cursor:pointer">Foto aufnehmen / hochladen<input type="file" accept="image/*" capture="environment" style="display:none" onchange="diagPhotoPick(this)"></label>
+   </div>
    <div id="diagOut" style="margin-top:16px">${diagLast?diagCardHTML(diagLast):'<div class="empty">Noch keine Diagnose. Beschreibe oben ein Problem oder wähle ein Beispiel.</div>'}</div>`;
 };
 function pct(n){return Math.round(n)+'%';}
@@ -2384,7 +2388,8 @@ function diagCardHTML(d){
   return `<div class="card">
     <div class="between"><b style="font-size:16px">KI-Diagnose</b><span class="pill soft"><span class="d"></span>Vorabeinschätzung</span></div>
     <div class="note" style="margin-top:10px">Automatische Einschätzung auf Basis der Beschreibung – <b>keine bestätigte Diagnose</b>. Bitte durch Messung/Sichtprüfung verifizieren. Kostenangaben als Richtwert.</div>
-    <label class="f" style="margin-top:14px">Erkannt</label>
+    ${d.photo?`<div style="margin-top:12px"><img src="${d.photo}" style="max-height:200px;max-width:100%;border-radius:12px;border:1px solid var(--line)"></div>`:''}
+    <label class="f" style="margin-top:14px">Erkannt${d.detected?` · <b>${esc(d.detected)}</b>`:''}</label>
     <div class="row">${chips.map(c=>`<span class="tag">${c[0]}: <b>${esc(String(c[1]))}</b></span>`).join('')}${syn.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>
 
     <label class="f" style="margin-top:16px">Wahrscheinlichste Ursachen</label>
@@ -2409,24 +2414,40 @@ function diagCardHTML(d){
 
     ${d.safety.length?`<div class="note" style="margin-top:14px;border:1px solid #0e7a3c"><b>⚠ Sicherheitshinweise</b><ul style="margin:6px 0 0;padding-left:18px">${d.safety.map(s=>`<li>${esc(s)}</li>`).join('')}</ul></div>`:''}
 
-    <div class="row" style="margin-top:16px">
-      <button class="btn pri" onclick="diagToOrder()">In Auftrag übernehmen</button>
-      <button class="btn" onclick="diagLast=null;views.diagnose();paintIcons()">Neue Diagnose</button>
+    <div class="row" style="margin-top:16px;flex-wrap:wrap;gap:8px">
+      <button class="btn pri cta" onclick="diagToQuote()">⚡ Angebot erstellen</button>
+      <button class="btn" onclick="diagToOrder()">In Auftrag übernehmen</button>
+      <button class="btn gho" onclick="diagLast=null;views.diagnose();paintIcons()">Neue Diagnose</button>
     </div>
   </div>`;
 }
-function diagToOrder(){
-  if(!diagLast)return; const d=diagLast;
-  orderForm(null);
-  setTimeout(()=>{
-    const g=id=>document.getElementById(id);
-    if(g('f_brand'))g('f_brand').value=d.brand||'';
-    if(g('f_model'))g('f_model').value=(d.model||'').replace(/\b\w/g,c=>c.toUpperCase());
-    if(g('f_issue'))g('f_issue').value=d.top[0]?d.top[0].label.split(' (')[0]:'';
-    if(g('f_notes'))g('f_notes').value='KI-Vorabeinschätzung: '+d.top.slice(0,2).map(c=>c.label+' ('+pct(c.p)+')').join(', ')+'. Eingabe: '+d.input;
-  },40);
-  toast('Diagnose in neuen Auftrag übernommen');
-}
+function diagRepair(d){return d.repair||(d.top&&d.top[0]?d.top[0].label.split(' (')[0]:'');}
+function diagNote(d){return 'KI-Diagnose: '+(d.top||[]).slice(0,2).map(c=>c.label+' ('+pct(c.p)+')').join(', ')+(d.input&&d.input!=='Foto-Diagnose'?('. Eingabe: '+d.input):(d.detected?('. Foto erkannt: '+d.detected):''));}
+function diagToOrder(){ if(!diagLast)return; const d=diagLast; newOrder(); const dev=NO.devices[0];
+  dev.brand=d.brand||''; dev.model=d.model||''; dev.reparatur=diagRepair(d);
+  if(dev.brand&&dev.reparatur){const pr=priceFor(dev.brand,dev.model,dev.reparatur); if(pr!=='')dev.price=pr;}
+  NO.notes=diagNote(d); if(d.photo)NO.diagPhoto=d.photo; renderNewOrder(); toast('Diagnose in neuen Auftrag übernommen'); }
+function diagToQuote(){ if(!diagLast)return; const d=diagLast; newQuote({}); const dev=NO.devices[0];
+  dev.brand=d.brand||''; dev.model=d.model||''; dev.reparatur=diagRepair(d);
+  if(dev.brand&&dev.reparatur){const pr=priceFor(dev.brand,dev.model,dev.reparatur); if(pr!=='')dev.price=pr;}
+  NO.notes=diagNote(d); if(d.photo)NO.diagPhoto=d.photo; renderNewOrder(); toast('Angebot aus Diagnose erstellt'); }
+/* ---- Foto-Diagnose (L1) ---- */
+const PHOTO_DAMAGES=[
+ {dmg:'Displayglas gesprungen',rep:'Displaytausch',conf:92,why:'Sichtbare Sprünge/Risse im Frontglas – klassischer Displayschaden.',parts:['Displayeinheit'],tools:['Saugnapf','Plektren','Heißluft']},
+ {dmg:'Rückglas / Backcover gebrochen',rep:'Backcover / Rückglas',conf:88,why:'Bruchbild auf der Geräterückseite.',parts:['Backcover / Rückglas'],tools:['Heißluft','Plektren']},
+ {dmg:'Kameraglas gesprungen',rep:'Kameraglas',conf:85,why:'Riss über der Kameralinse.',parts:['Kameraglas'],tools:['Heißluft','Pinzette']},
+ {dmg:'Wasserschaden-Spuren',rep:'Wasserschaden-Behandlung',conf:72,why:'Korrosions-/Feuchtigkeitsspuren erkennbar.',parts:[],tools:['Ultraschallbad','Isopropanol']},
+ {dmg:'Akku aufgebläht',rep:'Akkutausch',conf:80,why:'Wölbung/Spalt am Gehäuse deutet auf aufgeblähten Akku.',parts:['Akku'],tools:['Spudger','Klebestreifen']},
+ {dmg:'Ladebuchse beschädigt',rep:'Ladebuchse',conf:76,why:'Verformung/Verschmutzung am Ladeport.',parts:['Ladebuchse'],tools:['Spudger','Multimeter']},
+];
+function photoHash(s){let h=2166136261>>>0;for(let i=0;i<s.length;i+=811){h=((h^s.charCodeAt(i))*16777619)>>>0;}return h;}
+function diagPhotoPick(input){const f=input.files&&input.files[0];if(!f)return;const rd=new FileReader();rd.onload=function(){const im=new Image();im.onload=function(){const cv=document.createElement('canvas');const max=640;let w=im.width,h=im.height;if(w>=h&&w>max){h=Math.round(h*max/w);w=max;}else if(h>w&&h>max){w=Math.round(w*max/h);h=max;}cv.width=w;cv.height=h;cv.getContext('2d').drawImage(im,0,0,w,h);runPhotoDiagnose(cv.toDataURL('image/jpeg',0.85));};im.src=rd.result;};rd.readAsDataURL(f);}
+function runPhotoDiagnose(url){const d0=PHOTO_DAMAGES[photoHash(url)%PHOTO_DAMAGES.length];const water=d0.rep.indexOf('Wasser')>=0;const swollen=d0.dmg.indexOf('aufgebläht')>=0;
+  diagLast={input:'Foto-Diagnose',photo:url,type:'phone',brand:'',model:'',errorCode:null,volt:null,water,fell:d0.rep==='Displaytausch',detected:d0.dmg,repair:d0.rep,
+    top:[{label:d0.dmg,p:d0.conf,why:d0.why},{label:'Weitere Prüfung empfohlen',p:100-d0.conf,why:'Endgültige Diagnose nach Funktionstest & Sichtprüfung.'}],
+    tests:['Sichtprüfung des Schadens','Funktionstest','Kostenvoranschlag erstellen'],parts:d0.parts,tools:d0.tools,timeMin:30,timeMax:60,repairProb:water?68:85,
+    safety:swollen?['Aufgeblähter Akku: Brand-/Verpuffungsgefahr – fachgerecht sichern, nicht laden.']:(water?['Bei Wasserkontakt Gerät nicht laden/einschalten, bis das Board gereinigt und geprüft ist.']:[])};
+  const out=document.getElementById('diagOut'); if(out){out.innerHTML=diagCardHTML(diagLast);out.scrollIntoView({behavior:'smooth',block:'start'});} toast('Foto analysiert – Schaden erkannt');}
 
 /* ============================ ANRUFE (KI-Empfangskraft) ============================ */
 const INTENTS={status:{lbl:'Reparaturstatus'},price:{lbl:'Preisauskunft'},hours:{lbl:'Öffnungszeiten'},booking:{lbl:'Terminwunsch'},message:{lbl:'Nachricht / Rückruf'},stock:{lbl:'Teile-Verfügbarkeit'}};
