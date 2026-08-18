@@ -734,7 +734,7 @@ function saveSig(id){const c=document.getElementById('sig');const o=S.ord.find(x
   o.sig=c.toDataURL('image/png');save();closeAll();toast('Unterschrift gespeichert');openOrder(id);}
 
 /* ============================ NEUER / EDIT AUFTRAG (Reparatur-Eingang, mit Entwurf) ============================ */
-function priceFor(brand,model,type){const base=BASEPRICE[type]; if(base===undefined)return ''; const models=CATALOG[brand]||[]; const i=models.indexOf(model); const f=i>=0?1+((i%3)*0.06):1; const bf=brand==='Apple'?1.2:(brand==='Samsung'?1.12:(brand==='Sonstige'||!brand?1:1.05)); return Math.round(base*bf*f);}
+function priceFor(brand,model,repair){const c=ensureCat();const k=brand+'|'+model+'|'+repair;if(c.prices[k]!==undefined&&c.prices[k]!=='')return +c.prices[k];const base=c.base[repair];if(base===undefined)return '';const names=catModelNames(brand);const i=names.indexOf(model);const f=i>=0?1+((i%3)*0.06):1;const bf=(c.brandMul&&c.brandMul[brand])||(brand==='Sonstige'||!brand?1:1.05);return Math.round(base*bf*f);}
 function blankDevice(){return {typ:'Smartphone',brand:'',model:'',imei:'',fach:'',ref:'',reparatur:'',price:'',qual:'Original',warranty:6};}
 function blankForm(){return {mode:'auftrag',draftId:'',editId:'',quoteEditId:'',fromRequest:'',cid:'',typ:'Privat',anrede:'Herr',firma:'',vorname:'',nachname:'',tel:'+49 ',mail:'',plz:'',stadt:'',adr:'',lock:'Keine',lockval:'',devices:[blankDevice()],prio:'Standard',technikerId:'',notes:'',terminMode:'kein',appt:'',due:today(),sig:''};}
 function dPlus(n){const x=new Date();x.setDate(x.getDate()+(+n||0));return x.toISOString().slice(0,10);}
@@ -778,8 +778,9 @@ function noSaveDraft(){ if(!NO||NO.editId||NO.mode==='angebot')return; if(!noHas
 let _noT=null; function noSaveDraftDebounced(){clearTimeout(_noT);_noT=setTimeout(()=>{noCollect();noSaveDraft();},600);}
 function noAutosave(){noCollect();noSaveDraft();}
 function noBrandChange(i){noCollect();NO.devices[i].model='';renderNewOrder();}
+function noModelPick(i){noCollect();const d=NO.devices[i];if(d.brand&&d.model){const t=catModelType(d.brand,d.model);if(t)d.typ=t;}if(d.brand&&d.reparatur){const p=priceFor(d.brand,d.model,d.reparatur);if(p!=='')d.price=p;}renderNewOrder();}
 function noPrice(i){noCollect();const d=NO.devices[i];if(d.brand&&d.reparatur){const p=priceFor(d.brand,d.model,d.reparatur);if(p!==''){const e=document.getElementById('dev'+i+'_price');if(e)e.value=p;d.price=p;}}noSaveDraft();}
-function noQuickPick(i){const v=(document.getElementById('dev'+i+'_search').value||'').trim();if(!v)return;noCollect();const brand=Object.keys(CATALOG).find(b=>v.toLowerCase().startsWith(b.toLowerCase()));const d=NO.devices[i];if(brand){d.brand=brand;const rest=v.slice(brand.length).trim();const mm=(CATALOG[brand]||[]).find(x=>x.toLowerCase()===rest.toLowerCase());d.model=mm||rest;}else{d.model=v;}if(d.brand&&d.reparatur){const p=priceFor(d.brand,d.model,d.reparatur);if(p!=='')d.price=p;}renderNewOrder();}
+function noQuickPick(i){const v=(document.getElementById('dev'+i+'_search').value||'').trim();if(!v)return;noCollect();const brand=catBrands().find(b=>v.toLowerCase().startsWith(b.toLowerCase()));const d=NO.devices[i];if(brand){d.brand=brand;const rest=v.slice(brand.length).trim();const mm=catModelNames(brand).find(x=>x.toLowerCase()===rest.toLowerCase());d.model=mm||rest;if(d.model){const t=catModelType(brand,d.model);if(t)d.typ=t;}}else{d.model=v;}if(d.brand&&d.reparatur){const p=priceFor(d.brand,d.model,d.reparatur);if(p!=='')d.price=p;}renderNewOrder();}
 function noAddDevice(){noCollect();NO.devices.push(blankDevice());renderNewOrder();}
 function noRemoveDevice(i){noCollect();NO.devices.splice(i,1);renderNewOrder();}
 function noTyp(){noCollect();renderNewOrder();}
@@ -836,18 +837,22 @@ function noFinalize(){ noCollect();
 function noBuildDevices(){ return NO.devices.filter(d=>d.reparatur&&(d.brand||d.model)).map(d=>({typ:d.typ,brand:d.brand,model:d.model,imei:d.imei,fach:d.fach,ref:d.ref,reparatur:d.reparatur,qual:d.qual,price:+d.price||0,warranty:+d.warranty||6})); }
 function noMirror(devs){ const f=devs[0]||{}; return {devtyp:f.typ||'Smartphone',brand:f.brand||'',model:f.model||'',imei:f.imei||'',fach:f.fach||'',ref:f.ref||'',qual:f.qual||'Original',warranty:f.warranty||6,issue:devs.map(d=>d.reparatur).filter(Boolean).join(' · '),price:devs.reduce((s,d)=>s+(+d.price||0),0)}; }
 function noDevBlock(d,i){
-  const models=CATALOG[d.brand]||[];
-  const modelOpts=['<option value="">Modell wählen…</option>'].concat(models.map(mm=>`<option ${d.model===mm?'selected':''}>${esc(mm)}</option>`));
-  if(d.model&&models.indexOf(d.model)<0)modelOpts.push(`<option selected>${esc(d.model)}</option>`);
-  const brandOpts=['<option value="">Marke wählen…</option>'].concat(Object.keys(CATALOG).map(b=>`<option ${d.brand===b?'selected':''}>${b}</option>`));
+  const brands=catBrands();
+  const modelNames=catModelNames(d.brand);
+  const modelOpts=['<option value="">Modell wählen…</option>'].concat(modelNames.map(mm=>`<option ${d.model===mm?'selected':''}>${esc(mm)}</option>`));
+  if(d.model&&modelNames.indexOf(d.model)<0)modelOpts.push(`<option selected>${esc(d.model)}</option>`);
+  const brandOpts=['<option value="">Marke wählen…</option>'].concat(brands.map(b=>`<option ${d.brand===b?'selected':''}>${esc(b)}</option>`));
+  const types=ensureCat().types;
+  const img=(d.brand&&d.model)?catModelImg(d.brand,d.model):'';
   return `<div class="card" style="background:var(--soft);border:0;margin-top:12px">
     <div class="between"><b>Gerät ${i+1}</b>${i>0?`<button class="btn sm gho" onclick="noRemoveDevice(${i})">Entfernen</button>`:''}</div>
     <label class="f" style="margin-top:10px">Geräte-Schnellsuche</label>
     <input class="in" id="dev${i}_search" list="allDevices" placeholder="z. B. „iph 15 p“ → Apple iPhone 15 Pro" onchange="noQuickPick(${i})">
     <div class="grid g2" style="margin-top:10px">
-      <div><label class="f">Gerätetyp *</label><select class="in" id="dev${i}_typ">${GERAETETYPEN.map(t=>`<option ${d.typ===t?'selected':''}>${t}</option>`).join('')}</select></div>
+      <div><label class="f">Gerätetyp *</label><select class="in" id="dev${i}_typ">${types.map(t=>`<option ${d.typ===t?'selected':''}>${t}</option>`).join('')}</select></div>
       <div><label class="f">Marke *</label><select class="in" id="dev${i}_brand" onchange="noBrandChange(${i})">${brandOpts.join('')}</select></div>
-      <div><label class="f">Modell *</label><select class="in" id="dev${i}_model" onchange="noPrice(${i})">${modelOpts.join('')}</select></div>
+      <div><label class="f">Modell *</label><select class="in" id="dev${i}_model" onchange="noModelPick(${i})">${modelOpts.join('')}</select></div>
+      ${img?`<div><label class="f">Vorschau</label><img src="${img}" style="height:56px;max-width:100%;border:1px solid var(--line);border-radius:8px;background:#fff;object-fit:contain;padding:2px"></div>`:''}
       <div><label class="f">IMEI / Seriennummer</label><input class="in" id="dev${i}_imei" value="${esc(d.imei)}" placeholder="optional"></div>
       <div><label class="f">Reparaturfach-Nr.</label><input class="in" id="dev${i}_fach" value="${esc(d.fach)}" placeholder="z. B. Fach 42"></div>
       <div><label class="f">Referenznummer</label><input class="in" id="dev${i}_ref" value="${esc(d.ref)}" placeholder="Kundenreferenz / Auftragsnr."></div>
@@ -855,7 +860,7 @@ function noDevBlock(d,i){
     <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin-top:10px">
       <div><label class="f">Reparaturart *</label><input class="in" id="dev${i}_reparatur" list="allRepairs" value="${esc(d.reparatur)}" placeholder="Tippen zum Suchen oder Auswählen…" onchange="noPrice(${i})"></div>
       <div><label class="f">Preis (€)</label><input class="in" id="dev${i}_price" type="number" value="${d.price!==''?d.price:''}" placeholder="0.00"></div>
-      <div><label class="f">Qualität</label><select class="in" id="dev${i}_qual"><option ${d.qual==='Original'?'selected':''}>Original</option><option ${d.qual==='Kopie'?'selected':''}>Kopie</option></select></div>
+      <div><label class="f">Qualität</label><select class="in" id="dev${i}_qual">${catQuals().map(q=>`<option ${d.qual===q?'selected':''}>${esc(q)}</option>`).join('')}</select></div>
     </div>
     <div class="grid g2" style="margin-top:10px"><div><label class="f">Garantie (Monate)</label><select class="in" id="dev${i}_warranty">${[6,12,24,0].map(w=>`<option ${(+d.warranty)===w?'selected':''}>${w}</option>`).join('')}</select></div></div>
   </div>`;
@@ -867,8 +872,8 @@ function renderNewOrder(){
   document.getElementById('side').classList.remove('show');
   const c=NO; const techs=S.users||[]; const isQ=NO.mode==='angebot';
   m.innerHTML=`
-  <datalist id="allDevices">${Object.entries(CATALOG).flatMap(([b,ms])=>ms.map(mm=>`<option value="${esc(b+' '+mm)}"></option>`)).join('')}</datalist>
-  <datalist id="allRepairs">${REPAIRS.map(r=>`<option value="${esc(r)}"></option>`).join('')}</datalist>
+  <datalist id="allDevices">${catBrands().flatMap(b=>catModelNames(b).map(mm=>`<option value="${esc(b+' '+mm)}"></option>`)).join('')}</datalist>
+  <datalist id="allRepairs">${catRepairs().map(r=>`<option value="${esc(r)}"></option>`).join('')}</datalist>
   <div id="noForm">
    <div class="between" style="flex-wrap:wrap;gap:12px">
      <div><button class="btn sm gho" onclick="noCancel()">← Zurück</button>
@@ -1013,13 +1018,13 @@ function printQuote(id){const q=(S.quotes||[]).find(x=>x.id===id);if(!q)return;c
 }
 function requestToQuote(id){const r=(S.requests||[]).find(x=>x.id===id);if(!r)return;const nm=(r.name||'').split(' ');
   newQuote({fromRequest:id,vorname:nm.slice(0,-1).join(' ')||nm[0]||'',nachname:nm.length>1?nm[nm.length-1]:'',tel:r.tel||'+49 ',mail:r.mail||'',
-    devices:[{typ:r.type||'Smartphone',brand:(CATALOG[r.brand]?r.brand:''),model:(r.model&&r.model!=='Anderes Modell'?r.model:''),imei:'',fach:'',ref:'',reparatur:(REPAIRS.indexOf(r.issue)>=0?r.issue:''),price:'',qual:'Original',warranty:6}],
+    devices:[{typ:r.type||'Smartphone',brand:(catBrands().includes(r.brand)?r.brand:''),model:(r.model&&r.model!=='Anderes Modell'?r.model:''),imei:'',fach:'',ref:'',reparatur:(catRepairs().indexOf(r.issue)>=0?r.issue:''),price:'',qual:(catQuals()[0]||'Original'),warranty:6}],
     notes:r.problem?('Anfrage: '+r.problem):''});
 }
 function requestToOrder(id){const r=(S.requests||[]).find(x=>x.id===id);if(!r)return;const nm=(r.name||'').split(' ');
   closeAll(); NO=blankForm(); NO.draftId=uid('dr'); NO.fromRequest=id;
   NO.vorname=nm.slice(0,-1).join(' ')||nm[0]||''; NO.nachname=nm.length>1?nm[nm.length-1]:''; NO.tel=r.tel||'+49 '; NO.mail=r.mail||'';
-  NO.devices=[{typ:r.type||'Smartphone',brand:(CATALOG[r.brand]?r.brand:''),model:(r.model&&r.model!=='Anderes Modell'?r.model:''),imei:'',fach:'',ref:'',reparatur:(REPAIRS.indexOf(r.issue)>=0?r.issue:''),price:'',qual:'Original',warranty:6}];
+  NO.devices=[{typ:r.type||'Smartphone',brand:(catBrands().includes(r.brand)?r.brand:''),model:(r.model&&r.model!=='Anderes Modell'?r.model:''),imei:'',fach:'',ref:'',reparatur:(catRepairs().indexOf(r.issue)>=0?r.issue:''),price:'',qual:(catQuals()[0]||'Original'),warranty:6}];
   NO.notes=r.problem?('Anfrage: '+r.problem):''; current='neworder'; renderNewOrder(); window.scrollTo(0,0);
 }
 function dismissRequest(id){S.requests=(S.requests||[]).filter(x=>x.id!==id);save();if(current==='angebote')views.angebote();paintIcons();refreshBadges();toast('Anfrage erledigt');}
@@ -1343,15 +1348,75 @@ const REPAIRS=['Displaytausch','Akkutausch','Ladebuchse','Rückkamera','Frontkam
 const GERAETETYPEN=['Smartphone','Tablet','Smartwatch','Laptop','Konsole','E-Scooter','Kopfhörer','Sonstiges'];
 const PRIOS=['Standard','Express','Versand','Kostenvoranschlag (KVA)'];
 let priceBrand='Apple';
+/* ---- Katalog (selbst pflegbar): Datenmodell + Helfer + CRUD ---- */
+function ensureCat(){ if(!S.cat){
+    const models={}; Object.keys(CATALOG).forEach(b=>{models[b]=CATALOG[b].map(nm=>({name:nm,type:(/iPad/.test(nm)?'Tablet':'Smartphone'),img:''}));});
+    S.cat={types:GERAETETYPEN.slice(),brands:Object.keys(CATALOG),models,repairs:REPAIRS.slice(),base:Object.assign({},BASEPRICE),quals:['Original','Kopie'],brandMul:{Apple:1.2,Samsung:1.12},prices:{}}; save();
+  } const c=S.cat; if(!c.quals)c.quals=['Original','Kopie']; if(!c.prices)c.prices={}; if(!c.types)c.types=GERAETETYPEN.slice(); return c; }
+function qa(s){return String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
+function catBrands(){return ensureCat().brands;}
+function catModels(brand){return (ensureCat().models[brand]||[]);}
+function catModelNames(brand){return catModels(brand).map(m=>m.name);}
+function catRepairs(){return ensureCat().repairs;}
+function catQuals(){return ensureCat().quals;}
+function catModelObj(brand,name){return catModels(brand).find(m=>m.name===name);}
+function catModelImg(brand,name){const m=catModelObj(brand,name);return (m&&m.img)||'';}
+function catModelType(brand,name){const m=catModelObj(brand,name);return (m&&m.type)||'Smartphone';}
+function catAddBrand(){const b=(prompt('Name der Marke:')||'').trim();if(!b)return;const c=ensureCat();if(c.brands.includes(b)){toast('Marke existiert schon');return;}c.brands.push(b);c.models[b]=[];save();catBrand=b;views.preise();paintIcons();toast('Marke „'+b+'" angelegt');}
+function catDelBrand(b){if(!confirm('Marke „'+b+'" inkl. aller Modelle löschen?'))return;const c=ensureCat();c.brands=c.brands.filter(x=>x!==b);delete c.models[b];if(catBrand===b)catBrand=c.brands[0]||'';save();views.preise();paintIcons();toast('Marke gelöscht');}
+function catAddType(){const t=(prompt('Neuer Gerätetyp:')||'').trim();if(!t)return;const c=ensureCat();if(!c.types.includes(t))c.types.push(t);save();views.preise();paintIcons();}
+function catAddModel(brand){const nm=(prompt('Modellname (z. B. iPhone 16 Pro):')||'').trim();if(!nm)return;const c=ensureCat();c.models[brand]=c.models[brand]||[];if(c.models[brand].some(m=>m.name===nm)){toast('Modell existiert schon');return;}c.models[brand].push({name:nm,type:(c.types[0]||'Smartphone'),img:''});save();views.preise();paintIcons();toast('Modell angelegt');}
+function catRenameModel(brand,name){const nm=(prompt('Modell umbenennen:',name)||'').trim();if(!nm||nm===name)return;const m=catModelObj(brand,name);if(m){m.name=nm;save();views.preise();paintIcons();}}
+function catDelModel(brand,name){if(!confirm('Modell „'+name+'" löschen?'))return;const c=ensureCat();c.models[brand]=(c.models[brand]||[]).filter(m=>m.name!==name);save();views.preise();paintIcons();toast('Modell gelöscht');}
+function catSetModelType(brand,name,type){const m=catModelObj(brand,name);if(m){m.type=type;save();}}
+function catImgUpload(brand,name,input){const f=input.files&&input.files[0];if(!f)return;const rd=new FileReader();rd.onload=function(){const im=new Image();im.onload=function(){const cv=document.createElement('canvas');const max=240;let w=im.width,h=im.height;if(w>=h&&w>max){h=Math.round(h*max/w);w=max;}else if(h>w&&h>max){w=Math.round(w*max/h);h=max;}cv.width=w;cv.height=h;const cx=cv.getContext('2d');cx.fillStyle='#fff';cx.fillRect(0,0,w,h);cx.drawImage(im,0,0,w,h);const m=catModelObj(brand,name);if(m){m.img=cv.toDataURL('image/jpeg',0.82);save();views.preise();paintIcons();toast('Bild gespeichert');}};im.src=rd.result;};rd.readAsDataURL(f);}
+function catImgClear(brand,name){const m=catModelObj(brand,name);if(m){m.img='';save();views.preise();paintIcons();}}
+function catAddRepair(){const nm=(prompt('Neue Reparaturart:')||'').trim();if(!nm)return;const bp=+((prompt('Basispreis (€):','49'))||0);const c=ensureCat();if(!c.repairs.includes(nm))c.repairs.push(nm);c.base[nm]=bp;save();views.preise();paintIcons();toast('Reparaturart angelegt');}
+function catDelRepair(nm){if(!confirm('Reparaturart „'+nm+'" löschen?'))return;const c=ensureCat();c.repairs=c.repairs.filter(x=>x!==nm);delete c.base[nm];save();views.preise();paintIcons();toast('Reparaturart gelöscht');}
+function catSetBase(nm,val){const c=ensureCat();c.base[nm]=+val||0;save();}
+function catAddQual(){const q=(prompt('Neue Qualitätsoption (z. B. Refurbished):')||'').trim();if(!q)return;const c=ensureCat();if(!c.quals.includes(q))c.quals.push(q);save();views.preise();paintIcons();}
+function catDelQual(q){const c=ensureCat();if(c.quals.length<=1){toast('Mindestens eine Qualität nötig');return;}c.quals=c.quals.filter(x=>x!==q);save();views.preise();paintIcons();}
+function catSetPrice(brand,model,repair,val){const c=ensureCat();const k=brand+'|'+model+'|'+repair;if(val===''||val==null){delete c.prices[k];}else{c.prices[k]=+val||0;}save();}
+function catResetPrice(brand,model,repair){const c=ensureCat();delete c.prices[brand+'|'+model+'|'+repair];save();views.preise();paintIcons();}
+let catTab='modelle', catBrand='', catPriceRep='';
 views.preise=function(){
-  const m=document.getElementById('main');
-  const models=CATALOG[priceBrand]||[];
-  m.innerHTML=`<div class="between"><div><h1 class="h1">Modelle &amp; Preise</h1><p class="sub">Preiskatalog für die Kalkulation und die Online-Buchung</p></div>
-     <button class="btn" onclick="toast('Excel exportiert (Demo)')">Excel Export</button></div>
-   <div class="row" style="margin:16px 0">${Object.keys(CATALOG).map(b=>`<button class="chip ${priceBrand===b?'on':''}" onclick="priceBrand='${b}';views.preise();paintIcons()">${b}</button>`).join('')}</div>
-   <div class="card" style="padding:0;overflow:auto"><table><thead><tr><th>Modell</th>${REPTYPES.map(r=>`<th>${r}</th>`).join('')}</tr></thead>
-     <tbody>${models.map((mo,i)=>`<tr><td><b>${esc(mo)}</b></td>${REPTYPES.map(r=>{const p=Math.round((BASEPRICE[r]||50)*(priceBrand==='Apple'?1.2:1)*(1+(i%3)*0.06));return `<td class="mono">${eur(p)}</td>`;}).join('')}</tr>`).join('')}</tbody></table></div>
-   <div class="note" style="margin-top:14px">Diese Preise erscheinen automatisch in der <b>Online-Buchung</b> (Einstellungen → Integrationen), damit Kunden vorab Preise sehen und Termine buchen können.</div>`;
+  const m=document.getElementById('main'); const c=ensureCat();
+  if(!catBrand||!c.brands.includes(catBrand))catBrand=c.brands[0]||'';
+  if(!catPriceRep||!c.repairs.includes(catPriceRep))catPriceRep=c.repairs[0]||'';
+  const tabBtn=(k,l)=>`<button class="chip ${catTab===k?'on':''}" onclick="catTab='${k}';views.preise();paintIcons()">${l}</button>`;
+  let body='';
+  if(catTab==='modelle'){
+    const models=catModels(catBrand);
+    body=`<div class="row" style="margin:14px 0;flex-wrap:wrap;gap:8px">${c.brands.map(b=>`<button class="chip ${catBrand===b?'on':''}" onclick="catBrand='${qa(b)}';views.preise();paintIcons()">${esc(b)}</button>`).join('')}<button class="btn sm" onclick="catAddBrand()">+ Marke</button></div>
+     <div class="between"><b>${esc(catBrand)} · ${models.length} Modell${models.length===1?'':'e'}</b><div class="row"><button class="btn sm" onclick="catAddModel('${qa(catBrand)}')">+ Modell</button>${c.brands.length>1?`<button class="btn sm gho" onclick="catDelBrand('${qa(catBrand)}')">Marke löschen</button>`:''}</div></div>
+     <div class="card" style="padding:0;overflow:auto;margin-top:10px"><table><thead><tr><th>Bild</th><th>Modell</th><th>Gerätetyp</th><th></th></tr></thead>
+       <tbody>${models.length?models.map(mo=>`<tr>
+         <td>${mo.img?`<img src="${mo.img}" style="width:46px;height:46px;object-fit:contain;border:1px solid var(--line);border-radius:8px;background:#fff">`:`<div style="width:46px;height:46px;border:1px dashed var(--line);border-radius:8px;display:grid;place-items:center;color:#bbb;font-size:10px">kein Bild</div>`}</td>
+         <td><b>${esc(mo.name)}</b></td>
+         <td><select class="in" style="padding:6px 10px;width:auto" onchange="catSetModelType('${qa(catBrand)}','${qa(mo.name)}',this.value)">${c.types.map(t=>`<option ${mo.type===t?'selected':''}>${t}</option>`).join('')}</select></td>
+         <td style="text-align:right;white-space:nowrap"><label class="btn sm" style="cursor:pointer">${mo.img?'Bild ändern':'Bild'}<input type="file" accept="image/*" style="display:none" onchange="catImgUpload('${qa(catBrand)}','${qa(mo.name)}',this)"></label>${mo.img?`<button class="btn sm gho" onclick="catImgClear('${qa(catBrand)}','${qa(mo.name)}')">Bild ✕</button>`:''}<button class="btn sm gho" onclick="catRenameModel('${qa(catBrand)}','${qa(mo.name)}')">Umbenennen</button><button class="btn sm gho" onclick="catDelModel('${qa(catBrand)}','${qa(mo.name)}')">Löschen</button></td></tr>`).join(''):`<tr><td colspan="4"><div class="empty">Keine Modelle. „+ Modell" hinzufügen.</div></td></tr>`}</tbody></table></div>
+     <div class="note" style="margin-top:12px">Gerätetypen: ${c.types.map(t=>esc(t)).join(' · ')} &nbsp;<a onclick="catAddType()" style="color:var(--green,#0e7a3c);cursor:pointer;font-weight:700">+ Gerätetyp</a><br>Das hinterlegte Bild erscheint beim Modell-Auswählen im Auftrag/Angebot.</div>`;
+  } else if(catTab==='reparaturarten'){
+    body=`<div class="between" style="margin:14px 0"><b>Reparaturarten &amp; Basispreise</b><button class="btn sm" onclick="catAddRepair()">+ Reparaturart</button></div>
+     <div class="card" style="padding:0;overflow:auto"><table><thead><tr><th>Reparaturart</th><th>Basispreis (€)</th><th></th></tr></thead>
+       <tbody>${c.repairs.map(r=>`<tr><td><b>${esc(r)}</b></td><td><input class="in" style="width:130px;padding:6px 10px" type="number" value="${c.base[r]!==undefined?c.base[r]:''}" onchange="catSetBase('${qa(r)}',this.value)"></td><td style="text-align:right"><button class="btn sm gho" onclick="catDelRepair('${qa(r)}')">Löschen</button></td></tr>`).join('')}</tbody></table></div>
+     <div class="note" style="margin-top:12px">Basispreis = Ausgangswert. Der tatsächliche Preis wird je Marke/Modell berechnet und ist im Reiter „Preise" pro Modell überschreibbar.</div>
+     <div class="between" style="margin:18px 0 10px"><b>Qualitätsoptionen</b><button class="btn sm" onclick="catAddQual()">+ Qualität</button></div>
+     <div class="row" style="flex-wrap:wrap;gap:8px">${c.quals.map(q=>`<span class="pill soft" style="gap:8px;padding:8px 12px"><span class="d"></span>${esc(q)} <a onclick="catDelQual('${qa(q)}')" style="cursor:pointer;color:#c0392b;font-weight:800">✕</a></span>`).join('')}</div>`;
+  } else {
+    const models=catModels(catBrand);
+    body=`<div class="row" style="margin:14px 0;flex-wrap:wrap;gap:8px">${c.brands.map(b=>`<button class="chip ${catBrand===b?'on':''}" onclick="catBrand='${qa(b)}';views.preise();paintIcons()">${esc(b)}</button>`).join('')}</div>
+     <label class="f">Reparaturart</label><select class="in" style="max-width:340px" onchange="catPriceRep=this.value;views.preise();paintIcons()">${c.repairs.map(r=>`<option ${catPriceRep===r?'selected':''}>${esc(r)}</option>`).join('')}</select>
+     <div class="card" style="padding:0;overflow:auto;margin-top:12px"><table><thead><tr><th>Modell</th><th>Preis (€)</th><th>berechnet</th><th></th></tr></thead>
+       <tbody>${models.length?models.map(mo=>{const k=catBrand+'|'+mo.name+'|'+catPriceRep;const ov=c.prices[k];const auto=priceFor(catBrand,mo.name,catPriceRep);return `<tr><td><b>${esc(mo.name)}</b></td>
+         <td><input class="in" style="width:130px;padding:6px 10px" type="number" value="${ov!==undefined?ov:''}" placeholder="${auto!==''?auto:'—'}" onchange="catSetPrice('${qa(catBrand)}','${qa(mo.name)}','${qa(catPriceRep)}',this.value)"></td>
+         <td class="mono muted">${auto!==''?eur(auto):'—'}</td>
+         <td style="text-align:right">${ov!==undefined?`<button class="btn sm gho" onclick="catResetPrice('${qa(catBrand)}','${qa(mo.name)}','${qa(catPriceRep)}')">auf Auto</button>`:'<span class="muted" style="font-size:12px">Auto</span>'}</td></tr>`;}).join(''):`<tr><td colspan="4"><div class="empty">Keine Modelle für diese Marke.</div></td></tr>`}</tbody></table></div>
+     <div class="note" style="margin-top:12px">Leer = automatischer Preis (Basispreis × Marke). Ein eingetragener Wert überschreibt ihn nur für dieses Modell.</div>`;
+  }
+  m.innerHTML=`<div class="between"><div><h1 class="h1">Modelle &amp; Reparaturarten</h1><p class="sub">Eigener Katalog: Modelle, Reparaturarten, Preise – für Auftrag, Angebot &amp; Website</p></div></div>
+   <div class="row" style="margin-top:14px">${tabBtn('modelle','Modelle')}${tabBtn('reparaturarten','Reparaturarten')}${tabBtn('preise','Preise')}</div>
+   ${body}`;
 };
 
 /* ============================ KASSE ============================ */
@@ -2300,7 +2365,7 @@ function demoDone(){ if(_demoStop)return; const el=document.getElementById('demo
 
 /* ============================ BOOT ============================ */
 paintIcons();
-(function(){ensureAcct(); const n=pullBookings(); const nq=pullRequests(); go('dashboard'); applyNavRole(); if(!curUser())showLogin();
+(function(){ensureAcct(); ensureCat(); const n=pullBookings(); const nq=pullRequests(); go('dashboard'); applyNavRole(); if(!curUser())showLogin();
   if(nq) setTimeout(()=>toast(nq+' neue Website-Anfrage'+(nq>1?'n':'')),900);
   if(n) setTimeout(()=>toast(n+' neue Online-Buchung'+(n>1?'en':'')+' übernommen'),500);
 })();
