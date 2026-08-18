@@ -29,15 +29,15 @@ Wachstums-Motoren (Versandreparatur, B2B, Forecast) · **Echtes System** (DB, Au
 
 ---
 
-## Phase 1 — Fundament des Produkts (schaltet alles andere frei)
+## Phase 1 — Fundament des Produkts (schaltet alles andere frei) — ✅ KOMPLETT (18.8.)
 *Die erste Frage jedes Shops: „Kann ich meine eigenen Preise/Abläufe einstellen?"*
 
 | # | Feature | Typ | Effort | Impact | Abhängig |
 |---|---|---|---|---|---|
 | ✅ P1 | **Selbst-pflegbarer Katalog** — Gerätetypen→Marken→Modelle, Reparaturarten, Basispreise, Preise pro Modell überschreibbar, Qualitätsoptionen, **Modellbilder (B3)** · **FERTIG 18.8.** | Parität 🔴 | L | ★★★ | — (Basis für Preise, Angebote, Widget) |
 | ✅ P3 | **Konfigurierbare Status + Automatisierungen** — Status anlegen/sortieren/Farbe/aktivieren, je Status Auto-E-Mail/SMS mit Vorlage · **FERTIG 18.8.** | Parität 🔴 | M–L | ★★★ | — |
-| P8 | **Systemeinstellungen** — Reparatur-Nummernschema, Pflichtfelder wählbar, AGB-Text | Parität 🟠 | S–M | ★★ | — |
-| P12 | **Auftragsliste-Politur** — Inline-Status in der Liste, Sortierung, Bulk-Auswahl, Filter (Termin/Versand/Express), Spalten Fach/Referenz/Termin, **Archiv**, **Papierkorb** | Parität 🟡 | M | ★★ | — |
+| ✅ P8 | **Systemeinstellungen** — Nummernschema (REP-/AN-), Pflichtfelder (E-Mail/Adresse/IMEI/Unterschrift), AGB-Text auf Beleg · **FERTIG 18.8.** | Parität 🟠 | S–M | ★★ | — |
+| ✅ P12 | **Auftragsliste-Politur** — Inline-Status (farbig), Sortierung, Bulk-Auswahl, **Archiv**, **Papierkorb** (+Wiederherstellen/endgültig löschen) · **FERTIG 18.8.** | Parität 🟡 | M | ★★ | — |
 
 ## Phase 2 — Die 3 Killer-Wedges (das Wow, das verkauft)
 *Nutzt euren KI-Vorsprung — RepairDash kann das nicht.*
