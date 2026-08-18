@@ -79,6 +79,10 @@ const STEPS=[
   {key:'abgeschlossen',t:'Abgeschlossen',s:'Gerät abgeholt. Vielen Dank!'},
 ];
 function stepIndex(status){return {offen:0,bearbeitung:1,warten:1,fertig:2,abgeholt:3}[status]??0;}
+function sDevices(o){if(o.devices&&o.devices.length)return o.devices;return [{brand:o.brand,model:o.model,reparatur:o.issue,price:+o.price||0}];}
+function sTotal(o){return sDevices(o).reduce((s,d)=>s+(+d.price||0),0);}
+function sDevLabel(o){return sDevices(o).map(d=>[d.brand,d.model].filter(Boolean).join(' ')).filter(Boolean).join(' + ');}
+function sIssue(o){return sDevices(o).map(d=>d.reparatur).filter(Boolean).join(' · ');}
 
 function render(){
   const wrap=document.getElementById('wrap');
@@ -97,8 +101,8 @@ function render(){
 
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <div><div style="font-weight:800;font-size:18px">${esc(o.brand)} ${esc(o.model)}</div>
-          <div class="muted" style="font-size:14px">${esc(o.issue)} · Auftrag ${esc(o.nr)}</div></div>
+        <div><div style="font-weight:800;font-size:18px">${esc(sDevLabel(o))}</div>
+          <div class="muted" style="font-size:14px">${esc(sIssue(o))} · Auftrag ${esc(o.nr)}</div></div>
         <span class="badge ${(ready||done||o.status==='bearbeitung')?'solid':''}"><span class="d"></span>${STEPS[cur].t}</span>
       </div>
     </div>
@@ -121,11 +125,11 @@ function render(){
        <div style="font-weight:800;font-size:17px;margin-bottom:6px">Ihr Gerät ist abholbereit</div>
        <div class="row"><span>Abholung</span><b>${SHOP.hours}</b></div>
        <div class="row"><span>Adresse</span><b>${SHOP.street}, ${SHOP.zip} ${SHOP.city}</b></div>
-       <div class="row"><span>Endbetrag</span><b>${eur(o.price)}</b></div>
+       <div class="row"><span>Endbetrag</span><b>${eur(sTotal(o))}</b></div>
      </div>`:''}
 
     <div class="card">
-      <div class="row"><span>Voraussichtlicher Preis</span><b>${eur(o.price)}</b></div>
+      <div class="row"><span>Voraussichtlicher Preis</span><b>${eur(sTotal(o))}</b></div>
       ${o.appt?`<div class="row"><span>Termin</span><b>${fmtDate(o.appt)}</b></div>`:''}
       <div class="row"><span>Garantie</span><b>${o.warranty} Monate${warrUntil?' · bis '+fmtDate(warrUntil):''}</b></div>
       <div class="row"><span>Status seit</span><b>${fmtDate(o.readyAt||o.created)}</b></div>

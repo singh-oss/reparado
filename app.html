@@ -267,7 +267,7 @@ const SHOP = {name:"Dein Handy Doc", city:"Balingen", street:"Bahnhofstr. 12", z
 const KEY='reparado_v1';
 let S = load();
 
-function load(){ try{const r=JSON.parse(localStorage.getItem(KEY)); if(r&&r.v===7) return r;}catch(e){} const s=seed(); save(s); return s; }
+function load(){ try{const r=JSON.parse(localStorage.getItem(KEY)); if(r&&r.v===8) return r;}catch(e){} const s=seed(); save(s); return s; }
 function save(x){ localStorage.setItem(KEY, JSON.stringify(x||S)); }
 function uid(p){ return p+Math.random().toString(36).slice(2,7); }
 
@@ -320,6 +320,13 @@ function seed(){
   [['c5','Apple','iPhone 13','Displaytausch',149,'Express'],['c6','Samsung','Galaxy A14','Akkutausch',59,'Standard'],['c9','Apple','iPhone 12','Kameraglas',49,'Standard']].forEach((t,i)=>ord.unshift({id:'ot'+i,nr:'REP-'+(1116+i),cid:t[0],brand:t[1],model:t[2],imei:'',issue:t[3],qual:'Original',price:t[4],status:'offen',prio:t[5],created:d(0),due:d(0),notes:'Terminkunde heute',appt:d(0),readyAt:'',pickedAt:'',warranty:6,sig:'',source:''}));
   // Verkäufe (Kasse) diesen Monat
   const sales=[];for(let s=0;s<22;s++)sales.push({t:new Date(d(0)+'T'+String(9+(s%8)).padStart(2,'0')+':15:00').toISOString(),total:[15,12,9,25,19,39,10,29][s%8],items:1+(s%3)});
+  // Techniker-Zuweisung (Demo): aktive Aufträge an Lena (u2) / Tom (u3), Rest bleibt frei zum Übernehmen
+  ord.forEach((o,i)=>{ if(o.status==='abgeholt')return; if(i%3===1)o.technikerId='u2'; else if(i%3===2)o.technikerId='u3'; });
+  // Ein Auftrag, zwei Geräte (echtes Mehrgeräte-Modell)
+  ord.unshift({id:'omulti',nr:'REP-1119',cid:'c1',status:'bearbeitung',prio:'Express',created:d(0),due:d(2),appt:'',readyAt:'',notes:'Beide Geräte der Familie zusammen abgegeben',source:'',sig:'',technikerId:'u2',lock:'Passwort / PIN',lockval:'1234',
+    devices:[{typ:'Smartphone',brand:'Apple',model:'iPhone 13',imei:'356789123456780',fach:'Fach 12',ref:'',reparatur:'Displaytausch',qual:'Original',price:129,warranty:6},
+             {typ:'Tablet',brand:'Apple',model:'iPad Air',imei:'',fach:'Fach 12',ref:'',reparatur:'Akkutausch',qual:'Original',price:89,warranty:6}],
+    devtyp:'Smartphone',brand:'Apple',model:'iPhone 13',imei:'356789123456780',fach:'Fach 12',ref:'',qual:'Original',warranty:6,issue:'Displaytausch · Akkutausch',price:218});
   // --- Wertgarantie: bestehende Versicherungsfälle in verschiedenen Stadien (für die Vorführung) ---
   const wgCases=[['o1111','eingereicht',30],['o1108','freigegeben',0],['o1106','abgerechnet',0],['o1113','geprueft',50]];
   wgCases.forEach(([id,st,sb],i)=>{const o=ord.find(x=>x.id===id);if(o)o.ins={on:true,provider:'Wertgarantie',vertrag:'WG-88'+(42150+i*137),selbst:sb,status:st,claimNr:st!=='geprueft'?'WG-CLM-'+(o.nr.replace(/\D/g,''))+'-26':'',submittedAt:st!=='geprueft'?d(-2):'',approvedAt:(st==='freigegeben'||st==='abgerechnet')?d(-1):'',note:''};});
@@ -328,7 +335,7 @@ function seed(){
     {id:'wl1',name:'Sandra Böhm',tel:'+49 151 22887744',brand:'Apple',model:'iPhone 14',issue:'Displaytausch (Sturzschaden)',vertrag:'WG-8840012',selbst:0,recv:d(0)},
     {id:'wl2',name:'Murat Yıldız',tel:'+49 160 5566778',brand:'Samsung',model:'Galaxy S23',issue:'Displaytausch (Glasbruch)',vertrag:'WG-8839551',selbst:25,recv:d(0)},
   ];
-  return {v:7, cust, ord, parts, orders, sold:[], counter:1119, rules: defaultRules(), sales, cash:{connected:''}, mailLog:[], calls:seedCalls(), phone:defaultPhone(), users:defaultUsers(), userId:'u1', insurance:defaultInsurance(), wgLeads, drafts:[]};
+  return {v:8, cust, ord, parts, orders, sold:[], counter:1120, rules: defaultRules(), sales, cash:{connected:''}, mailLog:[], calls:seedCalls(), phone:defaultPhone(), users:defaultUsers(), userId:'u1', insurance:defaultInsurance(), wgLeads, drafts:[]};
 }
 function defaultPhone(){return {active:true, mode:'overflow',
   greeting:'Herzlich willkommen bei Dein Handy Doc. Ich bin die digitale Assistentin. Wie kann ich Ihnen helfen?',
@@ -441,6 +448,14 @@ const STATUS = {
 const STFLOW=['offen','bearbeitung','warten','fertig','abgeholt'];
 function statusPill(s){const m=STATUS[s]||STATUS.offen;return `<span class="pill ${m.cls}"><span class="d"></span>${m.lbl}</span>`;}
 function cust(id){return S.cust.find(c=>c.id===id)||{name:'—',tel:'',mail:'',adr:''};}
+/* Geräte pro Auftrag (mehrere möglich); Alt-Aufträge ohne devices[] werden aus den Einzelfeldern synthetisiert */
+function oDevices(o){ if(o&&o.devices&&o.devices.length) return o.devices; return [{typ:(o&&o.devtyp)||'Smartphone',brand:(o&&o.brand)||'',model:(o&&o.model)||'',imei:(o&&o.imei)||'',fach:(o&&o.fach)||'',ref:(o&&o.ref)||'',reparatur:(o&&o.issue)||'',qual:(o&&o.qual)||'Original',price:+(o&&o.price)||0,warranty:(o&&o.warranty)||6}]; }
+function oTotal(o){ return oDevices(o).reduce((s,d)=>s+(+d.price||0),0); }
+function oDevLabel(o){ return oDevices(o).map(d=>[d.brand,d.model].filter(Boolean).join(' ')).filter(Boolean).join(' + ')||'—'; }
+function oIssueLabel(o){ return oDevices(o).map(d=>d.reparatur).filter(Boolean).join(' · '); }
+function posRows(o){ return oDevices(o).map(d=>`<tr><td>${esc(d.brand)} ${esc(d.model)} — ${esc(d.reparatur)} (${esc(d.qual)})</td><td style="text-align:right" class="mono">${eur(d.price)}</td></tr>`).join(''); }
+/* Techniker (Mitarbeiter) sehen nur ihnen zugewiesene + noch nicht zugewiesene Aufträge */
+function visibleOrders(){ if(curRole()==='inhaber') return S.ord; const u=S.userId; return S.ord.filter(o=>!o.technikerId||o.technikerId===u); }
 function eur(n){return '€ '+Number(n||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function initials(n){return (n||'?').split(' ').map(x=>x[0]).slice(0,2).join('').toUpperCase();}
 function today(){return new Date().toISOString().slice(0,10);}
@@ -497,7 +512,7 @@ function go(v){
 }
 document.getElementById('nav').addEventListener('click',e=>{const a=e.target.closest('a');if(a){go(a.dataset.view);}});
 function refreshBadges(){
-  document.getElementById('bg-auf').textContent=S.ord.filter(o=>o.status!=='abgeholt').length;
+  document.getElementById('bg-auf').textContent=visibleOrders().filter(o=>o.status!=='abgeholt').length;
   document.getElementById('bg-rem').textContent=computeQueue().length;
   const bc=document.getElementById('bg-call'); if(bc) bc.textContent=(S.calls||[]).filter(c=>c.task&&!c.done).length;
   const bb=document.getElementById('bg-beleg'); if(bb) bb.textContent=(S.belege||[]).filter(x=>x.status==='neu').length;
@@ -507,20 +522,21 @@ function refreshBadges(){
 /* ============================ DASHBOARD ============================ */
 views.dashboard=function(){
   const m=document.getElementById('main');
-  const monthRev=S.ord.filter(o=>(o.status==='abgeholt'||o.status==='fertig')&&isThisMonth(o.pickedAt||o.readyAt||o.created)).reduce((s,o)=>s+(+o.price||0),0)+ S.sales.filter(x=>isThisMonth(x.t)).reduce((s,x)=>s+x.total,0);
-  const offen=S.ord.filter(o=>o.status!=='abgeholt').length;
-  const fertig=S.ord.filter(o=>o.status==='fertig').length;
-  const heute=S.ord.filter(o=>o.appt===today()).length;
+  const src=visibleOrders();
+  const monthRev=src.filter(o=>(o.status==='abgeholt'||o.status==='fertig')&&isThisMonth(o.pickedAt||o.readyAt||o.created)).reduce((s,o)=>s+oTotal(o),0)+ S.sales.filter(x=>isThisMonth(x.t)).reduce((s,x)=>s+x.total,0);
+  const offen=src.filter(o=>o.status!=='abgeholt').length;
+  const fertig=src.filter(o=>o.status==='fertig').length;
+  const heute=src.filter(o=>o.appt===today()).length;
   const q=computeQueue();
   const agenda=[
-    ...S.ord.filter(o=>o.appt===today()).map(o=>({t:'Termin heute',o})),
-    ...S.ord.filter(o=>o.status==='fertig').map(o=>({t:'Abholbereit',o})),
+    ...src.filter(o=>o.appt===today()).map(o=>({t:'Termin heute',o})),
+    ...src.filter(o=>o.status==='fertig').map(o=>({t:'Abholbereit',o})),
   ];
   m.innerHTML=`
    <div class="between"><div><h1 class="h1">Guten Tag</h1><p class="sub">${SHOP.name} · ${fmtDate(today())}</p></div>
      <div class="row"><button class="btn" onclick="newOrder()">Neuer Auftrag</button><button class="btn" onclick="go('kasse')">Kasse öffnen</button><button class="btn pri" onclick="startDemo()">Demo-Tour</button></div></div>
    <div class="grid g4" style="margin-top:18px">
-     ${curRole()==='inhaber'?`<div class="card kpi"><div class="n">${eur(monthRev)}</div><div class="l">Umsatz diesen Monat</div><div class="t">Reparaturen führen</div></div>`:`<div class="card kpi"><div class="n">${S.ord.filter(o=>o.status==='abgeholt'&&isThisMonth(o.pickedAt||o.readyAt||o.created)).length}</div><div class="l">Erledigt diesen Monat</div><div class="t">Weiter so</div></div>`}
+     ${curRole()==='inhaber'?`<div class="card kpi"><div class="n">${eur(monthRev)}</div><div class="l">Umsatz diesen Monat</div><div class="t">Reparaturen führen</div></div>`:`<div class="card kpi"><div class="n">${src.filter(o=>o.status==='abgeholt'&&isThisMonth(o.pickedAt||o.readyAt||o.created)).length}</div><div class="l">Erledigt diesen Monat</div><div class="t">Weiter so</div></div>`}
      <div class="card kpi"><div class="n">${offen}</div><div class="l">Offene Aufträge</div><div class="t">${fertig} abholbereit</div></div>
      <div class="card kpi"><div class="n">${heute}</div><div class="l">Termine heute</div><div class="t">Kalender ansehen</div></div>
      <div class="card kpi"><div class="n">${q.length}</div><div class="l">Geplante Erinnerungen</div><div class="t">Kunde &amp; Werkstatt</div></div>
@@ -561,11 +577,13 @@ views.dashboard=function(){
 let aufFilter='alle';
 views.auftraege=function(){
   const m=document.getElementById('main');
-  const counts={alle:S.ord.length};
-  STFLOW.forEach(s=>counts[s]=S.ord.filter(o=>o.status===s).length);
-  const list=S.ord.filter(o=>aufFilter==='alle'?true:o.status===aufFilter);
+  const src=visibleOrders();
+  const counts={alle:src.length};
+  STFLOW.forEach(s=>counts[s]=src.filter(o=>o.status===s).length);
+  const list=src.filter(o=>aufFilter==='alle'?true:o.status===aufFilter);
+  const mine=curRole()!=='inhaber';
   m.innerHTML=`
-   <div class="between"><div><h1 class="h1">Aufträge</h1><p class="sub">${S.ord.length} Aufträge insgesamt</p></div>
+   <div class="between"><div><h1 class="h1">Aufträge</h1><p class="sub">${src.length} Aufträge${mine?' (dir zugewiesen &amp; offen)':' insgesamt'}</p></div>
      <button class="btn pri" onclick="newOrder()">Neuer Auftrag</button></div>
    <div class="row" style="margin:16px 0">
      ${['alle',...STFLOW].map(s=>`<button class="chip ${aufFilter===s?'on':''}" onclick="aufFilter='${s}';views.auftraege();paintIcons()">${s==='alle'?'Alle':STATUS[s].lbl} · ${counts[s]||0}</button>`).join('')}
@@ -578,9 +596,9 @@ views.auftraege=function(){
     <tbody>${list.map(o=>`<tr onclick="openOrder('${o.id}')">
       <td><b>${o.nr}</b>${o.source==='online'?' <span class="tag">Online</span>':''}</td>
       <td>${esc(cust(o.cid).name)}</td>
-      <td>${esc(o.brand)} ${esc(o.model)}</td>
-      <td>${esc(o.issue)}</td>
-      <td class="mono">${eur(o.price)}</td>
+      <td>${esc(oDevLabel(o))}${oDevices(o).length>1?` <span class="tag">${oDevices(o).length} Geräte</span>`:''}</td>
+      <td>${esc(oIssueLabel(o))}</td>
+      <td class="mono">${eur(oTotal(o))}</td>
       <td>${statusPill(o.status)}</td>
       <td class="muted mono">${fmtDate(o.due)}</td>
     </tr>`).join('')||'<tr><td colspan="7"><div class="empty">Keine Aufträge in diesem Filter</div></td></tr>'}</tbody></table>
@@ -604,9 +622,10 @@ function openOrder(id){
          <div class="avatar" style="width:44px;height:44px">${initials(c.name)}</div></div>
      </div>
      <div class="grid g2" style="margin-top:14px">
-       <div><label class="f">Gerät</label><div style="font-weight:700">${esc(o.brand)} ${esc(o.model)}</div><div class="muted" style="font-size:13px">IMEI: ${esc(o.imei)||'—'}</div></div>
-       <div><label class="f">Reparatur</label><div style="font-weight:700">${esc(o.issue)}</div><div class="muted" style="font-size:13px">Qualität: ${esc(o.qual)} · Priorität: ${esc(o.prio)}</div></div>
-       <div><label class="f">Preis</label><div style="font-weight:800;font-size:18px">${eur(o.price)}</div></div>
+       <div style="grid-column:1/-1"><label class="f">Gerät${oDevices(o).length>1?'e ('+oDevices(o).length+')':''} &amp; Reparatur</label>
+         ${oDevices(o).map(d=>`<div class="between" style="padding:7px 0;border-bottom:1px solid var(--line)"><div style="min-width:0"><b>${esc(d.brand)} ${esc(d.model)}</b><div class="muted" style="font-size:13px">${esc(d.reparatur)} · ${esc(d.qual)}${d.imei?' · IMEI '+esc(d.imei):''}${d.fach?' · '+esc(d.fach):''}</div></div><b class="mono">${eur(d.price)}</b></div>`).join('')}
+         <div class="between" style="padding:9px 0"><b>Gesamt</b><b style="font-size:18px">${eur(oTotal(o))}</b></div></div>
+       <div><label class="f">Priorität</label><div style="font-weight:700">${esc(o.prio)}</div></div>
        <div><label class="f">Termin / Fällig</label><div style="font-weight:700">${o.appt?'Termin '+fmtDate(o.appt)+' · ':''}Fällig ${fmtDate(o.due)}</div></div>
        <div><label class="f">Garantie</label><div style="font-weight:700">${o.warranty} Monate${warrUntil?' · bis '+fmtDate(warrUntil):' (ab Abholung)'}</div></div>
        <div><label class="f">Annahme</label><div style="font-weight:700">${o.sig?'Unterschrieben':'Keine Unterschrift'}</div>${o.sig?`<img src="${o.sig}" alt="Unterschrift" style="height:40px;margin-top:4px;border:1px solid var(--line);border-radius:6px;background:#fff">`:''}</div>
@@ -707,7 +726,7 @@ let NO=null;
 function newOrder(){ closeAll(); NO=blankForm(); NO.draftId=uid('dr'); current='neworder'; renderNewOrder(); window.scrollTo(0,0); }
 function editOrder(id){ closeAll(); const o=S.ord.find(x=>x.id===id); if(!o)return; NO=orderToForm(o); NO.editId=id; current='neworder'; renderNewOrder(); window.scrollTo(0,0); }
 function resumeDraft(did){ closeAll(); const d=(S.drafts||[]).find(x=>x.id===did); if(!d)return; NO=Object.assign(blankForm(),JSON.parse(JSON.stringify(d.data))); NO.draftId=did; NO.editId=''; current='neworder'; renderNewOrder(); window.scrollTo(0,0); }
-function orderToForm(o){const c=cust(o.cid);const nm=(c.name||'').split(' ');const f=blankForm();f.cid=o.cid;f.typ=c.typ||'Privat';f.firma=c.firma||'';f.anrede=c.anrede||'Herr';f.vorname=nm.slice(0,-1).join(' ')||nm[0]||'';f.nachname=nm.length>1?nm[nm.length-1]:'';f.tel=c.tel||'+49 ';f.mail=c.mail||'';f.plz=c.plz||'';f.stadt=c.stadt||'';f.adr=c.adr||'';f.lock=o.lock||'Keine';f.lockval=o.lockval||'';f.prio=o.prio||'Standard';f.technikerId=o.technikerId||'';f.notes=o.notes||'';f.due=o.due||today();f.appt=o.appt||'';f.terminMode=o.appt?'termin':'kein';f.sig=o.sig||'';f.devices=[{typ:o.devtyp||'Smartphone',brand:o.brand||'',model:o.model||'',imei:o.imei||'',fach:o.fach||'',ref:o.ref||'',reparatur:o.issue||'',price:(o.price!==undefined?o.price:''),qual:o.qual||'Original',warranty:o.warranty||6}];return f;}
+function orderToForm(o){const c=cust(o.cid);const nm=(c.name||'').split(' ');const f=blankForm();f.cid=o.cid;f.typ=c.typ||'Privat';f.firma=c.firma||'';f.anrede=c.anrede||'Herr';f.vorname=nm.slice(0,-1).join(' ')||nm[0]||'';f.nachname=nm.length>1?nm[nm.length-1]:'';f.tel=c.tel||'+49 ';f.mail=c.mail||'';f.plz=c.plz||'';f.stadt=c.stadt||'';f.adr=c.adr||'';f.lock=o.lock||'Keine';f.lockval=o.lockval||'';f.prio=o.prio||'Standard';f.technikerId=o.technikerId||'';f.notes=o.notes||'';f.due=o.due||today();f.appt=o.appt||'';f.terminMode=o.appt?'termin':'kein';f.sig=o.sig||'';f.devices=oDevices(o).map(d=>({typ:d.typ||'Smartphone',brand:d.brand||'',model:d.model||'',imei:d.imei||'',fach:d.fach||'',ref:d.ref||'',reparatur:d.reparatur||'',price:(d.price!==undefined&&d.price!==0?d.price:(d.price===0?0:'')),qual:d.qual||'Original',warranty:d.warranty||6}));return f;}
 function noHasContent(){ if(!NO)return false; const d=NO.devices[0]||{}; return !!(NO.vorname||NO.nachname||(NO.tel||'').replace(/\D/g,'').length>3||NO.firma||NO.mail||d.brand||d.model||d.reparatur||NO.notes); }
 function noTitleOf(){const nm=((NO.vorname+' '+NO.nachname).trim())||NO.firma||'Unbenannter Kunde';const d=NO.devices[0]||{};const dev=[d.brand,d.model].filter(Boolean).join(' ');return nm+(dev?' · '+dev:'');}
 function noCollect(){ if(!NO)return; const g=id=>{const e=document.getElementById(id);return e?e.value:'';};
@@ -736,6 +755,27 @@ function noSign(){ openModal(`<div class="dhead"><b style="flex:1">Unterschrift 
   <div class="sigwrap"><canvas id="sig" width="520" height="150"></canvas></div>
   <div class="row" style="margin-top:12px;justify-content:space-between"><button class="btn gho" onclick="clearSig()">Löschen</button><button class="btn pri" onclick="noSaveSig()">Übernehmen</button></div></div>`); setTimeout(initSig,30); }
 function noSaveSig(){const c=document.getElementById('sig');if(!window.__sigDirty){toast('Bitte zuerst unterschreiben');return;}noCollect();NO.sig=c.toDataURL('image/png');noSaveDraft();closeAll();renderNewOrder();}
+function qrSVG(str,px){px=px||170;const cells=25;let x=2166136261>>>0;const grid=[];for(let i=0;i<cells*cells;i++){x=(x*1103515245+12345+str.charCodeAt(i%str.length||0))>>>0;grid.push(((x>>>7)%100)<46?1:0);}
+  function finder(r,c){for(let a=-1;a<8;a++)for(let b=-1;b<8;b++){const rr=r+a,cc=c+b;if(rr<0||cc<0||rr>=cells||cc>=cells)continue;const on=(a>=0&&a<7&&b>=0&&b<7)&&((a===0||a===6||b===0||b===6)||(a>=2&&a<=4&&b>=2&&b<=4));grid[rr*cells+cc]=on?1:0;}}
+  finder(0,0);finder(0,cells-7);finder(cells-7,0);
+  const s=px/cells;let rects='';for(let r=0;r<cells;r++)for(let c=0;c<cells;c++){if(grid[r*cells+c])rects+=`<rect x="${(c*s).toFixed(1)}" y="${(r*s).toFixed(1)}" width="${Math.ceil(s)}" height="${Math.ceil(s)}"/>`;}
+  return `<svg width="${px}" height="${px}" viewBox="0 0 ${px} ${px}" style="background:#fff;border-radius:8px" fill="#0f2318">${rects}</svg>`;}
+function makeSigStamp(text){const c=document.createElement('canvas');c.width=520;c.height=150;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,520,150);x.fillStyle='#0e7a3c';x.font='600 22px Inter,sans-serif';x.fillText(text,20,72);x.fillStyle='#5f6b64';x.font='13px Inter,sans-serif';x.fillText(new Date().toLocaleString('de-DE'),20,102);return c.toDataURL('image/png');}
+function noSignQR(){ noCollect(); const url='reparado.de/sign/'+(NO.draftId||'auftrag'); openModal(`<div class="dhead"><b style="flex:1">Unterschrift per QR-Code</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+  <div class="dbody" style="text-align:center"><p class="muted" style="font-size:13px">Der Kunde scannt den Code mit dem eigenen Handy und unterschreibt dort – ideal bei Abgabe ohne Tablet oder für Fernaufträge.</p>
+  <div style="display:flex;justify-content:center;margin:12px 0">${qrSVG(url,180)}</div>
+  <div class="mono" style="font-size:13px;color:var(--ink2)">${url}</div>
+  <div class="note" style="margin-top:12px;text-align:left">Prototyp: Der Signatur-Link wird beim echten System an das Kundenhandy übermittelt. Für die Vorführung können Sie die Unterschrift direkt als eingegangen markieren.</div>
+  <div class="row" style="margin-top:14px;justify-content:center"><button class="btn pri" onclick="noQRDone()">Unterschrift als eingegangen markieren</button></div></div>`); }
+function noQRDone(){ noCollect(); NO.sig=makeSigStamp('Digital signiert · QR-Fernunterschrift'); noSaveDraft(); closeAll(); renderNewOrder(); toast('QR-Unterschrift eingegangen'); }
+function noSignKiosk(){ noCollect(); const nm=(NO.vorname+' '+NO.nachname).trim()||'Kunde'; const ov=document.createElement('div'); ov.id='kioskOv';
+  ov.style.cssText='position:fixed;inset:0;z-index:300;background:#0f2318;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;gap:18px';
+  ov.innerHTML=`<div style="color:#fff;text-align:center"><div style="font-size:24px;font-weight:800">Bitte hier unterschreiben</div><div style="opacity:.75;font-size:14px;margin-top:4px">${esc(SHOP.name)} · Reparaturauftrag für ${esc(nm)}</div><div style="opacity:.6;font-size:12px;margin-top:2px">Mit der Unterschrift bestätige ich die Auftragserteilung und den Hinweis zur Datensicherung.</div></div>
+   <div style="background:#fff;border-radius:16px;padding:14px"><canvas id="sig" width="720" height="240" style="touch-action:none;max-width:86vw"></canvas></div>
+   <div style="display:flex;gap:12px"><button class="btn" style="background:#2a3d31;color:#fff;border:0" onclick="clearSig()">Löschen</button><button class="btn" style="background:#2a3d31;color:#fff;border:0" onclick="noKioskCancel()">Abbrechen</button><button class="btn pri" onclick="noKioskSave()">Bestätigen &amp; abschließen</button></div>`;
+  document.body.appendChild(ov); setTimeout(initSig,30); }
+function noKioskCancel(){const o=document.getElementById('kioskOv');if(o)o.remove();}
+function noKioskSave(){const c=document.getElementById('sig');if(!window.__sigDirty){toast('Bitte zuerst unterschreiben');return;}noCollect();NO.sig=c.toDataURL('image/png');noSaveDraft();noKioskCancel();renderNewOrder();toast('Unterschrift übernommen');}
 function noSaveExit(){noCollect();if(noHasContent()){noSaveDraft();toast('Als Entwurf gespeichert');}NO=null;go('auftraege');}
 function noCancel(){noCollect();if(!NO.editId&&noHasContent()){if(!confirm('Auftrag verwerfen? Der ungespeicherte Entwurf wird gelöscht.'))return;S.drafts=(S.drafts||[]).filter(x=>x.id!==NO.draftId);save();}NO=null;go('auftraege');}
 function noFinalize(){ noCollect();
@@ -749,15 +789,16 @@ function noFinalize(){ noCollect();
   if(!c)c=S.cust.find(x=>x.tel&&x.tel.replace(/\D/g,'')===digits&&digits.length>5);
   if(!c){c={id:uid('c'),name,tel:NO.tel,mail:NO.mail,adr:NO.adr,plz:NO.plz,stadt:NO.stadt,typ:NO.typ,firma:NO.firma,anrede:NO.anrede};S.cust.push(c);}
   else{c.name=name;c.tel=NO.tel;c.mail=NO.mail||c.mail;c.adr=NO.adr||c.adr;c.plz=NO.plz||c.plz;c.stadt=NO.stadt||c.stadt;c.typ=NO.typ;c.firma=NO.firma;c.anrede=NO.anrede;}
-  if(NO.editId){const o=S.ord.find(x=>x.id===NO.editId);if(o){Object.assign(o,{cid:c.id,devtyp:d0.typ,brand:d0.brand,model:d0.model,issue:d0.reparatur,qual:d0.qual,price:+d0.price||0,prio:NO.prio,warranty:+d0.warranty||6,imei:d0.imei,fach:d0.fach,ref:d0.ref,lock:NO.lock,lockval:NO.lockval,appt:NO.terminMode==='termin'?NO.appt:'',due:NO.due,notes:NO.notes,technikerId:NO.technikerId,sig:NO.sig||o.sig});}save();toast('Auftrag gespeichert');NO=null;go('auftraege');return;}
-  let firstNr='';
-  NO.devices.forEach((d,i)=>{ if(!d.reparatur||(!d.brand&&!d.model))return; const nr='REP-'+(S.counter++); if(!firstNr)firstNr=nr;
-    const o={id:uid('o'),nr,cid:c.id,devtyp:d.typ,brand:d.brand,model:d.model,imei:d.imei,fach:d.fach,ref:d.ref,lock:NO.lock,lockval:NO.lockval,issue:d.reparatur,qual:d.qual,price:+d.price||0,status:'offen',prio:NO.prio,created:today(),due:NO.due,appt:NO.terminMode==='termin'?NO.appt:'',notes:NO.notes,readyAt:'',warranty:+d.warranty||6,sig:NO.sig||'',source:'',technikerId:NO.technikerId};
-    S.ord.unshift(o); const rc=S.rules.find(x=>x.id==='r_confirm'); if(rc&&rc.on&&c.mail)logMail(o,rc,'automatisch (Anlage)'); });
+  const devs=noBuildDevices();
+  if(NO.editId){const o=S.ord.find(x=>x.id===NO.editId);if(o){Object.assign(o,{cid:c.id,devices:devs},noMirror(devs),{lock:NO.lock,lockval:NO.lockval,prio:NO.prio,appt:NO.terminMode==='termin'?NO.appt:'',due:NO.due,notes:NO.notes,technikerId:NO.technikerId,sig:NO.sig||o.sig});}save();toast('Auftrag gespeichert');NO=null;go('auftraege');return;}
+  const nr='REP-'+(S.counter++);
+  const o=Object.assign({id:uid('o'),nr,cid:c.id,devices:devs,lock:NO.lock,lockval:NO.lockval,status:'offen',prio:NO.prio,created:today(),due:NO.due,appt:NO.terminMode==='termin'?NO.appt:'',notes:NO.notes,readyAt:'',sig:NO.sig||'',source:'',technikerId:NO.technikerId},noMirror(devs));
+  S.ord.unshift(o); const rc=S.rules.find(x=>x.id==='r_confirm'); if(rc&&rc.on&&c.mail)logMail(o,rc,'automatisch (Anlage)');
   S.drafts=(S.drafts||[]).filter(x=>x.id!==NO.draftId); save();
-  const n=NO.devices.filter(d=>d.brand||d.model||d.reparatur).length;
-  toast(n>1?(n+' Aufträge angelegt ('+firstNr+' …)'):('Auftrag '+firstNr+' angelegt')); NO=null; go('auftraege');
+  toast('Auftrag '+nr+' angelegt'+(devs.length>1?(' · '+devs.length+' Geräte'):'')); NO=null; go('auftraege');
 }
+function noBuildDevices(){ return NO.devices.filter(d=>d.reparatur&&(d.brand||d.model)).map(d=>({typ:d.typ,brand:d.brand,model:d.model,imei:d.imei,fach:d.fach,ref:d.ref,reparatur:d.reparatur,qual:d.qual,price:+d.price||0,warranty:+d.warranty||6})); }
+function noMirror(devs){ const f=devs[0]||{}; return {devtyp:f.typ||'Smartphone',brand:f.brand||'',model:f.model||'',imei:f.imei||'',fach:f.fach||'',ref:f.ref||'',qual:f.qual||'Original',warranty:f.warranty||6,issue:devs.map(d=>d.reparatur).filter(Boolean).join(' · '),price:devs.reduce((s,d)=>s+(+d.price||0),0)}; }
 function noDevBlock(d,i){
   const models=CATALOG[d.brand]||[];
   const modelOpts=['<option value="">Modell wählen…</option>'].concat(models.map(mm=>`<option ${d.model===mm?'selected':''}>${esc(mm)}</option>`));
@@ -825,7 +866,7 @@ function renderNewOrder(){
 
    <div class="card" style="margin-top:16px"><b>Gerät &amp; Fehlerbeschreibung</b>
      ${NO.devices.map((d,i)=>noDevBlock(d,i)).join('')}
-     ${(!NO.editId&&NO.devices.length<3)?`<button class="btn" style="margin-top:12px;width:100%" onclick="noAddDevice()">+ Weiteres Gerät hinzufügen (optional)</button>`:''}
+     ${NO.devices.length<4?`<button class="btn" style="margin-top:12px;width:100%" onclick="noAddDevice()">+ Weiteres Gerät hinzufügen (optional)</button>`:''}
      <label class="f" style="margin-top:14px">Detaillierte Informationen &amp; Notizen</label>
      <textarea class="in" id="no_notes" rows="3" placeholder="z. B. Daten sichern, Schutzfolie aufbringen, Kundenhinweise, technische Hinweise…">${esc(NO.notes)}</textarea>
    </div>
@@ -840,7 +881,13 @@ function renderNewOrder(){
      </div>
      <div class="divider"></div>
      <label class="f">Unterschrift des Kunden (Annahme)</label>
-     <div class="row" style="align-items:center;gap:12px">${NO.sig?`<img src="${NO.sig}" style="height:54px;border:1px solid var(--line);border-radius:8px;background:#fff">`:'<span class="muted" style="font-size:13px">Noch keine Unterschrift erfasst</span>'}<button class="btn" onclick="noSign()">${NO.sig?'Unterschrift ändern':'Unterschrift erfassen'}</button></div>
+     <div class="row" style="align-items:center;gap:12px;flex-wrap:wrap">
+       ${NO.sig?`<img src="${NO.sig}" style="height:54px;border:1px solid var(--line);border-radius:8px;background:#fff">`:'<span class="muted" style="font-size:13px">Noch keine Unterschrift erfasst</span>'}
+       <button class="btn" onclick="noSign()">${NO.sig?'Unterschrift ändern':'Unterschrift erfassen'}</button>
+       <button class="btn" onclick="noSignQR()">QR-Code (Kundenhandy)</button>
+       <button class="btn" onclick="noSignKiosk()">Kiosk-Modus</button>
+       ${NO.sig?`<button class="btn gho" onclick="noCollect();NO.sig='';renderNewOrder()">Entfernen</button>`:''}
+     </div>
    </div>
 
    <div class="row" style="margin:18px 0 48px;justify-content:flex-end;flex-wrap:wrap;gap:10px">
@@ -889,7 +936,7 @@ function shopHead(){return `<div class="hd"><div><div class="n">${SHOP.name}</di
 function printLabel(id){const o=S.ord.find(x=>x.id===id);const c=cust(o.cid);
   printHTML('Etikett '+o.nr, `<div class="label"><div class="muted">${SHOP.name}</div><div class="big">${o.nr}</div><div class="bc"></div>
     <div class="lrow"><b>Kunde:</b> ${esc(c.name)}</div><div class="lrow"><b>Telefon:</b> ${esc(c.tel)}</div>
-    <div class="lrow"><b>Gerät:</b> ${esc(o.brand)} ${esc(o.model)}</div><div class="lrow"><b>Fehler:</b> ${esc(o.issue)}</div>
+    <div class="lrow"><b>Gerät:</b> ${esc(oDevLabel(o))}</div><div class="lrow"><b>Fehler:</b> ${esc(oIssueLabel(o))}</div>
     <div class="lrow"><b>Angenommen:</b> ${fmtDate(o.created)}</div>${o.imei?`<div class="lrow"><b>IMEI:</b> ${esc(o.imei)}</div>`:''}
     <div class="lrow" style="margin-top:8px;color:#555">reparado.de/status/${o.nr}</div></div>`);
   }
@@ -897,8 +944,8 @@ function printReceipt(id){const o=S.ord.find(x=>x.id===id);const c=cust(o.cid);
   printHTML('Beleg '+o.nr, shopHead()+`<h2>Beleg / Quittung</h2><div class="muted">Auftrag ${o.nr} · ${fmtDate(o.created)}</div>
     <div class="box" style="margin-top:12px"><b>${esc(c.name)}</b><br><span class="muted">${esc(c.adr)}</span></div>
     <table><thead><tr><th>Position</th><th style="text-align:right">Betrag</th></tr></thead>
-    <tbody><tr><td>${esc(o.brand)} ${esc(o.model)} — ${esc(o.issue)} (${esc(o.qual)})</td><td style="text-align:right" class="mono">${eur(o.price)}</td></tr></tbody></table>
-    <div class="tot"><span>Gesamt</span><span>${eur(o.price)}</span></div>
+    <tbody>${posRows(o)}</tbody></table>
+    <div class="tot"><span>Gesamt</span><span>${eur(oTotal(o))}</span></div>
     <div class="foot">Preis inkl. gesetzlicher MwSt. · Garantie: ${o.warranty} Monate auf die durchgeführte Reparatur.<br>Vielen Dank für Ihren Auftrag bei ${SHOP.name}.</div>`);
   }
 function printWarranty(id){const o=S.ord.find(x=>x.id===id);const c=cust(o.cid);
@@ -906,8 +953,8 @@ function printWarranty(id){const o=S.ord.find(x=>x.id===id);const c=cust(o.cid);
   printHTML('Garantie '+o.nr, shopHead()+`<h2>Garantie-Nachweis</h2><div class="muted">Auftrag ${o.nr}</div>
     <div class="box" style="margin-top:12px"><b>${esc(c.name)}</b><br><span class="muted">${esc(c.adr)}</span></div>
     <table><tbody>
-      <tr><th>Gerät</th><td>${esc(o.brand)} ${esc(o.model)}</td></tr>
-      <tr><th>Durchgeführte Reparatur</th><td>${esc(o.issue)} (${esc(o.qual)}teil)</td></tr>
+      <tr><th>Gerät${oDevices(o).length>1?'e':''}</th><td>${esc(oDevLabel(o))}</td></tr>
+      <tr><th>Durchgeführte Reparatur</th><td>${esc(oIssueLabel(o))} (${esc(o.qual)}teil)</td></tr>
       <tr><th>Garantiedauer</th><td>${o.warranty} Monate</td></tr>
       <tr><th>Gültig bis</th><td><b>${fmtDate(until)}</b></td></tr>
     </tbody></table>
@@ -917,8 +964,8 @@ function printKVA(id){const o=S.ord.find(x=>x.id===id);const c=cust(o.cid);
   printHTML('Kostenvoranschlag '+o.nr, shopHead()+`<h2>Kostenvoranschlag</h2><div class="muted">Auftrag ${o.nr} · ${fmtDate(today())}</div>
     <div class="box" style="margin-top:12px"><b>${esc(c.name)}</b><br><span class="muted">${esc(c.adr)}</span></div>
     <table><thead><tr><th>Leistung</th><th style="text-align:right">Preis</th></tr></thead>
-    <tbody><tr><td>${esc(o.brand)} ${esc(o.model)} — ${esc(o.issue)} (${esc(o.qual)})</td><td style="text-align:right" class="mono">${eur(o.price)}</td></tr></tbody></table>
-    <div class="tot"><span>Voraussichtlich</span><span>${eur(o.price)}</span></div>
+    <tbody>${posRows(o)}</tbody></table>
+    <div class="tot"><span>Voraussichtlich</span><span>${eur(oTotal(o))}</span></div>
     <div class="foot">Unverbindlicher Kostenvoranschlag, gültig 14 Tage. Der endgültige Preis kann nach genauer Prüfung abweichen; wir informieren Sie vor Ausführung.<br>${SHOP.name}</div>`);
   }
 
@@ -929,7 +976,7 @@ views.kalender=function(){
   const y=base.getFullYear(),mo=base.getMonth();
   const first=(new Date(y,mo,1).getDay()+6)%7; const dim=new Date(y,mo+1,0).getDate();
   const evByDay={};
-  S.ord.forEach(o=>{ if(o.appt){(evByDay[o.appt]=evByDay[o.appt]||[]).push({t:'Termin',o});}
+  visibleOrders().forEach(o=>{ if(o.appt){(evByDay[o.appt]=evByDay[o.appt]||[]).push({t:'Termin',o});}
     if(o.due&&o.status!=='abgeholt'){(evByDay[o.due]=evByDay[o.due]||[]).push({t:'Fällig',o});}});
   let cells='';
   for(let i=0;i<first;i++)cells+='<div></div>';
@@ -1264,12 +1311,11 @@ function posAdd(name,price){cart.push({name,price:+price,qty:1,vat:19});refreshC
 function reparaturPos(){const p=+prompt('Reparatur-Betrag (€, brutto):')||0;if(!p)return;cart.push({name:'Reparatur',price:p,qty:1,vat:19});refreshCart();}
 function freePos(){const n=prompt('Bezeichnung der Position:');if(!n)return;const p=+prompt('Preis (€, brutto):')||0;cart.push({name:n,price:p,qty:1,vat:19});refreshCart();}
 function posSearch(v){window.__posq=v;}
-function addToCart(orderId){const o=S.ord.find(x=>x.id===orderId);if(o){
+function addToCart(orderId){const o=S.ord.find(x=>x.id===orderId);if(!o)return;
   const insCovered=o.ins&&o.ins.on&&['freigegeben','abgerechnet'].includes(o.ins.status);
-  const price=insCovered?(+o.ins.selbst||0):o.price;
-  const name=o.nr+' · '+o.model+' · '+o.issue+(insCovered?' (Wertgarantie – Selbstbeteiligung)':'');
-  cart.push({name,price,qty:1,vat:19});
-  toast(insCovered?'Wertgarantie-Fall: Kunde zahlt nur Selbstbeteiligung':'Auftrag in Kasse übernommen');kasseTab='pos';views.kasse();paintIcons();}}
+  if(insCovered){cart.push({name:o.nr+' · Wertgarantie – Selbstbeteiligung',price:+o.ins.selbst||0,qty:1,vat:19});}
+  else{oDevices(o).forEach(d=>cart.push({name:o.nr+' · '+[d.brand,d.model].filter(Boolean).join(' ')+' · '+d.reparatur,price:+d.price||0,qty:1,vat:19}));}
+  toast(insCovered?'Wertgarantie-Fall: Kunde zahlt nur Selbstbeteiligung':'Auftrag in Kasse übernommen');kasseTab='pos';views.kasse();paintIcons();}
 function checkout(){
   if(!cart.length){toast('Warenkorb leer');return;}
   if(!ensureTse().active){toast('TSE nicht verbunden – Kassieren gesperrt (KassenSichV)');go('einstellungen');return;}
@@ -1611,7 +1657,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAll();});
 
 /* ============================ SEARCH ============================ */
 function globalSearch(v){ if(!v){go(current);return;} v=v.toLowerCase();
-  const hits=S.ord.filter(o=>[o.nr,cust(o.cid).name,cust(o.cid).tel,o.model,o.issue,o.imei].join(' ').toLowerCase().includes(v));
+  const hits=visibleOrders().filter(o=>[o.nr,cust(o.cid).name,cust(o.cid).tel,oDevLabel(o),oIssueLabel(o),oDevices(o).map(d=>d.imei).join(' ')].join(' ').toLowerCase().includes(v));
   const m=document.getElementById('main');
   m.innerHTML=`<h1 class="h1">Suche: „${esc(v)}"</h1><p class="sub">${hits.length} Treffer</p>
     <div class="card" style="margin-top:16px;padding:0"><table><tbody>${hits.map(o=>`<tr onclick="openOrder('${o.id}')"><td><b>${o.nr}</b></td><td>${esc(cust(o.cid).name)}</td><td>${esc(o.model)}</td><td>${esc(o.issue)}</td><td>${statusPill(o.status)}</td></tr>`).join('')||'<tr><td><div class="empty">Nichts gefunden</div></td></tr>'}</tbody></table></div>`;
