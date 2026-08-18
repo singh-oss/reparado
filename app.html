@@ -521,6 +521,7 @@ function daysBetween(a,b){return Math.round((new Date(b)-new Date(a))/864e5);}
 function addMonths(ds,m){const x=new Date(ds);x.setMonth(x.getMonth()+(+m||0));return x.toISOString().slice(0,10);}
 function fmtDate(d){if(!d)return '—';const x=new Date(d);return x.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});}
 function isThisMonth(ds){if(!ds)return false;const x=new Date(ds);const n=new Date();return x.getFullYear()===n.getFullYear()&&x.getMonth()===n.getMonth();}
+function isLastMonth(ds){if(!ds)return false;const x=new Date(ds);const n=new Date();n.setDate(1);n.setMonth(n.getMonth()-1);return x.getFullYear()===n.getFullYear()&&x.getMonth()===n.getMonth();}
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._);t._=setTimeout(()=>t.classList.remove('show'),2200);}
 function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
@@ -1228,7 +1229,9 @@ function showDoc(title,body){
   const f=document.getElementById('docframe'); if(f) f.srcdoc=html;
 }
 function printDocFrame(){const f=document.getElementById('docframe'); if(f&&f.contentWindow){f.contentWindow.focus();f.contentWindow.print();}}
-function shopHead(){return `<div class="hd"><div><div class="n">${SHOP.name}</div><div class="muted">${SHOP.street} · ${SHOP.zip} ${SHOP.city}<br>${SHOP.phone} · ${SHOP.email}</div></div><div class="muted" style="text-align:right">${fmtDate(today())}</div></div>`;}
+function shopHead(){const lg=(S.settings&&S.settings.logo)?`<img src="${S.settings.logo}" style="height:46px;max-width:180px;object-fit:contain;margin-bottom:6px"><br>`:'';return `<div class="hd"><div>${lg}<div class="n">${SHOP.name}</div><div class="muted">${SHOP.street} · ${SHOP.zip} ${SHOP.city}<br>${SHOP.phone} · ${SHOP.email}</div></div><div class="muted" style="text-align:right">${fmtDate(today())}</div></div>`;}
+function logoUpload(input){const f=input.files&&input.files[0];if(!f)return;imgToDataURL(f,300,0.85,function(url){ensureSettings().logo=url;save();views.einstellungen();paintIcons();toast('Logo gespeichert');});}
+function logoClear(){ensureSettings().logo='';save();views.einstellungen();paintIcons();}
 function printLabel(id){const o=S.ord.find(x=>x.id===id);const c=cust(o.cid);
   printHTML('Etikett '+o.nr, `<div class="label"><div class="muted">${SHOP.name}</div><div class="big">${o.nr}</div><div class="bc"></div>
     <div class="lrow"><b>Kunde:</b> ${esc(c.name)}</div><div class="lrow"><b>Telefon:</b> ${esc(c.tel)}</div>
@@ -1696,7 +1699,7 @@ views.ankauf=function(){
    <div class="row" style="margin:14px 0;flex-wrap:wrap;gap:8px">${tab('alle','Alle',all.length)}${tab('verfuegbar','Verfügbar',avail.length)}${tab('reserviert','Reserviert',res.length)}${tab('verkauft','Verkauft',sold.length)}</div>
    <div class="card" style="padding:0;overflow:auto"><table><thead><tr><th>Gerät</th><th>Zustand</th><th>Ankauf</th><th>Verkauf</th><th>Profit</th><th>Status</th><th></th></tr></thead>
      <tbody>${filt.length?filt.map(x=>{const prof=(+x.sellPrice||0)-(+x.buy||0);const ppct=x.buy?Math.round(prof/x.buy*100):0;const col=TRADE_ST[x.status]||['—','#888'];return `<tr>
-       <td><b>${esc(x.model)}</b>${x.imei?`<div class="muted mono" style="font-size:12px">IMEI ${esc(x.imei)}</div>`:''}</td>
+       <td><div class="row" style="gap:8px">${x.photo?`<img src="${x.photo}" style="width:38px;height:38px;object-fit:cover;border-radius:6px;border:1px solid var(--line)">`:''}<div><b>${esc(x.model)}</b>${x.imei?`<div class="muted mono" style="font-size:12px">IMEI ${esc(x.imei)}</div>`:''}</div></div></td>
        <td><span class="tag">${esc(x.cond||'—')}</span></td>
        <td class="mono">${eur(x.buy)}<div class="muted" style="font-size:11px">${fmtDate(x.buyDate)}</div></td>
        <td class="mono">${x.sellPrice?eur(x.sellPrice):'—'}</td>
@@ -1735,14 +1738,17 @@ function ensureTrade(){ let ch=false; if(!S.sold)S.sold=[];
     {id:'sd3',model:'iPhone 12 64GB',imei:'',cond:'Gut',buy:180,buyDate:today(),from:'',sellPrice:0,sellDate:'',to:'Vorgemerkt',status:'reserviert'}];}}
   S.sold.forEach(x=>{if(!x.status){x.status=x.sellPrice?'verkauft':'verfuegbar';ch=true;}if(x.imei===undefined){x.imei='';ch=true;}if(x.cond===undefined){x.cond='Gut';ch=true;}if(!x.buyDate){x.buyDate=today();ch=true;}});
   if(ch)save(); }
-function buyDevice(){ensureTrade();openModal(`<div class="dhead"><b style="flex:1">Gerät ankaufen</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+function buyDevice(){ensureTrade();window.__bdPhoto='';openModal(`<div class="dhead"><b style="flex:1">Gerät ankaufen</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
   <div class="dbody"><label class="f">Gerät</label><input class="in" id="bd_model" placeholder="z. B. iPhone 12 128GB">
    <div class="grid g2" style="margin-top:10px"><div><label class="f">IMEI / Seriennr.</label><input class="in" id="bd_imei" placeholder="optional"></div>
    <div><label class="f">Zustand</label><select class="in" id="bd_cond"><option>Neuwertig</option><option selected>Sehr gut</option><option>Gut</option><option>Gebraucht</option><option>Defekt</option></select></div>
    <div><label class="f">Ankaufspreis (€)</label><input class="in" id="bd_buy" type="number" placeholder="0.00"></div>
    <div><label class="f">Angekauft von (optional)</label><input class="in" id="bd_from" placeholder="Name"></div></div>
+   <label class="f" style="margin-top:10px">Foto (Gerät / Ausweis / Kaufbeleg – Rechtssicherheit)</label>
+   <div class="row" style="align-items:center;gap:12px"><div id="bd_photoprev"><span class="muted" style="font-size:13px">Kein Foto</span></div><label class="btn sm" style="cursor:pointer">Foto aufnehmen<input type="file" accept="image/*" capture="environment" style="display:none" onchange="bdPhotoPick(this)"></label></div>
    <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn gho" onclick="closeAll()">Abbrechen</button><button class="btn pri" onclick="buyDeviceDo()">Ankaufen</button></div></div>`);}
-function buyDeviceDo(){const g=id=>document.getElementById(id).value;const model=g('bd_model').trim();if(!model){toast('Gerät angeben');return;}S.sold.push({id:uid('s'),model,imei:g('bd_imei'),cond:g('bd_cond'),buy:+g('bd_buy')||0,buyDate:today(),from:g('bd_from'),sellPrice:0,sellDate:'',to:'',status:'verfuegbar'});save();closeAll();views.ankauf();paintIcons();toast('Gerät angekauft');checkWishes(model);}
+function bdPhotoPick(input){const f=input.files&&input.files[0];if(!f)return;imgToDataURL(f,700,0.82,function(url){window.__bdPhoto=url;const p=document.getElementById('bd_photoprev');if(p)p.innerHTML=`<img src="${url}" style="height:60px;border-radius:8px;border:1px solid var(--line)">`;});}
+function buyDeviceDo(){const g=id=>document.getElementById(id).value;const model=g('bd_model').trim();if(!model){toast('Gerät angeben');return;}S.sold.push({id:uid('s'),model,imei:g('bd_imei'),cond:g('bd_cond'),buy:+g('bd_buy')||0,buyDate:today(),from:g('bd_from'),photo:window.__bdPhoto||'',sellPrice:0,sellDate:'',to:'',status:'verfuegbar'});window.__bdPhoto='';save();closeAll();views.ankauf();paintIcons();toast('Gerät angekauft');checkWishes(model);}
 function sellDevice(id){const x=S.sold.find(s=>s.id===id);if(!x)return;openModal(`<div class="dhead"><b style="flex:1">Gerät verkaufen</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
   <div class="dbody"><div class="muted" style="font-size:13px">${esc(x.model)} · Ankauf ${eur(x.buy)}</div>
    <label class="f" style="margin-top:10px">Verkaufspreis (€)</label><input class="in" id="sd_price" type="number" value="${Math.round((x.buy||0)*1.5)}">
@@ -2045,6 +2051,16 @@ views.statistik=function(){
        <div style="margin-top:14px"><div class="between" style="margin-bottom:4px"><span>Reparatur</span><b>${total?Math.round(rep/total*100):100}%</b></div><div class="bar"><i style="width:${total?rep/total*100:100}%"></i></div>
        <div class="between" style="margin:14px 0 4px"><span>Verkauf (Kasse)</span><b>${total?Math.round(sale/total*100):0}%</b></div><div class="bar"><i style="width:${total?sale/total*100:0}%"></i></div></div>
      </div>
+   </div>
+   <div class="grid g2" style="margin-top:16px">
+     ${(function(){const repL=S.ord.filter(o=>(o.status==='abgeholt'||o.status==='fertig')&&isLastMonth(o.pickedAt||o.readyAt||o.created)).reduce((s,o)=>s+oTotal(o),0);const saleL=S.sales.filter(x=>isLastMonth(x.t)).reduce((s,x)=>s+x.total,0);const totL=repL+saleL;const chg=totL?Math.round((total-totL)/totL*100):(total?100:0);const up=total>=totL;return `<div class="card"><b>Monatsvergleich</b>
+       <div class="between" style="margin-top:14px"><span>Dieser Monat</span><b>${eur(total)}</b></div><div class="bar"><i style="width:${Math.max(total,totL)?total/Math.max(total,totL)*100:0}%"></i></div>
+       <div class="between" style="margin:14px 0 4px"><span>Vormonat</span><b>${eur(totL)}</b></div><div class="bar"><i style="width:${Math.max(total,totL)?totL/Math.max(total,totL)*100:0}%;background:#bbb"></i></div>
+       <div class="note" style="margin-top:12px;color:${up?'#0e7a3c':'#c0392b'}">${up?'▲':'▼'} ${Math.abs(chg)}% ${up?'mehr':'weniger'} als im Vormonat</div></div>`;})()}
+     ${(function(){const buyM=(S.sold||[]).filter(x=>isThisMonth(x.buyDate)).reduce((s,x)=>s+(+x.buy||0),0);const sellM=(S.sold||[]).filter(x=>x.sellDate&&isThisMonth(x.sellDate)).reduce((s,x)=>s+(+x.sellPrice||0),0);const mg=(S.sold||[]).filter(x=>x.sellDate&&isThisMonth(x.sellDate)).reduce((s,x)=>s+((+x.sellPrice||0)-(+x.buy||0)),0);return `<div class="card"><b>Ankauf / Verkauf (Monat)</b>
+       <div class="between" style="padding:8px 0;border-bottom:1px solid var(--line)"><span>Angekauft</span><b class="mono">${eur(buyM)}</b></div>
+       <div class="between" style="padding:8px 0;border-bottom:1px solid var(--line)"><span>Verkauft</span><b class="mono">${eur(sellM)}</b></div>
+       <div class="between" style="padding:8px 0"><span>Handels-Marge</span><b class="mono" style="color:${mg<0?'#c0392b':'#0e7a3c'}">${eur(mg)}</b></div></div>`;})()}
    </div>`;
 };
 
@@ -2059,6 +2075,8 @@ views.einstellungen=function(){
        <div><label class="f">Telefon</label><input class="in" value="${SHOP.phone}"></div>
        <div><label class="f">Straße</label><input class="in" value="${SHOP.street}"></div>
        <div><label class="f">PLZ / Ort</label><input class="in" value="${SHOP.zip} ${SHOP.city}"></div></div>
+       <label class="f" style="margin-top:12px">Logo (auf Belegen, Angeboten, Etiketten)</label>
+       <div class="row" style="align-items:center;gap:12px">${(ensureSettings().logo)?`<img src="${ensureSettings().logo}" style="height:44px;max-width:150px;object-fit:contain;border:1px solid var(--line);border-radius:8px;background:#fff;padding:3px">`:'<span class="muted" style="font-size:13px">Kein Logo</span>'}<label class="btn sm" style="cursor:pointer">${ensureSettings().logo?'Logo ändern':'Logo hochladen'}<input type="file" accept="image/*" style="display:none" onchange="logoUpload(this)"></label>${ensureSettings().logo?`<button class="btn sm gho" onclick="logoClear()">Entfernen</button>`:''}</div>
        <button class="btn pri" style="margin-top:12px" onclick="toast('Stammdaten gespeichert')">Speichern</button>
      </div>
      <div class="card"><b>Kasse anbinden</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Kartenzahlung und TSE-konforme Belege – verbinden Sie Ihr vorhandenes Terminal.</p>
