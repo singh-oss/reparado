@@ -268,7 +268,7 @@ const SHOP = {name:"Dein Handy Doc", city:"Balingen", street:"Bahnhofstr. 12", z
 const KEY='reparado_v1';
 let S = load();
 
-function load(){ try{const r=JSON.parse(localStorage.getItem(KEY)); if(r&&r.v===9) return r;}catch(e){} const s=seed(); save(s); return s; }
+function load(){ try{const r=JSON.parse(localStorage.getItem(KEY)); if(r&&r.v===10) return r;}catch(e){} const s=seed(); save(s); return s; }
 function save(x){ localStorage.setItem(KEY, JSON.stringify(x||S)); }
 function uid(p){ return p+Math.random().toString(36).slice(2,7); }
 
@@ -349,7 +349,13 @@ function seed(){
   const requests=[
     {id:'rq1',name:'Katrin Vogel',tel:'+49 176 33221100',mail:'',type:'Smartphone',brand:'Apple',model:'iPhone 13',issue:'Displaytausch',problem:'Display gesprungen, Touch reagiert noch',contact:'Rückruf',besttime:'werktags nachmittags',ts:new Date(d(0)+'T09:20:00').toISOString()},
   ];
-  return {v:9, cust, ord, parts, orders, sold:[], counter:1120, rules: defaultRules(), sales, cash:{connected:''}, mailLog:[], calls:seedCalls(), phone:defaultPhone(), users:defaultUsers(), userId:'u1', insurance:defaultInsurance(), wgLeads, drafts:[], quotes, requests, quoteCounter:1002};
+  // Reaktivierungs-Demo (ältere Aufträge + inaktiver Kunde) — für L5
+  cust.push({id:'cinact',name:'Renate Bauer',tel:'+49 170 8887766',mail:'r.bauer@web.de',adr:'Lindenweg 2, 72336 Balingen'});
+  cust.push({id:'cakku',name:'Stefan Krämer',tel:'+49 176 5544332',mail:'s.kraemer@web.de',adr:'Talstraße 7, 72336 Balingen'});
+  ord.push({id:'oreact1',nr:'REP-0990',cid:'cakku',brand:'Apple',model:'iPhone 12',imei:'',issue:'Akkutausch',qual:'Original',price:69,status:'abgeholt',prio:'Standard',created:d(-470),due:d(-468),readyAt:d(-467),pickedAt:d(-466),warranty:6,sig:'',source:'',devices:[{typ:'Smartphone',brand:'Apple',model:'iPhone 12',imei:'',fach:'',ref:'',reparatur:'Akkutausch',qual:'Original',price:69,warranty:6}]});
+  ord.push({id:'oreact2',nr:'REP-1050',cid:'c4',brand:'Samsung',model:'Galaxy S22',imei:'',issue:'Displaytausch',qual:'Original',price:209,status:'abgeholt',prio:'Standard',created:d(-172),due:d(-170),readyAt:d(-169),pickedAt:d(-168),warranty:6,sig:'',source:'',devices:[{typ:'Smartphone',brand:'Samsung',model:'Galaxy S22',imei:'',fach:'',ref:'',reparatur:'Displaytausch',qual:'Original',price:209,warranty:6}]});
+  ord.push({id:'oreact3',nr:'REP-0900',cid:'cinact',brand:'Apple',model:'iPhone 11',imei:'',issue:'Displaytausch',qual:'Kopie',price:99,status:'abgeholt',prio:'Standard',created:d(-370),due:d(-368),readyAt:d(-367),pickedAt:d(-366),warranty:6,sig:'',source:'',devices:[{typ:'Smartphone',brand:'Apple',model:'iPhone 11',imei:'',fach:'',ref:'',reparatur:'Displaytausch',qual:'Kopie',price:99,warranty:6}]});
+  return {v:10, cust, ord, parts, orders, sold:[], counter:1120, rules: defaultRules(), sales, cash:{connected:''}, mailLog:[], calls:seedCalls(), phone:defaultPhone(), users:defaultUsers(), userId:'u1', insurance:defaultInsurance(), wgLeads, drafts:[], quotes, requests, quoteCounter:1002, feedback:[], reactDone:[]};
 }
 function defaultPhone(){return {active:true, mode:'overflow',
   greeting:'Herzlich willkommen bei Dein Handy Doc. Ich bin die digitale Assistentin. Wie kann ich Ihnen helfen?',
@@ -1207,10 +1213,38 @@ views.kalender=function(){
 };
 
 /* ============================ KUNDEN ============================ */
+/* ---- Reaktivierung (L5): KI findet Wiederkehr-Chancen ---- */
+function reactivationOps(){
+  const now=Date.now(), MO=1000*60*60*24*30.4, DAY=1000*60*60*24, done=S.reactDone||[], ops=[];
+  S.cust.forEach(c=>{ const co=S.ord.filter(o=>o.cid===c.id&&!o.trashed); if(!co.length)return; const fn=(c.name||'').split(' ')[0]||c.name;
+    let g=null; co.forEach(o=>{const st=o.pickedAt||o.readyAt; if(st&&o.warranty){const until=new Date(addMonths(st,o.warranty)).getTime(); const dl=(until-now)/DAY; if(dl>0&&dl<=30&&(!g||dl<g.dl))g={o,dl};}});
+    if(g){ops.push({cid:c.id,name:c.name,type:'garantie',label:'Garantie endet',reason:'Garantie endet in '+Math.round(g.dl)+' Tagen · '+oDevLabel(g.o),msg:'Hallo '+fn+', die Garantie auf Ihre Reparatur ('+oDevLabel(g.o)+') endet in Kürze. Ist alles in Ordnung mit dem Gerät? Melden Sie sich gern.'});return;}
+    const bat=co.filter(o=>(oIssueLabel(o)+' '+oDevices(o).map(d=>d.reparatur).join(' ')).toLowerCase().indexOf('akku')>=0);
+    if(bat.length){const b=bat.reduce((a,x)=>((a.created||'')>(x.created||'')?a:x)); const mo=(now-new Date(b.pickedAt||b.readyAt||b.created).getTime())/MO; if(mo>=14){ops.push({cid:c.id,name:c.name,type:'akku',label:'Akku fällig',reason:'Akkutausch vor ~'+Math.round(mo)+' Monaten · '+oDevLabel(b),msg:'Hallo '+fn+', vor gut einem Jahr haben wir den Akku Ihres '+oDevLabel(b)+' erneuert. Lässt die Laufzeit nach? Wir prüfen ihn gern und tauschen bei Bedarf.'});return;}}
+    const last=co.reduce((a,x)=>((a.created||'')>(x.created||'')?a:x)); const lm=(now-new Date(last.pickedAt||last.readyAt||last.created).getTime())/MO;
+    if(lm>=10&&lm<48){ops.push({cid:c.id,name:c.name,type:'winback',label:'Lange nicht da',reason:'seit ~'+Math.round(lm)+' Monaten nicht mehr da',msg:'Hallo '+fn+', lange nicht gesehen! Falls ein Gerät zwickt – Display, Akku, Ladebuchse – wir sind für Sie da.'});}
+  });
+  const pr={garantie:0,akku:1,winback:2}; return ops.filter(o=>done.indexOf(o.cid+':'+o.type)<0).sort((a,b)=>pr[a.type]-pr[b.type]);
+}
+function reactOutreach(cid,type){const c=cust(cid);S.reactDone=S.reactDone||[];S.reactDone.push(cid+':'+type);S.mailLog.unshift({t:new Date().toISOString(),to:c.name,ch:'E-Mail',rule:'Reaktivierung ('+type+')',subj:'Wir denken an Sie – '+SHOP.name,how:'manuell'});save();views.kunden();paintIcons();toast('Kunde angeschrieben (Demo): '+c.name);}
+function reactDismiss(cid,type){S.reactDone=S.reactDone||[];S.reactDone.push(cid+':'+type);save();views.kunden();paintIcons();}
+function reactAll(){const ops=reactivationOps();ops.forEach(o=>{S.reactDone=S.reactDone||[];S.reactDone.push(o.cid+':'+o.type);S.mailLog.unshift({t:new Date().toISOString(),to:o.name,ch:'E-Mail',rule:'Reaktivierung ('+o.type+')',subj:'Wir denken an Sie',how:'manuell'});});save();views.kunden();paintIcons();toast(ops.length+' Kunden angeschrieben (Demo)');}
+const REACT_COL={garantie:'#0e7a3c',akku:'#d99a00',winback:'#6b7280'};
+function reactCard(){const ops=reactivationOps();if(!ops.length)return '';
+  return `<div class="card" style="margin-top:16px;border:1px solid var(--green)"><div class="between"><b>Reaktivierungs-Chancen (KI)</b><div class="row"><span class="muted" style="font-size:12px;align-self:center">${ops.length} Kunden ansprechbar</span><button class="btn sm pri" onclick="reactAll()">Alle anschreiben</button></div></div>
+    <p class="muted" style="font-size:13px;margin:4px 0 10px">Kunden, bei denen sich ein Kontakt lohnt – Akku am Lebensende, Garantie läuft aus oder lange nicht mehr da. Wiederkehr-Umsatz aus Bestandsdaten.</p>
+    ${ops.slice(0,8).map(o=>`<div class="listitem"><span class="pill" style="border-color:${REACT_COL[o.type]};color:${REACT_COL[o.type]}"><span class="d" style="background:${REACT_COL[o.type]}"></span>${o.label}</span>
+      <div style="flex:1;min-width:0"><b>${esc(o.name)}</b><div class="muted" style="font-size:12px">${esc(o.reason)}</div></div>
+      <button class="btn sm" onclick="reactOutreach('${o.cid}','${o.type}')">Ansprechen</button><button class="btn sm gho" onclick="reactDismiss('${o.cid}','${o.type}')">Verwerfen</button></div>`).join('')}
+    ${ops.length>8?`<div class="muted" style="font-size:12px;margin-top:6px">+${ops.length-8} weitere</div>`:''}
+  </div>`;
+}
+function quickCustomer2(){const name=prompt('Name des Kunden:');if(!name)return;const tel=prompt('Telefon:')||'';const mail=prompt('E-Mail (optional):')||'';S.cust.push({id:uid('c'),name,tel,mail,adr:''});save();views.kunden();paintIcons();toast('Kunde angelegt');}
 views.kunden=function(){
   const m=document.getElementById('main');
   m.innerHTML=`<div class="between"><div><h1 class="h1">Kunden</h1><p class="sub">${S.cust.length} Kunden</p></div>
      <div class="row"><button class="btn" onclick="toast('CSV importiert (Demo)')">CSV Import</button><button class="btn pri" onclick="quickCustomer2()">Neuer Kunde</button></div></div>
+   ${reactCard()}
    <div class="card" style="margin-top:16px;padding:0;overflow:auto"><table>
      <thead><tr><th>Name</th><th>Telefon</th><th>E-Mail</th><th>Adresse</th><th>Aufträge</th></tr></thead>
      <tbody>${S.cust.map(c=>`<tr onclick="custProfile('${c.id}')">
@@ -1218,7 +1252,6 @@ views.kunden=function(){
        <td class="mono">${esc(c.tel)||'—'}</td><td>${esc(c.mail)||'—'}</td><td class="muted">${esc(c.adr)||'—'}</td>
        <td>${S.ord.filter(o=>o.cid===c.id).length}</td></tr>`).join('')}</tbody></table></div>`;
 };
-function quickCustomer2(){ quickCustomer(); setTimeout(()=>{closeAll();go('kunden');},50); }
 function custProfile(id){
   const c=cust(id); const os=S.ord.filter(o=>o.cid===id);
   openDrawerHTML(`<div class="dhead"><b style="flex:1">${esc(c.name)}</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
