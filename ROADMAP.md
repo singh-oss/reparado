@@ -1,0 +1,118 @@
+# Reparado — Produkt-Roadmap
+
+> **Positionierung:** RepairDash ist ein **Verwaltungs-System** (dokumentiert, was der Shop tut).
+> Reparado wird ein **Mitarbeiter** (erledigt Arbeit + bringt Umsatz) — dank KI-Diagnose & KI-Empfangskraft, die RepairDash fehlen.
+> **Ziel:** erst Parität bei den Basics, dann per KI/Marge/Bindung an RepairDash **vorbeiziehen**.
+
+**Stand:** 18.8.2026 · Quelle: kompletter RepairDash-Durchgang (Lücken-Analyse) + „Besser-als"-Ideation.
+
+---
+
+## Legende
+- **Effort:** S = klein (Std./1 Tag) · M = mittel (Tage) · L = groß (Woche+)
+- **Impact:** ★★★ sehr hoch · ★★ hoch · ★ solide
+- **Typ:** `[Parität]` = RepairDash einholen · `[Leap]` = besser werden · `[Fundament]` = echtes System
+- **Status im Prototyp:** vieles wird zuerst **client-seitig/simuliert** gebaut (Demo-tauglich), später im echten System gehärtet.
+
+---
+
+## 🎯 Now / Next / Later (Kurzüberblick)
+
+**NOW — Phase 1 + 2 (Fundament-Basics + die 3 Killer-Wedges)**
+Katalog selbst pflegen · konfigurierbare Status+Automatik · Foto-Diagnose → Auto-Angebot · Bewertungs-Booster · Reaktivierung · echte Marge.
+
+**NEXT — Phase 3 + 4**
+Warenwirtschaft & Teile-Intelligenz · Kundenerlebnis (Live-Fotos, QR-Akte, Self-Check-in) · Widget-Konfig · Auftragslisten-/Kassen-Politur.
+
+**LATER — Phase 5 + Track F**
+Wachstums-Motoren (Versandreparatur, B2B, Forecast) · **Echtes System** (DB, Auth, TSE, E-Rechnung, Hosting).
+
+---
+
+## Phase 1 — Fundament des Produkts (schaltet alles andere frei)
+*Die erste Frage jedes Shops: „Kann ich meine eigenen Preise/Abläufe einstellen?"*
+
+| # | Feature | Typ | Effort | Impact | Abhängig |
+|---|---|---|---|---|---|
+| P1 | **Selbst-pflegbarer Katalog** — Gerätetypen→Marken→Modelle, Reparaturarten, Preise pro Modell×Reparatur, Qualitätsoptionen, Sichtbarkeit | Parität 🔴 | L | ★★★ | — (Basis für Preise, Angebote, Widget) |
+| P3 | **Konfigurierbare Status + Automatisierungen** — Status anlegen/sortieren/Farbe/Icon, je Status Auto-E-Mail/SMS mit Vorlage | Parität 🔴 | M–L | ★★★ | — |
+| P8 | **Systemeinstellungen** — Reparatur-Nummernschema, Pflichtfelder wählbar, AGB-Text | Parität 🟠 | S–M | ★★ | — |
+| P12 | **Auftragsliste-Politur** — Inline-Status in der Liste, Sortierung, Bulk-Auswahl, Filter (Termin/Versand/Express), Spalten Fach/Referenz/Termin, **Archiv**, **Papierkorb** | Parität 🟡 | M | ★★ | — |
+
+## Phase 2 — Die 3 Killer-Wedges (das Wow, das verkauft)
+*Nutzt euren KI-Vorsprung — RepairDash kann das nicht.*
+
+| # | Feature | Typ | Effort | Impact | Abhängig |
+|---|---|---|---|---|---|
+| L1 | **📸 Foto-Diagnose** — Gerät fotografieren → KI erkennt Schaden, schlägt Reparatur+Teil+Preis vor (Annahme + online) | Leap ★ | M | ★★★ | erweitert KI-Diagnose |
+| L2 | **⚡ Auto-Angebot aus Anfrage** — Website-Anfrage → KI schreibt Angebot fertig, 1 Klick „senden" | Leap ★ | M | ★★★ | P1, L1 |
+| L6 | **⭐ Bewertungs-Booster** — nach Abholung nur zufriedene Kunden (Sentiment-Gate) um Google-Bewertung bitten | Leap | S–M | ★★★ | — |
+| L5 | **🔁 Reaktivierung** — KI findet fällige Kunden (Akku vor 18 Mon., Garantie läuft aus) → Outreach | Leap | M | ★★★ | — |
+| L9 | **💰 Echte Marge pro Auftrag** — Preis − Teilekosten − Zeit = echter Gewinn, Verlust-Reparaturen sichtbar | Leap | M | ★★★ | Teilekosten aus P2 |
+
+## Phase 3 — Warenwirtschaft & Teile-Intelligenz
+*Zusammenhängender Block; Marge & Bestellungen hängen daran.*
+
+| # | Feature | Typ | Effort | Impact | Abhängig |
+|---|---|---|---|---|---|
+| P2 | **Warenwirtschaft** — Kategorien, Wareneingang, Inventur, Lagerbewegungen, Lieferanten, Eingangsrechnungen, Lagerwert, niedrige Bestände | Parität 🔴 | L | ★★★ | — |
+| P5 | **Bestellwesen** — Lager- vs. Kundenbestellung, Lieferant je Bestellung, Bestellliste drucken, Filter/Status/Priorität | Parität 🟠 | M | ★★ | P2 |
+| L10 | **🔎 Ersatzteil-Preisvergleich** über Lieferanten + Preishistorie | Leap | M | ★★ | P2 |
+| L11 | **♻️ Auto-Nachbestellung** bei niedrigem Bestand | Leap | S | ★★ | P2 |
+| P6 | **Ankauf/Verkauf-Tiefe** — Profit je Gerät, Lagerwert, Status Reserviert, Import | Parität 🟠 | M | ★ | — |
+| P4 | **Wunsch-Handy-Liste** — Kundenmerkliste + Auto-Benachrichtigung bei Ankauf | Parität 🟠 | S | ★ | P6 |
+
+## Phase 4 — Kundenerlebnis & Alltags-Politur
+*Bindung + die restliche Parität.*
+
+| # | Feature | Typ | Effort | Impact |
+|---|---|---|---|---|
+| L12 | **🖼️ Live-Status mit Foto-Updates** (killt „ist-es-fertig"-Anrufe) | Leap | M | ★★ |
+| L13 | **📱 Digitale Geräte-Akte per QR** (Historie/Garantie/frühere Reparaturen) | Leap | M | ★★ |
+| L14 | **🖥️ Self-Check-in-Terminal** (Kiosk-Modus ausbauen zur Selbstannahme) | Leap | S–M | ★★ |
+| L15 | **🛡️ Garantie-Portal** für Kunden (Status sehen, Fall melden) | Leap | M | ★ |
+| L7 | **📦 „Nicht abgeholt"-Workflow** (eskalierend + Lagergebühr) | Leap | S–M | ★★ |
+| L8 | **🛒 Upsell an der Kasse** (Panzerglas/Hülle vorschlagen) | Leap | S | ★ |
+| L18 | **⚖️ Rechtssichere digitale Übergabe** (Datenverlust-Waiver/DSGVO signiert) | Leap | S | ★★ |
+| L4 | **💬 Proaktive Kundenkommunikation** (Empfangskraft treibt aktiv) | Leap | M | ★★ |
+| L3 | **🔧 Techniker-Playbook** (KI-Reparaturanleitung, macht Azubis produktiv) | Leap | M | ★★ |
+| L16 | **🧠 KI-Tagesbriefing** (Chef-Cockpit — aus Agenten-Büro übernehmen) | Leap | M | ★★ |
+| P10 | **Repair-Widget-Konfig** — Preise/Styling, iframe-Embed, **WordPress-Plugin**, Standardpreise | Parität 🟠 | M–L | ★★ |
+| P14 | **Kasse-Politur** — Barcode/IMEI-Scan, Artikelkatalog+Kategorien, Berichte, Meistverkauft | Parität 🟡 | M | ★ |
+| P13 | **Kunden-Politur** — Pagination, A→Z, Detailseite | Parität 🟡 | S | ★ |
+| P16 | **Detaillierte Statistik** — Monatsvergleich, Reparatur/Verkauf/Ankauf | Parität 🟡 | S–M | ★ |
+| P15 | **Top-Bar-Werkzeuge** — Schnell-Kasse, Benachrichtigungs-Center, globaler Scanner | Parität 🟡 | S | ★ |
+| P9 | **Benutzer & Berechtigungen granular** (frei definierbare Rechte) | Parität 🟠 | M | ★ |
+| P7 | **Benachrichtigungen** — E-Mail-Vorlagen-Editor, SMS, SMTP-Konfig | Parität 🟠 | M | ★★ |
+
+## Phase 5 — Wachstums-Motoren
+| # | Feature | Typ | Effort | Impact |
+|---|---|---|---|---|
+| L20 | **📮 Versandreparatur end-to-end** (Prepaid-Label, Tracking, Fernannahme) | Leap | M–L | ★★ |
+| L21 | **🏢 B2B-Verträge** (Gerätepools, SLA, Monatsabrechnung — wiederkehrender Umsatz) | Leap | L | ★★ |
+| L17 | **📈 Forecast + Filial-Benchmark** (Franchise) | Leap | M | ★ |
+| L19 | **🏥 Mehr Versicherer** neben Wertgarantie + Direktabrechnung | Leap | M | ★ |
+| P11 | **Integrationen** — HelloCash, SumUp, Lexware, Google Bewertungen | Parität 🟠 | M | ★ |
+
+---
+
+## Track F — Echtes System (parallel, sobald echte Kunden/echtes Geld)
+*Bis dahin bleibt alles Prototyp/simuliert. Reihenfolge F1→F2 zuerst. Bauplan existiert bereits im **Agenten-Büro**.*
+
+| # | Baustein | Effort | Warum |
+|---|---|---|---|
+| F1 | **Datenbank/Backend (Supabase)** — localStorage → echte DB, Multi-User-Sync, Backup | L | ohne das kein echter Mehrplatz-Betrieb |
+| F2 | **Auth + server-seitige Rollen (RLS)** — Login sicher, „Techniker sieht kein Umsatz" wirklich durchgesetzt | M | Sicherheit |
+| F3 | **Mail/SMS-Versand real** (SMTP + SMS-Gateway) | M | schaltet alle Auto-Nachrichten scharf |
+| F4 | **Echte TSE** (fiskaly) — KassenSichV-konform | M | gesetzlich Pflicht |
+| F5 | **Buchhaltung/E-Rechnung/DATEV** (aus Agenten-Büro übernehmen) | M | GoBD, echte Rechnungen |
+| F6 | **Hosting/Deploy** (Hetzner + Caddy + systemd, wie Agenten-Büro) | S–M | 24/7-Betrieb |
+
+---
+
+## Sofort-Empfehlung (wenn nur ein Block)
+**Phase 1 (Katalog + Status/Automatik) + die 3 Wedges aus Phase 2 (Foto-Diagnose→Auto-Angebot, Bewertungs-Booster, Reaktivierung).**
+Das gibt dem Partner beides: „ich kann es an meinen Shop anpassen" **und** „das bringt mir Geld, was RepairDash nicht kann."
+
+## Bereits erledigt (Fundament steht schon)
+Auftragserstellung (Mehrgeräte, Entwurf-Autospeicherung) · Angebote + Website-Anfragen · Benutzer/Rollen (Prototyp) · Wertgarantie-Modul · KI-Diagnose · KI-Empfangskraft (Telefon/WhatsApp) · Kasse+TSE (simuliert) · Buchhaltung EÜR/USt/DATEV (simuliert) · Kiosk-/QR-Unterschrift · Online-Buchung.
