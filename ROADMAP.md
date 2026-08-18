@@ -69,15 +69,15 @@ Wachstums-Motoren (Versandreparatur, B2B, Forecast) · **Echtes System** (DB, Au
 |---|---|---|---|---|
 | ✅ L12 | **🖼️ Live-Status mit Foto-Updates** (Werkstattfotos auf der Kunden-Statusseite) · **FERTIG 18.8.** | Leap | M | ★★ |
 | ✅ L13 | **📱 Digitale Geräte-Akte per QR** (QR im Drawer + Reparatur-Historie auf Statusseite) · **FERTIG 18.8.** | Leap | M | ★★ |
-| L14 | **🖥️ Self-Check-in-Terminal** (Kiosk-Modus ausbauen zur Selbstannahme) | Leap | S–M | ★★ |
+| ✅ L14 | **🖥️ Self-Check-in-Terminal** (Vollbild-Selbstannahme + Unterschrift → Auftrag) · **FERTIG 18.8.** | Leap | S–M | ★★ |
 | ✅ L15 | **🛡️ Garantie-Portal** (Kunde sieht Garantie, meldet Fall → Dashboard-Inbox) · **FERTIG 18.8.** | Leap | M | ★ |
 | ✅ L7 | **📦 „Nicht abgeholt"-Workflow** (eskalierende Stufen + Lagergebühr) · **FERTIG 18.8.** | Leap | S–M | ★★ |
 | ✅ L8 | **🛒 Upsell an der Kasse** (Zubehör bei Reparatur im Warenkorb) · **FERTIG 18.8.** | Leap | S | ★ |
 | ✅ B2 | **Fotos am Auftrag** (Upload+Galerie im Drawer, aus Diagnose übernommen) · **FERTIG 18.8.** | Leap | S–M | ★★ |
 | L18 | **⚖️ Rechtssichere digitale Übergabe** (Datenverlust-Waiver/DSGVO signiert) | Leap | S | ★★ |
 | L4 | **💬 Proaktive Kundenkommunikation** (Empfangskraft treibt aktiv) | Leap | M | ★★ |
-| L3 | **🔧 Techniker-Playbook** (KI-Reparaturanleitung, macht Azubis produktiv) | Leap | M | ★★ |
-| L16 | **🧠 KI-Tagesbriefing** (Chef-Cockpit — aus Agenten-Büro übernehmen) | Leap | M | ★★ |
+| ✅ L3 | **🔧 Techniker-Playbook** (KI-Reparaturanleitung je Reparaturart im Auftrag) · **FERTIG 18.8.** | Leap | M | ★★ |
+| ✅ L16 | **🧠 KI-Tagesbriefing** (Chef-Cockpit auf dem Dashboard, GF-only) · **FERTIG 18.8.** | Leap | M | ★★ |
 | P10 | **Repair-Widget-Konfig** — Preise/Styling, iframe-Embed, **WordPress-Plugin**, Standardpreise | Parität 🟠 | M–L | ★★ |
 | P14 | **Kasse-Politur** — Barcode/IMEI-Scan, Artikelkatalog+Kategorien, Berichte, Meistverkauft | Parität 🟡 | M | ★ |
 | ✅ P13 | **Kunden-Politur** — Suche, A→Z-Sortierung, Pagination · **FERTIG 18.8.** | Parität 🟡 | S | ★ |
