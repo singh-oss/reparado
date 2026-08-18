@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anfrage & Rückruf · Dein Handy Doc</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root{--ink:#0f2318;--ink2:#5f6b64;--line:#eaedeb;--soft:#f5f8f6;--green:#0e7a3c;--ring:0 0 0 3px rgba(14,122,60,.16)}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:#fff;letter-spacing:-.006em;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  ::selection{background:rgba(14,122,60,.14)}
+  svg{display:block}
+  .top{border-bottom:1px solid var(--line);padding:16px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;background:#fff;z-index:5}
+  .top .dot{width:30px;height:30px;border-radius:9px;background:#0e7a3c;color:#fff;display:grid;place-items:center;font-weight:800}
+  .top b{font-size:17px;letter-spacing:-.3px}
+  .top .m{margin-left:auto;color:var(--ink2);font-size:13px}
+  .wrap{max-width:580px;margin:0 auto;padding:24px 20px 60px}
+  .steps{display:flex;gap:8px;margin-bottom:22px}
+  .steps .s{flex:1;height:5px;border-radius:20px;background:var(--soft)}
+  .steps .s.on{background:#0e7a3c}
+  h1{font-size:26px;letter-spacing:-.8px;margin-bottom:4px}
+  .sub{color:var(--ink2);margin-bottom:20px}
+  .grid{display:grid;gap:10px}
+  .g2{grid-template-columns:1fr 1fr}
+  .g3{grid-template-columns:1fr 1fr 1fr}
+  .g4{grid-template-columns:1fr 1fr 1fr 1fr}
+  @media(max-width:520px){.g4{grid-template-columns:1fr 1fr}}
+  .opt{border:1px solid var(--line);border-radius:12px;padding:15px;font-weight:700;cursor:pointer;transition:.12s;text-align:left;background:#fff;display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .opt:hover{border-color:#0e7a3c}
+  .opt.on{background:#0e7a3c;color:#fff;border-color:#0e7a3c}
+  .tile{border:1px solid var(--line);border-radius:14px;padding:16px 10px;cursor:pointer;transition:.12s;text-align:center;background:#fff;font-weight:700;font-size:14px}
+  .tile:hover{border-color:#0e7a3c}
+  .tile.on{background:#0e7a3c;color:#fff;border-color:#0e7a3c}
+  .tile .ic{display:block;margin:0 auto 8px}
+  .in{width:100%;border:1px solid var(--line);border-radius:12px;padding:13px 14px;outline:0;font-size:15px;margin-top:4px;font-family:inherit}
+  .in:focus{border-color:#0e7a3c;box-shadow:var(--ring)}
+  textarea.in{min-height:90px;resize:vertical}
+  label{font-size:12px;font-weight:700;color:#333;display:block;margin-top:16px}
+  .nav{display:flex;gap:10px;margin-top:24px}
+  .btn{flex:1;border:1px solid var(--line);background:#fff;border-radius:12px;padding:14px;font-weight:700;font-size:15px;cursor:pointer;font-family:inherit}
+  .btn.pri{background:#0e7a3c;color:#fff;border-color:#0e7a3c}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .summary{border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
+  .summary .r{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);gap:12px}
+  .summary .r:last-child{border:0}
+  .summary .r b{font-weight:800;text-align:right}
+  .done{text-align:center;padding:30px 10px}
+  .done .ck{width:64px;height:64px;border-radius:50%;background:#0e7a3c;color:#fff;display:grid;place-items:center;margin:0 auto 18px}
+  .note{background:var(--soft);border-radius:12px;padding:12px 14px;font-size:13px;color:#444;margin-top:16px}
+  .foot{text-align:center;color:var(--ink2);font-size:13px;margin-top:26px}
+  .chk{display:flex;gap:10px;align-items:flex-start;margin-top:16px;font-size:13px;color:#444}
+  .chk input{margin-top:2px}
+  .callnow{display:flex;align-items:center;gap:10px;background:var(--soft);border-radius:12px;padding:12px 14px;margin-bottom:18px;font-size:14px}
+  .callnow a{color:#0e7a3c;font-weight:800;text-decoration:none;margin-left:auto}
+</style>
+</head>
+<body>
+<div class="top"><span class="dot">D</span><b>Dein Handy Doc</b><span class="m">Anfrage & Rückruf</span></div>
+<div class="wrap">
+  <div class="callnow">Lieber direkt sprechen?<a href="tel:074339678444">07433 9678444</a></div>
+  <div class="steps"><div class="s on" id="s1"></div><div class="s" id="s2"></div><div class="s" id="s3"></div></div>
+  <div id="view"></div>
+  <div class="foot">Bahnhofstr. 12 · 72336 Balingen · 07433 9678444</div>
+</div>
+
+<script>
+const TYPES=['Smartphone','Tablet','Smartwatch','Laptop','Konsole','E-Scooter','Kopfhörer','Sonstiges'];
+const CATALOG={
+  Apple:['iPhone 15 Pro','iPhone 15','iPhone 14 Pro','iPhone 14','iPhone 13','iPhone 12','iPhone 11','iPhone SE','iPad Air','Anderes Modell'],
+  Samsung:['Galaxy S24','Galaxy S23','Galaxy A55','Galaxy A54','Galaxy A34','Galaxy A14','Galaxy S22','Anderes Modell'],
+  Xiaomi:['Redmi Note 14 Pro 5G','Redmi Note 13','Redmi Note 12','Redmi Note 8 Pro','Poco F5','Anderes Modell'],
+  Google:['Pixel 8 Pro','Pixel 8','Pixel 7','Pixel 6a','Anderes Modell'],
+  Huawei:['P30 Pro','P40 Lite','Mate 20','Anderes Modell'],
+  'Andere Marke':['Anderes Modell'],
+};
+const REPS=['Displaytausch','Akkutausch','Ladebuchse','Rückkamera','Backcover / Rückglas','Wasserschaden','Software / Datenrettung','Weiß ich nicht / anderes'];
+const CONTACT=['Rückruf','E-Mail','WhatsApp'];
+const state={step:1, type:'', brand:'', model:'', issue:'', problem:'', contact:'Rückruf', besttime:'', name:'', tel:'', mail:''};
+const CK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" width="30" height="30"><path d="M20 6L9 17l-5-5"/></svg>';
+function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function setStep(n){state.step=n;[1,2,3].forEach(i=>document.getElementById('s'+i).classList.toggle('on',i<=n));render();window.scrollTo(0,0);}
+function render(){
+  const v=document.getElementById('view');
+  if(state.step===1){
+    v.innerHTML=`<h1>Um welches Gerät geht es?</h1><p class="sub">Gerätetyp, Marke und Modell wählen – oder einfach „Anderes".</p>
+      <div class="grid g4">${TYPES.map(t=>`<div class="tile ${state.type===t?'on':''}" onclick="pickType('${t}')">${t}</div>`).join('')}</div>
+      ${state.type?`<label>Marke</label><div class="grid g3" style="margin-top:6px">${Object.keys(CATALOG).map(b=>`<button class="opt ${state.brand===b?'on':''}" style="justify-content:center" onclick="pickBrand('${esc(b)}')">${b}</button>`).join('')}</div>`:''}
+      ${state.brand?`<label>Modell</label><div class="grid g2" style="margin-top:6px">${CATALOG[state.brand].map(mo=>`<button class="opt ${state.model===mo?'on':''}" onclick="pickModel('${esc(mo)}')">${mo}</button>`).join('')}</div>`:''}
+      <div class="nav"><button class="btn pri" ${state.type&&state.brand&&state.model?'':'disabled'} onclick="setStep(2)">Weiter</button></div>`;
+  } else if(state.step===2){
+    v.innerHTML=`<h1>Was sollen wir für Sie tun?</h1><p class="sub">${esc(state.brand)} ${esc(state.model)}</p>
+      <div class="grid g2">${REPS.map(r=>`<button class="opt ${state.issue===r?'on':''}" style="justify-content:center;text-align:center" onclick="pickIssue('${esc(r)}')">${r}</button>`).join('')}</div>
+      <label>Problem genauer beschreiben (optional)</label>
+      <textarea class="in" id="pb" placeholder="z. B. Display gesprungen, Handy geht nicht mehr an, ins Wasser gefallen…">${esc(state.problem)}</textarea>
+      <label>Wie sollen wir uns melden?</label>
+      <div class="grid g3" style="margin-top:6px">${CONTACT.map(c=>`<button class="opt ${state.contact===c?'on':''}" style="justify-content:center" onclick="state.contact='${c}';render()">${c}</button>`).join('')}</div>
+      <label>Wann erreichen wir Sie am besten? (optional)</label>
+      <input class="in" id="bt" value="${esc(state.besttime)}" placeholder="z. B. werktags nachmittags">
+      <div class="nav"><button class="btn" onclick="grab();setStep(1)">Zurück</button><button class="btn pri" ${state.issue?'':'disabled'} onclick="grab();setStep(3)">Weiter</button></div>`;
+  } else if(state.step===3){
+    v.innerHTML=`<h1>Ihre Kontaktdaten</h1><p class="sub">Wir melden uns mit einem unverbindlichen Angebot.</p>
+      <div class="summary">
+        <div class="r"><span>Gerät</span><b>${esc(state.brand)} ${esc(state.model)}</b></div>
+        <div class="r"><span>Anliegen</span><b>${esc(state.issue)}</b></div>
+        ${state.problem?`<div class="r"><span>Beschreibung</span><b>${esc(state.problem)}</b></div>`:''}
+        <div class="r"><span>Kontakt per</span><b>${esc(state.contact)}</b></div>
+      </div>
+      <label>Name</label><input class="in" id="n" value="${esc(state.name)}" placeholder="Vor- und Nachname">
+      <label>Telefon</label><input class="in" id="t" value="${esc(state.tel)}" placeholder="Für den Rückruf">
+      <label>E-Mail ${state.contact==='E-Mail'?'':'(optional)'}</label><input class="in" id="m" value="${esc(state.mail)}" placeholder="Für die Antwort">
+      <div class="chk"><input type="checkbox" id="dsg"><label for="dsg" style="margin:0;font-weight:500;color:#444">Ich bin mit der Verarbeitung meiner Angaben zur Bearbeitung der Anfrage einverstanden.</label></div>
+      <div class="note">Unverbindliche Anfrage – es entstehen keine Kosten. Der endgültige Preis wird erst nach Prüfung des Geräts genannt.</div>
+      <div class="nav"><button class="btn" onclick="setStep(2)">Zurück</button><button class="btn pri" onclick="submit()">Anfrage absenden</button></div>`;
+  } else if(state.step===4){
+    v.innerHTML=`<div class="done"><div class="ck">${CK}</div>
+      <h1>Anfrage gesendet</h1><p class="sub">Vielen Dank, ${esc(state.name.split(' ')[0]||'')}. Wir melden uns zeitnah per ${esc(state.contact)} mit einem Angebot.</p>
+      <div class="summary" style="text-align:left">
+        <div class="r"><span>Gerät</span><b>${esc(state.brand)} ${esc(state.model)}</b></div>
+        <div class="r"><span>Anliegen</span><b>${esc(state.issue)}</b></div>
+        <div class="r"><span>Kontakt per</span><b>${esc(state.contact)}</b></div>
+      </div>
+      <div class="note">In der Regel antworten wir innerhalb eines Werktags. Bei dringenden Fällen erreichen Sie uns unter 07433 9678444.</div>
+      <div class="nav"><button class="btn pri" onclick="reset()">Neue Anfrage</button></div></div>`;
+  }
+}
+function pickType(t){state.type=t;render();}
+function pickBrand(b){state.brand=b;state.model='';render();}
+function pickModel(m){state.model=m;render();}
+function pickIssue(i){state.issue=i;render();}
+function grab(){var p=document.getElementById('pb');if(p)state.problem=p.value;var b=document.getElementById('bt');if(b)state.besttime=b.value;}
+function submit(){
+  state.name=document.getElementById('n').value.trim();
+  state.tel=document.getElementById('t').value.trim();
+  state.mail=document.getElementById('m').value.trim();
+  if(!state.name||!state.tel){alert('Bitte Name und Telefon angeben.');return;}
+  if(!document.getElementById('dsg').checked){alert('Bitte bestätigen Sie die Verarbeitung Ihrer Angaben.');return;}
+  if(state.contact==='E-Mail'&&!state.mail){alert('Bitte eine E-Mail-Adresse angeben.');return;}
+  let arr=[];try{arr=JSON.parse(localStorage.getItem('reparado_requests')||'[]');}catch(e){}
+  arr.push({name:state.name,tel:state.tel,mail:state.mail,type:state.type,brand:state.brand,model:state.model,issue:state.issue,problem:state.problem,contact:state.contact,besttime:state.besttime,ts:Date.now()});
+  localStorage.setItem('reparado_requests',JSON.stringify(arr));
+  setStep(4);
+}
+function reset(){Object.assign(state,{step:1,type:'',brand:'',model:'',issue:'',problem:'',contact:'Rückruf',besttime:'',name:'',tel:'',mail:''});[1,2,3].forEach(i=>document.getElementById('s'+i).classList.toggle('on',i===1));render();}
+render();
+</script>
+</body>
+</html>
