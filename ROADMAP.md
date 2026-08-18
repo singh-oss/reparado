@@ -96,6 +96,23 @@ Wachstums-Motoren (Versandreparatur, B2B, Forecast) · **Echtes System** (DB, Au
 
 ---
 
+## 📷 Fotos & Dokumentation (alle Bild-Funktionen an einem Ort)
+*Bilder sind in einer Werkstatt zentral — Haftung, Vertrauen, Diagnose, Katalog. Hier alle Foto-Touchpoints gebündelt.*
+
+| # | Feature | Typ | Phase | Effort | Impact | Warum wichtig |
+|---|---|---|---|---|---|---|
+| B1 | **Zustandsfotos bei Annahme** — Gerät bei Abgabe fotografieren (Kratzer/Dellen/Risse), am Auftrag gespeichert, auf dem Annahmebeleg vermerkt | Leap ★ | 2 | S–M | ★★★ | **Haftungsschutz** — Kunde kann später keinen Vorschaden reklamieren. Standard bei guten Shops. |
+| L1 | **📸 Foto-Diagnose (KI)** — Schaden fotografieren → KI erkennt Reparatur+Teil+Preis | Leap | 2 | M | ★★★ | Schnelles Angebot, online & an der Theke |
+| B2 | **Fotos am Auftrag (Vorher/Nachher, Schaden, Zubehör)** — beliebig viele Bilder je Auftrag, Galerie im Auftrag | Leap | 3 | S–M | ★★ | Beweis der Arbeit, interne Doku, Zubehör-Nachweis |
+| L12 | **🖼️ Live-Status mit Foto-Updates** — Kunde sieht Technikerfotos auf der Statusseite | Leap | 4 | M | ★★ | Vertrauen, killt „ist-es-fertig"-Anrufe |
+| B3 | **Produktbilder im Katalog** — Bild je Modell/Ersatzteil (Warenwirtschaft & Kasse) | Parität | 3 | S | ★ | schnellere Erkennung an der Kasse/im Lager |
+| B4 | **Logo & Briefpapier-Bilder** — eigenes Logo auf Belegen/Etiketten/Angeboten | Parität | 1 | S | ★ | Marken-Auftritt, White-Label |
+| B5 | **Foto vom Personalausweis/Kaufbeleg (Ankauf)** — bei Gebraucht-Ankauf Ident-/Herkunftsnachweis | Leap | 3 | S | ★★ | **Rechtssicherheit Ankauf** (Hehlerei-Schutz, §) |
+
+> **Technik-Hinweis:** Im Prototyp werden Bilder als Data-URL in localStorage gehalten (klein/komprimiert). Im echten System → Supabase Storage (Track F1), mit Thumbnails.
+
+---
+
 ## Track F — Echtes System (parallel, sobald echte Kunden/echtes Geld)
 *Bis dahin bleibt alles Prototyp/simuliert. Reihenfolge F1→F2 zuerst. Bauplan existiert bereits im **Agenten-Büro**.*
 
