@@ -55,7 +55,7 @@ Wachstums-Motoren (Versandreparatur, B2B, Forecast) · **Echtes System** (DB, Au
 
 | # | Feature | Typ | Effort | Impact | Abhängig |
 |---|---|---|---|---|---|
-| P2 | **Warenwirtschaft** — Kategorien, Wareneingang, Inventur, Lagerbewegungen, Lieferanten, Eingangsrechnungen, Lagerwert, niedrige Bestände | Parität 🔴 | L | ★★★ | — |
+| ✅ P2 | **Warenwirtschaft** — Kategorien, Wareneingang, Inventur, Lagerbewegungen, Lieferanten, Lagerwert, niedrige Bestände (EK/VK) · **FERTIG 18.8.** (offen: Eingangsrechnungen/IMAP → mit Buchhaltung) | Parität 🔴 | L | ★★★ | — |
 | P5 | **Bestellwesen** — Lager- vs. Kundenbestellung, Lieferant je Bestellung, Bestellliste drucken, Filter/Status/Priorität | Parität 🟠 | M | ★★ | P2 |
 | L10 | **🔎 Ersatzteil-Preisvergleich** über Lieferanten + Preishistorie | Leap | M | ★★ | P2 |
 | L11 | **♻️ Auto-Nachbestellung** bei niedrigem Bestand | Leap | S | ★★ | P2 |
