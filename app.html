@@ -487,7 +487,15 @@ function oDevLabel(o){ return oDevices(o).map(d=>[d.brand,d.model].filter(Boolea
 function oIssueLabel(o){ return oDevices(o).map(d=>d.reparatur).filter(Boolean).join(' · '); }
 function posRows(o){ return oDevices(o).map(d=>`<tr><td>${esc(d.brand)} ${esc(d.model)} — ${esc(d.reparatur)} (${esc(d.qual)})</td><td style="text-align:right" class="mono">${eur(d.price)}</td></tr>`).join(''); }
 /* Techniker (Mitarbeiter) sehen nur ihnen zugewiesene + noch nicht zugewiesene Aufträge */
-function visibleOrders(){ if(curRole()==='inhaber') return S.ord; const u=S.userId; return S.ord.filter(o=>!o.technikerId||o.technikerId===u); }
+function visRole(){ if(curRole()==='inhaber') return S.ord; const u=S.userId; return S.ord.filter(o=>!o.technikerId||o.technikerId===u); }
+function visibleOrders(){ return visRole().filter(o=>!o.trashed&&!o.archived); } /* operativer Standard */
+function searchOrders(){ return visRole().filter(o=>!o.trashed); } /* Suche: inkl. Archiv */
+function ordArchived(){ return visRole().filter(o=>o.archived&&!o.trashed); }
+function ordTrashed(){ return visRole().filter(o=>o.trashed); }
+/* ---- Systemeinstellungen (P8): Nummernschema, Pflichtfelder, AGB ---- */
+function ensureSettings(){ if(!S.settings){S.settings={orderPrefix:'REP-',quotePrefix:'AN-',required:{imei:false,mail:false,adr:false,sig:false},agb:'Für die Reparatur gelten unsere Allgemeinen Geschäftsbedingungen. Bei Datenverlust wird keine Haftung übernommen – bitte sichern Sie Ihre Daten vor der Abgabe. Die Gewährleistung bezieht sich auf die durchgeführte Reparatur und das eingesetzte Ersatzteil, nicht auf Folgeschäden durch Sturz, Feuchtigkeit oder unsachgemäße Handhabung. Nicht abgeholte Geräte werden nach 90 Tagen kostenpflichtig eingelagert.'};save();} const s=S.settings; if(!s.required)s.required={imei:false,mail:false,adr:false,sig:false}; if(!s.orderPrefix)s.orderPrefix='REP-'; if(!s.quotePrefix)s.quotePrefix='AN-'; return s; }
+function nextOrderNr(){ return (ensureSettings().orderPrefix||'REP-')+(S.counter++); }
+function nextQuoteNr(){ S.quoteCounter=(S.quoteCounter||1000); return (ensureSettings().quotePrefix||'AN-')+(S.quoteCounter++); }
 function eur(n){return '€ '+Number(n||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function initials(n){return (n||'?').split(' ').map(x=>x[0]).slice(0,2).join('').toUpperCase();}
 function today(){return new Date().toISOString().slice(0,10);}
@@ -607,34 +615,64 @@ views.dashboard=function(){
 };
 
 /* ============================ AUFTRÄGE ============================ */
-let aufFilter='alle';
+let aufFilter='alle', aufSort='neu', aufView='aktiv', aufSel={};
+function aufSelCount(){return Object.keys(aufSel).filter(k=>aufSel[k]).length;}
+function aufToggleSel(id){aufSel[id]=!aufSel[id];views.auftraege();paintIcons();}
+function aufSelAll(ids,on){ids.forEach(id=>aufSel[id]=on);views.auftraege();paintIcons();}
+function sortOrders(list){const l=list.slice();if(aufSort==='neu')l.sort((a,b)=>(b.created||'').localeCompare(a.created||'')||String(b.nr).localeCompare(String(a.nr)));else if(aufSort==='alt')l.sort((a,b)=>(a.created||'').localeCompare(b.created||'')||String(a.nr).localeCompare(String(b.nr)));else if(aufSort==='preis')l.sort((a,b)=>oTotal(b)-oTotal(a));else if(aufSort==='faellig')l.sort((a,b)=>(a.due||'zzzz').localeCompare(b.due||'zzzz'));return l;}
+function setStatusRow(id,s){const o=S.ord.find(x=>x.id===id);if(!o)return;o.status=s;if(s==='fertig'&&!o.readyAt)o.readyAt=today();if(s==='abgeholt')o.pickedAt=today();save();const def=statusDef(s);const notified=!!(def&&(def.email||def.sms));if(notified)statusNotify(o,def);toast('Status: '+statusLabel(s)+(notified?' · Kunde benachrichtigt':''));views.auftraege();paintIcons();refreshBadges();}
+function archiveOrder(id){const o=S.ord.find(x=>x.id===id);if(o){o.archived=true;save();closeAll();toast('Auftrag archiviert');views.auftraege();paintIcons();refreshBadges();}}
+function trashOrder(id){const o=S.ord.find(x=>x.id===id);if(o){o.trashed=true;save();closeAll();toast('In den Papierkorb verschoben');views.auftraege();paintIcons();refreshBadges();}}
+function restoreOrder(id){const o=S.ord.find(x=>x.id===id);if(o){o.trashed=false;o.archived=false;save();toast('Wiederhergestellt');views.auftraege();paintIcons();refreshBadges();}}
+function deleteOrderPerm(id){if(!confirm('Auftrag endgültig löschen? Das kann nicht rückgängig gemacht werden.'))return;S.ord=S.ord.filter(x=>x.id!==id);delete aufSel[id];save();toast('Endgültig gelöscht');views.auftraege();paintIcons();refreshBadges();}
+function aufBulk(action){const ids=Object.keys(aufSel).filter(k=>aufSel[k]);if(!ids.length)return;
+  if(action==='archive'){ids.forEach(id=>{const o=S.ord.find(x=>x.id===id);if(o)o.archived=true;});toast(ids.length+' archiviert');}
+  else if(action==='trash'){ids.forEach(id=>{const o=S.ord.find(x=>x.id===id);if(o)o.trashed=true;});toast(ids.length+' in den Papierkorb');}
+  else if(action==='restore'){ids.forEach(id=>{const o=S.ord.find(x=>x.id===id);if(o){o.trashed=false;o.archived=false;}});toast(ids.length+' wiederhergestellt');}
+  else if(action==='delete'){if(!confirm(ids.length+' Aufträge endgültig löschen?'))return;S.ord=S.ord.filter(x=>!aufSel[x.id]);toast(ids.length+' gelöscht');}
+  aufSel={};save();views.auftraege();paintIcons();refreshBadges();}
+function aufBulkStatus(s){const ids=Object.keys(aufSel).filter(k=>aufSel[k]);ids.forEach(id=>{const o=S.ord.find(x=>x.id===id);if(o){o.status=s;if(s==='fertig'&&!o.readyAt)o.readyAt=today();if(s==='abgeholt')o.pickedAt=today();const def=statusDef(s);if(def&&(def.email||def.sms))statusNotify(o,def);}});aufSel={};save();toast(ids.length+' auf „'+statusLabel(s)+'" gesetzt');views.auftraege();paintIcons();refreshBadges();}
 views.auftraege=function(){
   const m=document.getElementById('main');
-  const src=visibleOrders();
-  const counts={alle:src.length};
-  statusFlow().forEach(s=>counts[s]=src.filter(o=>o.status===s).length);
-  const list=src.filter(o=>aufFilter==='alle'?true:o.status===aufFilter);
-  const mine=curRole()!=='inhaber';
+  const arch=ordArchived(), trash=ordTrashed(); const mine=curRole()!=='inhaber';
+  let list, counts={};
+  if(aufView==='archiv'){list=arch;}
+  else if(aufView==='papierkorb'){list=trash;}
+  else{const src=visibleOrders();statusFlow().forEach(s=>counts[s]=src.filter(o=>o.status===s).length);counts.__all=src.length;list=src.filter(o=>aufFilter==='alle'?true:o.status===aufFilter);}
+  list=sortOrders(list);
+  const selN=aufSelCount(); const allIds=list.map(o=>o.id); const allSel=allIds.length&&allIds.every(id=>aufSel[id]);
+  const idsArr='['+allIds.map(id=>`'${id}'`).join(',')+']';
+  const vBtn=(k,l,n)=>`<button class="chip ${aufView===k?'on':''}" onclick="aufView='${k}';aufSel={};aufFilter='alle';views.auftraege();paintIcons()">${l}${n!=null?' · '+n:''}</button>`;
   m.innerHTML=`
-   <div class="between"><div><h1 class="h1">Aufträge</h1><p class="sub">${src.length} Aufträge${mine?' (dir zugewiesen &amp; offen)':' insgesamt'}</p></div>
+   <div class="between"><div><h1 class="h1">Aufträge</h1><p class="sub">${aufView==='archiv'?arch.length+' archiviert':(aufView==='papierkorb'?trash.length+' im Papierkorb':(visibleOrders().length+' Aufträge'+(mine?' (dir zugewiesen &amp; offen)':'')))}</p></div>
      <button class="btn pri" onclick="newOrder()">Neuer Auftrag</button></div>
-   <div class="row" style="margin:16px 0">
-     ${['alle',...statusFlow()].map(s=>`<button class="chip ${aufFilter===s?'on':''}" onclick="aufFilter='${s}';views.auftraege();paintIcons()">${s==='alle'?'Alle':esc(statusLabel(s))} · ${s==='alle'?src.length:(counts[s]||0)}</button>`).join('')}
+   <div class="row" style="margin:14px 0;gap:8px;flex-wrap:wrap;align-items:center">${vBtn('aktiv','Aktiv')}${vBtn('archiv','Archiv',arch.length)}${vBtn('papierkorb','Papierkorb',trash.length)}
+     <span style="flex:1"></span>
+     <label class="muted" style="font-size:13px">Sortieren</label>
+     <select class="in" style="width:auto;padding:6px 10px" onchange="aufSort=this.value;views.auftraege();paintIcons()">${[['neu','Neueste zuerst'],['alt','Älteste zuerst'],['preis','Preis: hoch → niedrig'],['faellig','Fällig zuerst']].map(o=>`<option value="${o[0]}" ${aufSort===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select>
    </div>
-   ${(S.drafts&&S.drafts.length)?`<div class="card" style="margin-bottom:14px;border:1px dashed var(--green);background:var(--green-tint,#eaf4ee)"><div class="between"><b>Entwürfe (${S.drafts.length})</b><span class="muted" style="font-size:12px">Nicht abgeschlossene Aufträge – jederzeit fortsetzen</span></div>
+   ${aufView==='aktiv'?`<div class="row" style="margin-bottom:14px;flex-wrap:wrap;gap:8px">${['alle',...statusFlow()].map(s=>`<button class="chip ${aufFilter===s?'on':''}" onclick="aufFilter='${s}';views.auftraege();paintIcons()">${s==='alle'?'Alle':esc(statusLabel(s))} · ${s==='alle'?(counts.__all||0):(counts[s]||0)}</button>`).join('')}</div>`:''}
+   ${(aufView==='aktiv'&&S.drafts&&S.drafts.length)?`<div class="card" style="margin-bottom:14px;border:1px dashed var(--green);background:var(--green-tint,#eaf4ee)"><div class="between"><b>Entwürfe (${S.drafts.length})</b><span class="muted" style="font-size:12px">Nicht abgeschlossene Aufträge – jederzeit fortsetzen</span></div>
      <div style="margin-top:8px">${S.drafts.map(d=>`<div class="listitem"><div class="lg">${ic('clip')}</div><div style="flex:1;min-width:0"><b>${esc(d.title||'Entwurf')}</b><div class="muted" style="font-size:12px">Zuletzt bearbeitet ${fmtDateTime(d.updatedAt)}</div></div>
        <button class="btn sm pri" onclick="resumeDraft('${d.id}')">Weiter bearbeiten</button><button class="btn sm gho" onclick="discardDraft('${d.id}')">Verwerfen</button></div>`).join('')}</div></div>`:''}
+   ${selN?`<div class="card" style="margin-bottom:12px;background:var(--green-tint,#eaf4ee);border:1px solid var(--green)"><div class="row" style="flex-wrap:wrap;gap:8px;align-items:center"><b>${selN} ausgewählt</b><span style="flex:1"></span>
+     ${aufView==='aktiv'?`<select class="in" style="width:auto;padding:6px 10px" onchange="if(this.value)aufBulkStatus(this.value)"><option value="">Status ändern…</option>${statusFlow().map(s=>`<option value="${s}">${esc(statusLabel(s))}</option>`).join('')}</select><button class="btn sm" onclick="aufBulk('archive')">Archivieren</button><button class="btn sm gho" onclick="aufBulk('trash')">In Papierkorb</button>`:''}
+     ${aufView==='archiv'?`<button class="btn sm" onclick="aufBulk('restore')">Wiederherstellen</button><button class="btn sm gho" onclick="aufBulk('trash')">In Papierkorb</button>`:''}
+     ${aufView==='papierkorb'?`<button class="btn sm" onclick="aufBulk('restore')">Wiederherstellen</button><button class="btn sm gho" onclick="aufBulk('delete')">Endgültig löschen</button>`:''}
+     <button class="btn sm gho" onclick="aufSel={};views.auftraege();paintIcons()">Auswahl aufheben</button></div></div>`:''}
    <div class="card" style="padding:0;overflow:auto">
-    <table><thead><tr><th>Nr.</th><th>Kunde</th><th>Gerät</th><th>Fehler</th><th>Preis</th><th>Status</th><th>Fällig</th></tr></thead>
-    <tbody>${list.map(o=>`<tr onclick="openOrder('${o.id}')">
-      <td><b>${o.nr}</b>${o.source==='online'?' <span class="tag">Online</span>':''}</td>
-      <td>${esc(cust(o.cid).name)}</td>
-      <td>${esc(oDevLabel(o))}${oDevices(o).length>1?` <span class="tag">${oDevices(o).length} Geräte</span>`:''}</td>
-      <td>${esc(oIssueLabel(o))}</td>
-      <td class="mono">${eur(oTotal(o))}</td>
-      <td>${statusPill(o.status)}</td>
-      <td class="muted mono">${fmtDate(o.due)}</td>
-    </tr>`).join('')||'<tr><td colspan="7"><div class="empty">Keine Aufträge in diesem Filter</div></td></tr>'}</tbody></table>
+    <table><thead><tr><th style="width:34px"><input type="checkbox" ${allSel?'checked':''} onclick="aufSelAll(${idsArr},this.checked)"></th><th>Nr.</th><th>Kunde</th><th>Gerät</th><th>Fehler</th><th>Preis</th><th>Status</th><th>Fällig</th><th></th></tr></thead>
+    <tbody>${list.length?list.map(o=>`<tr>
+      <td onclick="event.stopPropagation()"><input type="checkbox" ${aufSel[o.id]?'checked':''} onclick="aufToggleSel('${o.id}')"></td>
+      <td onclick="openOrder('${o.id}')" style="cursor:pointer"><b>${o.nr}</b>${o.source==='online'?' <span class="tag">Online</span>':''}${o.source==='wertgarantie'?' <span class="tag">WG</span>':''}</td>
+      <td onclick="openOrder('${o.id}')" style="cursor:pointer">${esc(cust(o.cid).name)}</td>
+      <td onclick="openOrder('${o.id}')" style="cursor:pointer">${esc(oDevLabel(o))}${oDevices(o).length>1?` <span class="tag">${oDevices(o).length}</span>`:''}</td>
+      <td onclick="openOrder('${o.id}')" style="cursor:pointer">${esc(oIssueLabel(o))}</td>
+      <td class="mono" onclick="openOrder('${o.id}')" style="cursor:pointer">${eur(oTotal(o))}</td>
+      <td onclick="event.stopPropagation()">${aufView==='aktiv'?`<select class="in" style="padding:5px 8px;width:auto;border-color:${statusColor(o.status)};color:${statusColor(o.status)};font-weight:700" onchange="setStatusRow('${o.id}',this.value)">${statusFlow().concat(statusFlow().includes(o.status)?[]:[o.status]).map(s=>`<option value="${s}" ${o.status===s?'selected':''}>${esc(statusLabel(s))}</option>`).join('')}</select>`:statusPill(o.status)}</td>
+      <td class="muted mono" onclick="openOrder('${o.id}')" style="cursor:pointer">${fmtDate(o.due)}</td>
+      <td onclick="event.stopPropagation()" style="text-align:right;white-space:nowrap">${aufView==='aktiv'?`<button class="btn sm gho" onclick="archiveOrder('${o.id}')">Archiv</button><button class="btn sm gho" onclick="trashOrder('${o.id}')">Papierkorb</button>`:''}${aufView==='archiv'?`<button class="btn sm gho" onclick="restoreOrder('${o.id}')">Wiederherstellen</button>`:''}${aufView==='papierkorb'?`<button class="btn sm gho" onclick="restoreOrder('${o.id}')">Wiederherstellen</button><button class="btn sm gho" onclick="deleteOrderPerm('${o.id}')">Löschen</button>`:''}</td>
+    </tr>`).join(''):`<tr><td colspan="9"><div class="empty">${aufView==='papierkorb'?'Papierkorb ist leer':(aufView==='archiv'?'Kein Archiv':'Keine Aufträge in diesem Filter')}</div></td></tr>`}</tbody></table>
    </div>`;
 };
 
@@ -692,6 +730,9 @@ function openOrder(id){
      <div class="divider"></div>
      <label class="f">Status-Link für den Kunden</label>
      <div class="row"><input class="in" style="flex:1" readonly value="${track}"><button class="btn" onclick="navigator.clipboard&&navigator.clipboard.writeText('${track}');toast('Link kopiert')">Kopieren</button><button class="btn" onclick="window.open('status.html?nr=${o.nr}','_blank')">Ansehen</button></div>
+
+     <div class="divider"></div>
+     <div class="row" style="justify-content:flex-end;gap:8px">${o.archived?`<button class="btn gho" onclick="restoreOrder('${o.id}')">Aus Archiv holen</button>`:`<button class="btn gho" onclick="archiveOrder('${o.id}')">Archivieren</button>`}<button class="btn gho" onclick="trashOrder('${o.id}')">In den Papierkorb</button></div>
    </div>`;
   openDrawer(); paintIcons();
 }
@@ -772,7 +813,7 @@ function noQuoteSave(status){ noCollect();
   else{c.name=name;c.tel=NO.tel;c.mail=NO.mail||c.mail;c.adr=NO.adr||c.adr;c.plz=NO.plz||c.plz;c.stadt=NO.stadt||c.stadt;c.typ=NO.typ;c.firma=NO.firma;c.anrede=NO.anrede;}
   const devs=noBuildDevices(); S.quotes=S.quotes||[];
   if(NO.quoteEditId){const q=S.quotes.find(x=>x.id===NO.quoteEditId);if(q){Object.assign(q,{cid:c.id,devices:devs},noMirror(devs),{status:status,validUntil:NO.due,notes:NO.notes});}}
-  else{const nr='AN-'+(S.quoteCounter=(S.quoteCounter||1000),S.quoteCounter++); const q=Object.assign({id:uid('q'),nr,cid:c.id,devices:devs,status:status,created:today(),validUntil:NO.due,notes:NO.notes,source:NO.fromRequest||''},noMirror(devs)); S.quotes.unshift(q);}
+  else{const nr=nextQuoteNr(); const q=Object.assign({id:uid('q'),nr,cid:c.id,devices:devs,status:status,created:today(),validUntil:NO.due,notes:NO.notes,source:NO.fromRequest||''},noMirror(devs)); S.quotes.unshift(q);}
   if(NO.fromRequest){S.requests=(S.requests||[]).filter(r=>r.id!==NO.fromRequest);}
   save(); toast(status==='entwurf'?'Angebot als Entwurf gespeichert':'Angebot erstellt'); NO=null; go('angebote');
 }
@@ -844,9 +885,14 @@ function noFinalize(){ noCollect();
   if(!c)c=S.cust.find(x=>x.tel&&x.tel.replace(/\D/g,'')===digits&&digits.length>5);
   if(!c){c={id:uid('c'),name,tel:NO.tel,mail:NO.mail,adr:NO.adr,plz:NO.plz,stadt:NO.stadt,typ:NO.typ,firma:NO.firma,anrede:NO.anrede};S.cust.push(c);}
   else{c.name=name;c.tel=NO.tel;c.mail=NO.mail||c.mail;c.adr=NO.adr||c.adr;c.plz=NO.plz||c.plz;c.stadt=NO.stadt||c.stadt;c.typ=NO.typ;c.firma=NO.firma;c.anrede=NO.anrede;}
+  const req=ensureSettings().required;
+  if(req.mail&&!(NO.mail||'').trim()){toast('Pflichtfeld: E-Mail angeben');return;}
+  if(req.adr&&!(NO.adr||'').trim()){toast('Pflichtfeld: Adresse angeben');return;}
+  if(req.imei&&NO.devices.some(d=>(d.brand||d.model)&&!(d.imei||'').trim())){toast('Pflichtfeld: IMEI/Seriennummer je Gerät angeben');return;}
+  if(req.sig&&!NO.sig){toast('Pflichtfeld: Unterschrift des Kunden erfassen');return;}
   const devs=noBuildDevices();
   if(NO.editId){const o=S.ord.find(x=>x.id===NO.editId);if(o){Object.assign(o,{cid:c.id,devices:devs},noMirror(devs),{lock:NO.lock,lockval:NO.lockval,prio:NO.prio,appt:NO.terminMode==='termin'?NO.appt:'',due:NO.due,notes:NO.notes,technikerId:NO.technikerId,sig:NO.sig||o.sig});}save();toast('Auftrag gespeichert');NO=null;go('auftraege');return;}
-  const nr='REP-'+(S.counter++);
+  const nr=nextOrderNr();
   const o=Object.assign({id:uid('o'),nr,cid:c.id,devices:devs,lock:NO.lock,lockval:NO.lockval,status:'offen',prio:NO.prio,created:today(),due:NO.due,appt:NO.terminMode==='termin'?NO.appt:'',notes:NO.notes,readyAt:'',sig:NO.sig||'',source:'',technikerId:NO.technikerId},noMirror(devs));
   S.ord.unshift(o); const rc=S.rules.find(x=>x.id==='r_confirm'); if(rc&&rc.on&&c.mail)logMail(o,rc,'automatisch (Anlage)');
   S.drafts=(S.drafts||[]).filter(x=>x.id!==NO.draftId); save();
@@ -1021,7 +1067,7 @@ function openQuote(id){ const q=(S.quotes||[]).find(x=>x.id===id); if(!q)return;
 function setQuoteStatus(id,st){const q=(S.quotes||[]).find(x=>x.id===id);if(!q)return;q.status=st;save();toast('Angebot: '+(QSTAT[st]?QSTAT[st][0]:st));if(document.getElementById('drawer').classList.contains('show'))openQuote(id);if(current==='angebote')views.angebote();paintIcons();refreshBadges();}
 function sendQuote(id){const q=(S.quotes||[]).find(x=>x.id===id);if(!q)return;const c=cust(q.cid);if(q.status==='entwurf')q.status='offen';save();toast(c.mail?('Angebot an '+c.mail+' gesendet (Demo)'):'Angebot versendet (Demo)');if(document.getElementById('drawer').classList.contains('show'))openQuote(id);if(current==='angebote')views.angebote();paintIcons();refreshBadges();}
 function deleteQuote(id){if(!confirm('Angebot löschen?'))return;S.quotes=(S.quotes||[]).filter(x=>x.id!==id);save();closeAll();if(current==='angebote')views.angebote();paintIcons();refreshBadges();toast('Angebot gelöscht');}
-function quoteToOrder(id){const q=(S.quotes||[]).find(x=>x.id===id);if(!q)return;const devs=oDevices(q).map(d=>Object.assign({},d));const nr='REP-'+(S.counter++);
+function quoteToOrder(id){const q=(S.quotes||[]).find(x=>x.id===id);if(!q)return;const devs=oDevices(q).map(d=>Object.assign({},d));const nr=nextOrderNr();
   const o=Object.assign({id:uid('o'),nr,cid:q.cid,devices:devs,lock:'Keine',lockval:'',status:'offen',prio:q.prio||'Standard',created:today(),due:dPlus(3),appt:'',notes:q.notes||('Aus Angebot '+q.nr),readyAt:'',sig:'',source:'',technikerId:''},noMirror(devs));
   S.ord.unshift(o); q.status='angenommen'; q.orderId=o.id; save();
   const rc=S.rules.find(x=>x.id==='r_confirm'); if(rc&&rc.on&&cust(q.cid).mail)logMail(o,rc,'automatisch (aus Angebot)');
@@ -1091,7 +1137,8 @@ function printReceipt(id){const o=S.ord.find(x=>x.id===id);const c=cust(o.cid);
     <table><thead><tr><th>Position</th><th style="text-align:right">Betrag</th></tr></thead>
     <tbody>${posRows(o)}</tbody></table>
     <div class="tot"><span>Gesamt</span><span>${eur(oTotal(o))}</span></div>
-    <div class="foot">Preis inkl. gesetzlicher MwSt. · Garantie: ${o.warranty} Monate auf die durchgeführte Reparatur.<br>Vielen Dank für Ihren Auftrag bei ${SHOP.name}.</div>`);
+    <div class="foot">Preis inkl. gesetzlicher MwSt. · Garantie: ${o.warranty} Monate auf die durchgeführte Reparatur.<br>Vielen Dank für Ihren Auftrag bei ${SHOP.name}.</div>
+    ${ensureSettings().agb?`<div style="margin-top:14px;padding-top:10px;border-top:1px solid #ddd;font-size:11px;color:#666;line-height:1.5">${esc(ensureSettings().agb)}</div>`:''}`);
   }
 function printWarranty(id){const o=S.ord.find(x=>x.id===id);const c=cust(o.cid);
   const start=o.pickedAt||o.readyAt||today();const until=addMonths(start,o.warranty);
@@ -1697,6 +1744,18 @@ views.einstellungen=function(){
        <div class="integ" style="padding:8px 12px;justify-content:space-between"><span style="font-size:13px">Ab Konfidenz <select onchange="S.acct.autoThreshold=+this.value;save()" style="border:0;background:transparent;font-weight:700;color:var(--green)">${[90,95,98].map(v=>`<option${a.autoThreshold===v?' selected':''}>${v}</option>`).join('')}</select> % · ohne Klick buchen</span><button class="switch ${a.autoBook?'on':''}" onclick="S.acct.autoBook=!S.acct.autoBook;save();views.einstellungen();paintIcons()"><i></i></button></div>
        <div class="row" style="margin-top:12px"><span class="pill ${a.datev.connected?'solid':'soft'}"><span class="d"></span>${a.datev.connected?'DATEV verbunden':'DATEV nicht verbunden'}</span><button class="btn" onclick="go('buchhaltung');buchTab='datev';views.buchhaltung();paintIcons()">Buchhaltung öffnen</button></div>`;})()}
      </div>
+     <div class="card" style="grid-column:1/-1"><b>Systemeinstellungen</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Nummernschema, Pflichtfelder und AGB-/Hinweistext.</p>
+       ${(function(){const st=ensureSettings();return `
+       <div class="grid g2">
+         <div><label class="f">Auftragsnummer-Präfix</label><input class="in" value="${esc(st.orderPrefix)}" onchange="ensureSettings().orderPrefix=this.value.trim()||'REP-';save();views.einstellungen();paintIcons()"><div class="muted" style="font-size:12px;margin-top:4px">Nächste Nummer: ${esc(st.orderPrefix)}${S.counter}</div></div>
+         <div><label class="f">Angebotsnummer-Präfix</label><input class="in" value="${esc(st.quotePrefix)}" onchange="ensureSettings().quotePrefix=this.value.trim()||'AN-';save();views.einstellungen();paintIcons()"><div class="muted" style="font-size:12px;margin-top:4px">Nächste Nummer: ${esc(st.quotePrefix)}${S.quoteCounter||1002}</div></div>
+       </div>
+       <label class="f" style="margin-top:12px">Pflichtfelder bei der Annahme</label>
+       <div class="row" style="flex-wrap:wrap;gap:8px">${[['mail','E-Mail'],['adr','Adresse'],['imei','IMEI/Seriennummer'],['sig','Unterschrift']].map(f=>`<button class="chip ${st.required[f[0]]?'on':''}" onclick="var s=ensureSettings();s.required['${f[0]}']=!s.required['${f[0]}'];save();views.einstellungen();paintIcons()">${f[1]}</button>`).join('')}</div>
+       <div class="muted" style="font-size:12px;margin-top:6px">Aktive Pflichtfelder blockieren das Anlegen eines Auftrags, bis sie ausgefüllt sind.</div>
+       <label class="f" style="margin-top:12px">AGB / Hinweistext (erscheint auf dem Beleg)</label>
+       <textarea class="in" rows="4" onchange="ensureSettings().agb=this.value;save()">${esc(st.agb)}</textarea>`;})()}
+     </div>
      <div class="card" style="grid-column:1/-1"><b>Status &amp; Automatisierungen</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Eigene Status mit Farbe &amp; Reihenfolge. Je Status optional automatische Kunden-Nachricht (E-Mail/SMS) beim Erreichen.</p>
        ${statusList().map((s,i)=>`<div style="border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px">
          <div class="row" style="flex-wrap:wrap;gap:10px;align-items:center">
@@ -1813,7 +1872,7 @@ function insRowAction(o){const st=o.ins.status;
 function guessPrice(l){const i=(l.issue||'').toLowerCase();if(i.includes('akku'))return 69;if(i.includes('display')||i.includes('glas'))return 159;if(i.includes('kamera'))return 59;return 99;}
 function wgAcceptLead(id){const l=(S.wgLeads||[]).find(x=>x.id===id);if(!l)return;
   let c=S.cust.find(x=>x.tel===l.tel); if(!c){c={id:uid('c'),name:l.name,tel:l.tel,mail:'',adr:''};S.cust.push(c);}
-  const nr='REP-'+(S.counter++);
+  const nr=nextOrderNr();
   const o={id:uid('o'),nr,cid:c.id,brand:l.brand,model:l.model,issue:l.issue,qual:'Original',price:guessPrice(l),status:'offen',prio:'Standard',created:today(),due:today(),appt:'',notes:'Von Wertgarantie vermittelt',imei:'',readyAt:'',warranty:SHOP.warranty,sig:'',source:'wertgarantie',
     ins:{on:true,provider:'Wertgarantie',vertrag:l.vertrag,selbst:l.selbst||0,status:'geprueft',claimNr:'',submittedAt:'',approvedAt:'',note:''}};
   S.ord.unshift(o); S.wgLeads=S.wgLeads.filter(x=>x.id!==id); save();
@@ -1863,7 +1922,7 @@ function pullBookings(){
   arr.forEach(bk=>{
     let c=S.cust.find(x=>x.tel===bk.tel||(bk.mail&&x.mail===bk.mail));
     if(!c){c={id:uid('c'),name:bk.name,tel:bk.tel,mail:bk.mail||'',adr:bk.adr||''};S.cust.push(c);}
-    const nr='REP-'+(S.counter++);
+    const nr=nextOrderNr();
     const o={id:uid('o'),nr,cid:c.id,brand:bk.brand,model:bk.model,issue:bk.issue,qual:'Original',price:+bk.price||0,
       status:'offen',prio:'Standard',created:today(),due:bk.appt||today(),appt:bk.appt||'',notes:'Online gebucht',imei:'',
       readyAt:'',warranty:SHOP.warranty,sig:'',source:'online'};
@@ -1884,7 +1943,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAll();});
 
 /* ============================ SEARCH ============================ */
 function globalSearch(v){ if(!v){go(current);return;} v=v.toLowerCase();
-  const hits=visibleOrders().filter(o=>[o.nr,cust(o.cid).name,cust(o.cid).tel,oDevLabel(o),oIssueLabel(o),oDevices(o).map(d=>d.imei).join(' ')].join(' ').toLowerCase().includes(v));
+  const hits=searchOrders().filter(o=>[o.nr,cust(o.cid).name,cust(o.cid).tel,oDevLabel(o),oIssueLabel(o),oDevices(o).map(d=>d.imei).join(' ')].join(' ').toLowerCase().includes(v));
   const m=document.getElementById('main');
   m.innerHTML=`<h1 class="h1">Suche: „${esc(v)}"</h1><p class="sub">${hits.length} Treffer</p>
     <div class="card" style="margin-top:16px;padding:0"><table><tbody>${hits.map(o=>`<tr onclick="openOrder('${o.id}')"><td><b>${o.nr}</b></td><td>${esc(cust(o.cid).name)}</td><td>${esc(o.model)}</td><td>${esc(o.issue)}</td><td>${statusPill(o.status)}</td></tr>`).join('')||'<tr><td><div class="empty">Nichts gefunden</div></td></tr>'}</tbody></table></div>`;
@@ -2352,7 +2411,7 @@ function playCall(call){
   setTimeout(step,700);
 }
 function finishCall(call){
-  if(call._book){const b=call._book;const c=ensureCustomer(b.name,b.tel,'');const nr='REP-'+(S.counter++);
+  if(call._book){const b=call._book;const c=ensureCustomer(b.name,b.tel,'');const nr=nextOrderNr();
     const o={id:uid('o'),nr,cid:c.id,brand:b.brand,model:b.model,issue:b.issue,qual:'Original',price:b.price,status:'offen',prio:'Standard',created:today(),due:b.appt,appt:b.appt,notes:(call.channel==='whatsapp'?'Per WhatsApp gebucht':'Telefonisch gebucht')+' (KI-Empfangskraft)',imei:'',readyAt:'',warranty:SHOP.warranty,sig:'',source:call.channel};
     S.ord.unshift(o);const r=S.rules.find(x=>x.id==='r_confirm');if(r&&r.on)logMail(o,r,'automatisch ('+CH[call.channel]+'-Buchung)');
     call.order=nr;call.result='Termin gebucht: '+b.model+' '+b.issue+', '+fmtDate(b.appt)+' 14:30'; delete call._book;}
@@ -2400,7 +2459,7 @@ function demoDone(){ if(_demoStop)return; const el=document.getElementById('demo
 
 /* ============================ BOOT ============================ */
 paintIcons();
-(function(){ensureAcct(); ensureCat(); ensureStatuses(); const n=pullBookings(); const nq=pullRequests(); go('dashboard'); applyNavRole(); if(!curUser())showLogin();
+(function(){ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); const n=pullBookings(); const nq=pullRequests(); go('dashboard'); applyNavRole(); if(!curUser())showLogin();
   if(nq) setTimeout(()=>toast(nq+' neue Website-Anfrage'+(nq>1?'n':'')),900);
   if(n) setTimeout(()=>toast(n+' neue Online-Buchung'+(n>1?'en':'')+' übernommen'),500);
 })();
