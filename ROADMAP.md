@@ -79,12 +79,12 @@ Wachstums-Motoren (Versandreparatur, B2B, Forecast) · **Echtes System** (DB, Au
 | ✅ L3 | **🔧 Techniker-Playbook** (KI-Reparaturanleitung je Reparaturart im Auftrag) · **FERTIG 18.8.** | Leap | M | ★★ |
 | ✅ L16 | **🧠 KI-Tagesbriefing** (Chef-Cockpit auf dem Dashboard, GF-only) · **FERTIG 18.8.** | Leap | M | ★★ |
 | P10 | **Repair-Widget-Konfig** — Preise/Styling, iframe-Embed, **WordPress-Plugin**, Standardpreise | Parität 🟠 | M–L | ★★ |
-| P14 | **Kasse-Politur** — Barcode/IMEI-Scan, Artikelkatalog+Kategorien, Berichte, Meistverkauft | Parität 🟡 | M | ★ |
+| ✅ P14 | **Kasse-Politur** — editierbarer Artikelkatalog + Kategorien, Meistverkauft, Verwalten · **FERTIG 19.8.** (Scan via Suche) | Parität 🟡 | M | ★ |
 | ✅ P13 | **Kunden-Politur** — Suche, A→Z-Sortierung, Pagination · **FERTIG 18.8.** | Parität 🟡 | S | ★ |
 | ✅ P16 | **Detaillierte Statistik** — Monatsvergleich (Trend) + Ankauf/Verkauf/Handels-Marge · **FERTIG 19.8.** | Parität 🟡 | S–M | ★ |
 | ✅ P15 | **Top-Bar-Werkzeuge** — Scanner-Fokus, Schnell-Kasse, Benachrichtigungs-Zähler · **FERTIG 18.8.** | Parität 🟡 | S | ★ |
-| P9 | **Benutzer & Berechtigungen granular** (frei definierbare Rechte) | Parität 🟠 | M | ★ |
-| P7 | **Benachrichtigungen** — E-Mail-Vorlagen-Editor, SMS, SMTP-Konfig | Parität 🟠 | M | ★★ |
+| ✅ P9 | **Benutzer & Berechtigungen granular** (Mitarbeiter-Zugriff je Bereich einstellbar) · **FERTIG 19.8.** | Parität 🟠 | M | ★ |
+| ✅ P7 | **Benachrichtigungen** — SMTP-Konfig + SMS-Gateway (Vorlagen via Erinnerungen/Status) · **FERTIG 19.8.** | Parität 🟠 | M | ★★ |
 
 ## Phase 5 — Wachstums-Motoren
 | # | Feature | Typ | Effort | Impact |
