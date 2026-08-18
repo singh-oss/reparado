@@ -81,7 +81,7 @@ Wachstums-Motoren (Versandreparatur, B2B, Forecast) · **Echtes System** (DB, Au
 | P10 | **Repair-Widget-Konfig** — Preise/Styling, iframe-Embed, **WordPress-Plugin**, Standardpreise | Parität 🟠 | M–L | ★★ |
 | P14 | **Kasse-Politur** — Barcode/IMEI-Scan, Artikelkatalog+Kategorien, Berichte, Meistverkauft | Parität 🟡 | M | ★ |
 | ✅ P13 | **Kunden-Politur** — Suche, A→Z-Sortierung, Pagination · **FERTIG 18.8.** | Parität 🟡 | S | ★ |
-| P16 | **Detaillierte Statistik** — Monatsvergleich, Reparatur/Verkauf/Ankauf | Parität 🟡 | S–M | ★ |
+| ✅ P16 | **Detaillierte Statistik** — Monatsvergleich (Trend) + Ankauf/Verkauf/Handels-Marge · **FERTIG 19.8.** | Parität 🟡 | S–M | ★ |
 | ✅ P15 | **Top-Bar-Werkzeuge** — Scanner-Fokus, Schnell-Kasse, Benachrichtigungs-Zähler · **FERTIG 18.8.** | Parität 🟡 | S | ★ |
 | P9 | **Benutzer & Berechtigungen granular** (frei definierbare Rechte) | Parität 🟠 | M | ★ |
 | P7 | **Benachrichtigungen** — E-Mail-Vorlagen-Editor, SMS, SMTP-Konfig | Parität 🟠 | M | ★★ |
@@ -107,8 +107,8 @@ Wachstums-Motoren (Versandreparatur, B2B, Forecast) · **Echtes System** (DB, Au
 | B2 | **Fotos am Auftrag (Vorher/Nachher, Schaden, Zubehör)** — beliebig viele Bilder je Auftrag, Galerie im Auftrag | Leap | 3 | S–M | ★★ | Beweis der Arbeit, interne Doku, Zubehör-Nachweis |
 | L12 | **🖼️ Live-Status mit Foto-Updates** — Kunde sieht Technikerfotos auf der Statusseite | Leap | 4 | M | ★★ | Vertrauen, killt „ist-es-fertig"-Anrufe |
 | B3 | **Modell-/Produktbilder** — Bild je Gerätetyp/Modell/Ersatzteil; **angezeigt beim Modell-Auswählen** (Auftragsformular + Buchungs-/Anfrage-Widget) und in Kasse & Lager | Parität | 1–3 | S–M | ★★ | visuelle, schnellere Geräteauswahl (wie RepairDash) + Erkennung an Kasse/Lager |
-| B4 | **Logo & Briefpapier-Bilder** — eigenes Logo auf Belegen/Etiketten/Angeboten | Parität | 1 | S | ★ | Marken-Auftritt, White-Label |
-| B5 | **Foto vom Personalausweis/Kaufbeleg (Ankauf)** — bei Gebraucht-Ankauf Ident-/Herkunftsnachweis | Leap | 3 | S | ★★ | **Rechtssicherheit Ankauf** (Hehlerei-Schutz, §) |
+| ✅ B4 | **Logo** — eigenes Logo auf Belegen/Angeboten/KVA/Garantie (Upload in Stammdaten) · **FERTIG 19.8.** | Parität | 1 | S | ★ | Marken-Auftritt |
+| ✅ B5 | **Foto beim Ankauf** (Gerät/Ausweis/Kaufbeleg → Ident-/Herkunftsnachweis) · **FERTIG 19.8.** | Leap | 3 | S | ★★ | **Rechtssicherheit Ankauf** |
 
 > **Technik-Hinweis:** Im Prototyp werden Bilder als Data-URL in localStorage gehalten (klein/komprimiert). Im echten System → Supabase Storage (Track F1), mit Thumbnails.
 
