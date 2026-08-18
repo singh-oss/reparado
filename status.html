@@ -78,7 +78,7 @@ const STEPS=[
   {key:'fertig',t:'Abholbereit',s:'Ihr Gerät ist repariert.'},
   {key:'abgeschlossen',t:'Abgeschlossen',s:'Gerät abgeholt. Vielen Dank!'},
 ];
-function stepIndex(status){return {offen:0,bearbeitung:1,warten:1,fertig:2,abgeholt:3}[status]??0;}
+function stepIndex(status){return {offen:0,bearbeitung:1,warten:1,fertig:2,abgeholt:3}[status]??1;}
 function sDevices(o){if(o.devices&&o.devices.length)return o.devices;return [{brand:o.brand,model:o.model,reparatur:o.issue,price:+o.price||0}];}
 function sTotal(o){return sDevices(o).reduce((s,d)=>s+(+d.price||0),0);}
 function sDevLabel(o){return sDevices(o).map(d=>[d.brand,d.model].filter(Boolean).join(' ')).filter(Boolean).join(' + ');}

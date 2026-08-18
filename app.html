@@ -460,7 +460,25 @@ const STATUS = {
   abgeholt:{lbl:'Abgeschlossen', cls:'soft'},
 };
 const STFLOW=['offen','bearbeitung','warten','fertig','abgeholt'];
-function statusPill(s){const m=STATUS[s]||STATUS.offen;return `<span class="pill ${m.cls}"><span class="d"></span>${m.lbl}</span>`;}
+const STATUS_COLOR={offen:'#6b7280',bearbeitung:'#d99a00',warten:'#e2681c',fertig:'#0e7a3c',abgeholt:'#64748b'};
+/* ---- Status (selbst konfigurierbar): Modell + Helfer + Auto-Nachricht + CRUD ---- */
+function ensureStatuses(){ if(!S.statuses){
+    S.statuses=STFLOW.map(k=>({key:k,label:STATUS[k].lbl,color:STATUS_COLOR[k]||'#6b7280',active:true,sys:true,email:(k==='fertig'),sms:false,
+      tpl:(k==='fertig'?'Guten Tag {kunde}, Ihr {geraet} ist abholbereit. Auftrag {auftrag}, Endbetrag {preis}. Öffnungszeiten: {oeffnung}. Status verfolgen: {tracking}':'')}));
+    save();
+  } return S.statuses; }
+function statusList(){return ensureStatuses();}
+function statusDef(k){const l=ensureStatuses();return l.find(s=>s.key===k)||l[0]||{key:k,label:k,color:'#6b7280'};}
+function statusLabel(k){return statusDef(k).label;}
+function statusColor(k){return statusDef(k).color||'#6b7280';}
+function statusFlow(){return ensureStatuses().filter(s=>s.active).map(s=>s.key);}
+function statusPill(s){const d=statusDef(s);return `<span class="pill" style="border-color:${d.color};color:${d.color}"><span class="d" style="background:${d.color}"></span>${esc(d.label)}</span>`;}
+function statusNotify(o,def){const c=cust(o.cid);const tpl=def.tpl||('Guten Tag {kunde}, Ihr {geraet} (Auftrag {auftrag}) hat einen neuen Status: '+def.label+'.');const rendered=renderTemplate({subj:'Statusupdate: '+def.label,body:tpl,who:'kunde'},o);const ch=(def.email&&def.sms)?'E-Mail+SMS':(def.email?'E-Mail':'SMS');S.mailLog.unshift({t:new Date().toISOString(),to:c.name,ch:ch,rule:'Status: '+def.label,subj:rendered.subj,how:'automatisch (Status)'});save();}
+function statSet(k,f,v){const s=statusDef(k);if(s){s[f]=v;save();}}
+function statToggle(k,f){const s=statusDef(k);if(s){s[f]=!s[f];save();views.einstellungen();paintIcons();}}
+function statMove(k,dir){const l=ensureStatuses();const i=l.findIndex(s=>s.key===k);const j=i+dir;if(i<0||j<0||j>=l.length)return;const t=l[i];l[i]=l[j];l[j]=t;save();views.einstellungen();paintIcons();}
+function statDel(k){const s=statusDef(k);if(s.sys){toast('System-Status nicht löschbar');return;}if(!confirm('Status „'+s.label+'" löschen?'))return;S.statuses=ensureStatuses().filter(x=>x.key!==k);S.ord.forEach(o=>{if(o.status===k)o.status='offen';});save();views.einstellungen();paintIcons();toast('Status gelöscht');}
+function statAdd(){const nm=(prompt('Name des neuen Status:')||'').trim();if(!nm)return;const key='st_'+uid('').slice(1);ensureStatuses().push({key,label:nm,color:'#3b82f6',active:true,sys:false,email:false,sms:false,tpl:''});save();views.einstellungen();paintIcons();toast('Status „'+nm+'" angelegt');}
 function cust(id){return S.cust.find(c=>c.id===id)||{name:'—',tel:'',mail:'',adr:''};}
 /* Geräte pro Auftrag (mehrere möglich); Alt-Aufträge ohne devices[] werden aus den Einzelfeldern synthetisiert */
 function oDevices(o){ if(o&&o.devices&&o.devices.length) return o.devices; return [{typ:(o&&o.devtyp)||'Smartphone',brand:(o&&o.brand)||'',model:(o&&o.model)||'',imei:(o&&o.imei)||'',fach:(o&&o.fach)||'',ref:(o&&o.ref)||'',reparatur:(o&&o.issue)||'',qual:(o&&o.qual)||'Original',price:+(o&&o.price)||0,warranty:(o&&o.warranty)||6}]; }
@@ -594,14 +612,14 @@ views.auftraege=function(){
   const m=document.getElementById('main');
   const src=visibleOrders();
   const counts={alle:src.length};
-  STFLOW.forEach(s=>counts[s]=src.filter(o=>o.status===s).length);
+  statusFlow().forEach(s=>counts[s]=src.filter(o=>o.status===s).length);
   const list=src.filter(o=>aufFilter==='alle'?true:o.status===aufFilter);
   const mine=curRole()!=='inhaber';
   m.innerHTML=`
    <div class="between"><div><h1 class="h1">Aufträge</h1><p class="sub">${src.length} Aufträge${mine?' (dir zugewiesen &amp; offen)':' insgesamt'}</p></div>
      <button class="btn pri" onclick="newOrder()">Neuer Auftrag</button></div>
    <div class="row" style="margin:16px 0">
-     ${['alle',...STFLOW].map(s=>`<button class="chip ${aufFilter===s?'on':''}" onclick="aufFilter='${s}';views.auftraege();paintIcons()">${s==='alle'?'Alle':STATUS[s].lbl} · ${counts[s]||0}</button>`).join('')}
+     ${['alle',...statusFlow()].map(s=>`<button class="chip ${aufFilter===s?'on':''}" onclick="aufFilter='${s}';views.auftraege();paintIcons()">${s==='alle'?'Alle':esc(statusLabel(s))} · ${s==='alle'?src.length:(counts[s]||0)}</button>`).join('')}
    </div>
    ${(S.drafts&&S.drafts.length)?`<div class="card" style="margin-bottom:14px;border:1px dashed var(--green);background:var(--green-tint,#eaf4ee)"><div class="between"><b>Entwürfe (${S.drafts.length})</b><span class="muted" style="font-size:12px">Nicht abgeschlossene Aufträge – jederzeit fortsetzen</span></div>
      <div style="margin-top:8px">${S.drafts.map(d=>`<div class="listitem"><div class="lg">${ic('clip')}</div><div style="flex:1;min-width:0"><b>${esc(d.title||'Entwurf')}</b><div class="muted" style="font-size:12px">Zuletzt bearbeitet ${fmtDateTime(d.updatedAt)}</div></div>
@@ -654,7 +672,7 @@ function openOrder(id){
      ${o.notes?`<div class="note" style="margin-top:12px">Notiz: ${esc(o.notes)}</div>`:''}
 
      <label class="f" style="margin-top:18px">Status ändern</label>
-     <div class="row">${STFLOW.map(s=>`<button class="chip ${o.status===s?'on':''}" onclick="setStatus('${o.id}','${s}')">${STATUS[s].lbl}</button>`).join('')}</div>
+     <div class="row" style="flex-wrap:wrap;gap:8px">${statusFlow().map(s=>`<button class="chip ${o.status===s?'on':''}" onclick="setStatus('${o.id}','${s}')" style="${o.status===s?`background:${statusColor(s)};border-color:${statusColor(s)};color:#fff`:''}">${esc(statusLabel(s))}</button>`).join('')}</div>
 
      ${insPanel(o)}
 
@@ -683,9 +701,9 @@ function setStatus(id,s){
   if(s==='fertig'&&!o.readyAt) o.readyAt=today();
   if(s==='abgeholt') o.pickedAt=today();
   save();
-  const map={bearbeitung:'r_received',warten:'r_waitpart',fertig:'r_ready'};
-  if(map[s]){const r=S.rules.find(x=>x.id===map[s]); if(r&&r.on) logMail(o,r,'automatisch ausgelöst');}
-  toast('Status: '+STATUS[s].lbl+(map[s]?' · Kunde benachrichtigt':''));
+  const def=statusDef(s); const notified=!!(def&&(def.email||def.sms));
+  if(notified) statusNotify(o,def);
+  toast('Status: '+statusLabel(s)+(notified?' · Kunde benachrichtigt':''));
   openOrder(id); (views[current]||views.dashboard)(); paintIcons(); refreshBadges();
 }
 
@@ -1679,6 +1697,23 @@ views.einstellungen=function(){
        <div class="integ" style="padding:8px 12px;justify-content:space-between"><span style="font-size:13px">Ab Konfidenz <select onchange="S.acct.autoThreshold=+this.value;save()" style="border:0;background:transparent;font-weight:700;color:var(--green)">${[90,95,98].map(v=>`<option${a.autoThreshold===v?' selected':''}>${v}</option>`).join('')}</select> % · ohne Klick buchen</span><button class="switch ${a.autoBook?'on':''}" onclick="S.acct.autoBook=!S.acct.autoBook;save();views.einstellungen();paintIcons()"><i></i></button></div>
        <div class="row" style="margin-top:12px"><span class="pill ${a.datev.connected?'solid':'soft'}"><span class="d"></span>${a.datev.connected?'DATEV verbunden':'DATEV nicht verbunden'}</span><button class="btn" onclick="go('buchhaltung');buchTab='datev';views.buchhaltung();paintIcons()">Buchhaltung öffnen</button></div>`;})()}
      </div>
+     <div class="card" style="grid-column:1/-1"><b>Status &amp; Automatisierungen</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Eigene Status mit Farbe &amp; Reihenfolge. Je Status optional automatische Kunden-Nachricht (E-Mail/SMS) beim Erreichen.</p>
+       ${statusList().map((s,i)=>`<div style="border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px">
+         <div class="row" style="flex-wrap:wrap;gap:10px;align-items:center">
+           <input type="color" value="${s.color}" onchange="statSet('${s.key}','color',this.value)" style="width:36px;height:36px;border:1px solid var(--line);border-radius:8px;background:none;padding:2px;cursor:pointer">
+           <input class="in" style="flex:1;min-width:150px" value="${esc(s.label)}" onchange="statSet('${s.key}','label',this.value)">
+           <button class="chip ${s.email?'on':''}" onclick="statToggle('${s.key}','email')">E-Mail</button>
+           <button class="chip ${s.sms?'on':''}" onclick="statToggle('${s.key}','sms')">SMS</button>
+           <span class="muted" style="font-size:12px">Aktiv</span><button class="switch ${s.active?'on':''}" onclick="statToggle('${s.key}','active')"><i></i></button>
+           <button class="btn sm gho" onclick="statMove('${s.key}',-1)"${i===0?' disabled':''}>↑</button>
+           <button class="btn sm gho" onclick="statMove('${s.key}',1)"${i===statusList().length-1?' disabled':''}>↓</button>
+           ${s.sys?'<span class="tag">System</span>':`<button class="btn sm gho" onclick="statDel('${s.key}')">Löschen</button>`}
+         </div>
+         ${(s.email||s.sms)?`<textarea class="in" rows="2" style="margin-top:8px" placeholder="Nachricht an den Kunden … Platzhalter: {kunde} {geraet} {auftrag} {preis} {tracking} {oeffnung}" onchange="statSet('${s.key}','tpl',this.value)">${esc(s.tpl||'')}</textarea>`:''}
+       </div>`).join('')}
+       <button class="btn" onclick="statAdd()">+ Status</button>
+       <div class="note" style="margin-top:8px">System-Status steuern den Ablauf (Abholbereit setzt „fertig", Abgeschlossen setzt „abgeholt") und sind nicht löschbar – aber umbenennbar, farbig und mit Auto-Nachricht.</div>
+     </div>
      <div class="card"><b>Wertgarantie (Versicherung)</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Als Fachhandelspartner Reparaturfälle versicherter Kunden einreichen, Freigaben erhalten und direkt mit Wertgarantie abrechnen. Prototyp – Portal-Anbindung simuliert.</p>
        ${(function(){const w=ensureInsurance();return `
        <div class="integ" style="justify-content:space-between"><div style="display:flex;gap:12px;align-items:center"><div class="lg">${ic('shield')}</div><div><b>Wertgarantie Fachhandelsportal</b><div class="muted" style="font-size:12px">${w.active&&w.connected?'Verbunden · Partner-Nr. '+esc(w.partnerNr):'Nicht verbunden'}</div></div></div>
@@ -2266,7 +2301,7 @@ function simCall(type){
   if(type==='status'){
     const o=S.ord.find(x=>x.status==='fertig')||S.ord.find(x=>x.status!=='abgeholt')||S.ord[0]; const c=cust(o.cid);
     const ab=o.status==='fertig';
-    call={...base,intent:'status',order:o.nr,task:false,result:'Status genannt: '+STATUS[o.status].lbl,
+    call={...base,intent:'status',order:o.nr,task:false,result:'Status genannt: '+statusLabel(o.status),
       transcript:[{who:'ki',text:greet},{who:you,text:'Hallo, ist mein Handy schon fertig?'},
        {who:'ki',text:'Sehr gerne. Auf welchen Namen läuft der Auftrag?'},{who:you,text:c.name+'.'},
        {who:'ki',text:ab?('Ihr '+o.brand+' '+o.model+' ist abholbereit'+(o.readyAt?(' seit '+fmtDate(o.readyAt)):'')+'. '+(after?'Abholen können Sie es ab morgen 9 Uhr':'Sie können es zu unseren Öffnungszeiten abholen: '+SHOP.hours)+'. Der Endbetrag beträgt '+eur(o.price)+'.'):('Ihr '+o.brand+' '+o.model+' ist gerade in Bearbeitung. Sie bekommen automatisch eine Nachricht, sobald es fertig ist.')},
@@ -2365,7 +2400,7 @@ function demoDone(){ if(_demoStop)return; const el=document.getElementById('demo
 
 /* ============================ BOOT ============================ */
 paintIcons();
-(function(){ensureAcct(); ensureCat(); const n=pullBookings(); const nq=pullRequests(); go('dashboard'); applyNavRole(); if(!curUser())showLogin();
+(function(){ensureAcct(); ensureCat(); ensureStatuses(); const n=pullBookings(); const nq=pullRequests(); go('dashboard'); applyNavRole(); if(!curUser())showLogin();
   if(nq) setTimeout(()=>toast(nq+' neue Website-Anfrage'+(nq>1?'n':'')),900);
   if(n) setTimeout(()=>toast(n+' neue Online-Buchung'+(n>1?'en':'')+' übernommen'),500);
 })();
