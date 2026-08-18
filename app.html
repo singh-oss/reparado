@@ -111,9 +111,9 @@
   .drawer.show{transform:none}
   .drawer .dhead{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--line);padding:16px 20px;display:flex;align-items:center;gap:12px}
   .drawer .dbody{padding:20px}
-  .modal{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;padding:20px}
+  .modal{position:fixed;inset:0;z-index:60;display:none;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;-webkit-overflow-scrolling:touch}
   .modal.show{display:flex}
-  .modal .box{background:#fff;border-radius:16px;max-width:580px;width:100%;max-height:92vh;overflow:auto;box-shadow:var(--shadow)}
+  .modal .box{background:#fff;border-radius:16px;max-width:580px;width:100%;max-height:calc(100vh - 40px);overflow:auto;margin:auto;box-shadow:var(--shadow)}
   .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:#0e7a3c;color:#fff;
          padding:12px 18px;border-radius:12px;font-weight:600;z-index:80;opacity:0;transition:.2s;pointer-events:none;box-shadow:var(--shadow)}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
