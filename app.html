@@ -501,7 +501,7 @@ function searchOrders(){ return visRole().filter(o=>!o.trashed); } /* Suche: ink
 function ordArchived(){ return visRole().filter(o=>o.archived&&!o.trashed); }
 function ordTrashed(){ return visRole().filter(o=>o.trashed); }
 /* ---- Systemeinstellungen (P8): Nummernschema, Pflichtfelder, AGB ---- */
-function ensureSettings(){ if(!S.settings){S.settings={orderPrefix:'REP-',quotePrefix:'AN-',required:{imei:false,mail:false,adr:false,sig:false},agb:'Für die Reparatur gelten unsere Allgemeinen Geschäftsbedingungen. Bei Datenverlust wird keine Haftung übernommen – bitte sichern Sie Ihre Daten vor der Abgabe. Die Gewährleistung bezieht sich auf die durchgeführte Reparatur und das eingesetzte Ersatzteil, nicht auf Folgeschäden durch Sturz, Feuchtigkeit oder unsachgemäße Handhabung. Nicht abgeholte Geräte werden nach 90 Tagen kostenpflichtig eingelagert.'};save();} const s=S.settings; if(!s.required)s.required={imei:false,mail:false,adr:false,sig:false}; if(!s.orderPrefix)s.orderPrefix='REP-'; if(!s.quotePrefix)s.quotePrefix='AN-'; if(s.hourlyRate===undefined)s.hourlyRate=60; if(s.autoReorder===undefined)s.autoReorder=false; if(s.storageFeePerDay===undefined)s.storageFeePerDay=2; return s; }
+function ensureSettings(){ if(!S.settings){S.settings={orderPrefix:'REP-',quotePrefix:'AN-',required:{imei:false,mail:false,adr:false,sig:false},agb:'Für die Reparatur gelten unsere Allgemeinen Geschäftsbedingungen. Bei Datenverlust wird keine Haftung übernommen – bitte sichern Sie Ihre Daten vor der Abgabe. Die Gewährleistung bezieht sich auf die durchgeführte Reparatur und das eingesetzte Ersatzteil, nicht auf Folgeschäden durch Sturz, Feuchtigkeit oder unsachgemäße Handhabung. Nicht abgeholte Geräte werden nach 90 Tagen kostenpflichtig eingelagert.'};save();} const s=S.settings; if(!s.required)s.required={imei:false,mail:false,adr:false,sig:false}; if(!s.orderPrefix)s.orderPrefix='REP-'; if(!s.quotePrefix)s.quotePrefix='AN-'; if(s.hourlyRate===undefined)s.hourlyRate=60; if(s.autoReorder===undefined)s.autoReorder=false; if(s.storageFeePerDay===undefined)s.storageFeePerDay=2; if(!s.maHidden)s.maHidden=MA_HIDDEN.slice(); if(!s.notify)s.notify={fromName:'',smtpHost:'',smtpUser:'',smsOn:false,smsGateway:''}; return s; }
 /* ---- Nicht-abgeholt-Workflow (L7) ---- */
 function uncollectedOrders(){const now=Date.now();return S.ord.filter(o=>o.status==='fertig'&&!o.trashed&&!o.archived&&o.readyAt).map(o=>{const days=Math.floor((now-new Date(o.readyAt).getTime())/(1000*60*60*24));return {o,days};}).filter(x=>x.days>=3).sort((a,b)=>b.days-a.days);}
 function uncLevel(days){if(days>=14)return{lbl:'Lagergebühr fällig',col:'#c0392b'};if(days>=7)return{lbl:'2. Erinnerung',col:'#e2681c'};return{lbl:'1. Erinnerung',col:'#d99a00'};}
@@ -534,7 +534,9 @@ const ROLE_LABEL={inhaber:'Geschäftsführung',mitarbeiter:'Mitarbeiter'};
 const MA_HIDDEN=['statistik','buchhaltung','einstellungen','ankauf'];
 function curUser(){return (S.users||[]).find(u=>u.id===S.userId)||null;}
 function curRole(){const u=curUser();return u?u.role:'inhaber';}
-function canView(v){return curRole()==='inhaber'?true:!MA_HIDDEN.includes(v);}
+function maHidden(){return (S.settings&&S.settings.maHidden)?S.settings.maHidden:MA_HIDDEN;}
+function canView(v){return curRole()==='inhaber'?true:maHidden().indexOf(v)<0;}
+function toggleMaView(v){const s=ensureSettings();s.maHidden=s.maHidden||MA_HIDDEN.slice();const i=s.maHidden.indexOf(v);if(i<0)s.maHidden.push(v);else s.maHidden.splice(i,1);save();views.einstellungen();paintIcons();}
 function applyNavRole(){
   document.querySelectorAll('#nav a').forEach(a=>{a.style.display=canView(a.dataset.view)?'':'none';});
   document.querySelectorAll('#nav .grouplbl').forEach(lbl=>{let el=lbl.nextElementSibling,vis=false;while(el&&!el.classList.contains('grouplbl')){if(el.tagName==='A'&&el.style.display!=='none'){vis=true;break;}el=el.nextElementSibling;}lbl.style.display=vis?'':'none';});
@@ -1893,9 +1895,11 @@ views.kasse=function(){
         ${cart.some(i=>/REP-/.test(i.name))?`<div class="note" style="margin-bottom:12px;border:1px solid var(--green);background:var(--green-tint,#eaf4ee)"><b>Upsell-Tipp:</b> Nach der Reparatur freut sich der Kunde über Schutz.
           <div class="row" style="margin-top:8px;flex-wrap:wrap;gap:8px">${[['Panzerglas',25],['Hülle',12],['Displayschutz',15]].map(x=>`<button class="btn sm pri" onclick="posAdd('${esc(x[0])}',${x[1]})">+ ${esc(x[0])} ${eur(x[1])}</button>`).join('')}</div></div>`:''}
         <div class="search" style="background:var(--soft)"><span class="ic" data-ic="search"></span><input placeholder="Artikel suchen …" oninput="posSearch(this.value)"></div>
-        <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0">
-          ${POS_ITEMS.map(x=>`<button class="chip" style="text-align:center;padding:14px 8px;border-radius:12px;display:block" onclick="posAdd('${esc(x[0])}',${x[1]})"><div style="font-weight:700">${esc(x[0])}</div><div class="muted" style="font-size:12px;margin-top:2px">${eur(x[1])}</div></button>`).join('')}
+        <div class="row" style="flex-wrap:wrap;gap:6px;margin-top:12px;align-items:center">${posCats().map(c=>`<button class="chip ${posCat===c?'on':''}" onclick="posCat='${esc(c)}';views.kasse();paintIcons()">${c==='alle'?'Alle':esc(c)}</button>`).join('')}<span style="flex:1"></span><button class="btn sm gho" onclick="posManage()">Artikel verwalten</button></div>
+        <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 0">
+          ${ensurePos().filter(p=>posCat==='alle'||(p.cat||'Sonstige')===posCat).map(x=>`<button class="chip" style="text-align:center;padding:14px 8px;border-radius:12px;display:block" onclick="posAdd('${esc(x.name)}',${x.price})"><div style="font-weight:700">${esc(x.name)}</div><div class="muted" style="font-size:12px;margin-top:2px">${eur(x.price)}</div></button>`).join('')}
         </div>
+        ${(function(){const top=ensurePos().filter(p=>p.sold>0).sort((a,b)=>b.sold-a.sold).slice(0,3);return top.length?`<div class="muted" style="font-size:12px">Meistverkauft: ${top.map(p=>esc(p.name)+' ('+p.sold+'×)').join(' · ')}</div>`:'';})()}
         <div class="row"><button class="btn" onclick="reparaturPos()">Reparatur (Betrag)</button><button class="btn" onclick="freePos()">Freie Position</button></div>
         <div class="note" style="margin-top:14px">TSE: ${t.provider} · Serien-Nr ${t.serial} · Zertifikat gültig bis ${fmtDate(t.certUntil)} · ~${remaining.toLocaleString('de-DE')} Signaturen frei</div>
       </div>
@@ -1929,7 +1933,15 @@ function renderCart(){
 }
 function refreshCart(){const el=document.getElementById('cartlist');if(el)el.innerHTML=renderCart();}
 function cartQty(x,d){cart[x].qty=Math.max(1,cart[x].qty+d);refreshCart();}
-function posAdd(name,price){cart.push({name,price:+price,qty:1,vat:19});refreshCart();}
+function ensurePos(){ if(!S.posItems){S.posItems=POS_ITEMS.map(x=>({name:x[0],price:x[1],cat:'Zubehör',sold:0}));save();} return S.posItems; }
+let posCat='alle';
+function posCats(){const c=['alle'];ensurePos().forEach(p=>{if(c.indexOf(p.cat||'Sonstige')<0)c.push(p.cat||'Sonstige');});return c;}
+function posManage(){ensurePos();openModal(`<div class="dhead"><b style="flex:1">Artikel verwalten</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+  <div class="dbody"><button class="btn sm pri" onclick="posAddItem()">+ Artikel</button>
+   <div class="card" style="padding:0;overflow:auto;margin-top:10px"><table><thead><tr><th>Artikel</th><th>Kategorie</th><th>Preis</th><th>Verkauft</th><th></th></tr></thead><tbody>${S.posItems.map((p,i)=>`<tr><td><input class="in" style="padding:5px 8px" value="${esc(p.name)}" onchange="S.posItems[${i}].name=this.value;save()"></td><td><input class="in" style="padding:5px 8px;width:120px" value="${esc(p.cat||'')}" onchange="S.posItems[${i}].cat=this.value;save()"></td><td><input class="in" style="padding:5px 8px;width:90px" type="number" value="${p.price}" onchange="S.posItems[${i}].price=+this.value||0;save()"></td><td class="mono">${p.sold||0}×</td><td style="text-align:right"><button class="btn sm gho" onclick="posDelItem(${i})">Löschen</button></td></tr>`).join('')}</tbody></table></div></div>`);}
+function posAddItem(){const n=(prompt('Artikelname:')||'').trim();if(!n)return;const pr=+((prompt('Preis (€):'))||0);const cat=(prompt('Kategorie:','Zubehör')||'Zubehör').trim();ensurePos().push({name:n,price:pr,cat,sold:0});save();posManage();}
+function posDelItem(i){S.posItems.splice(i,1);save();posManage();}
+function posAdd(name,price){cart.push({name,price:+price,qty:1,vat:19});ensurePos();const it=S.posItems.find(p=>p.name===name);if(it){it.sold=(it.sold||0)+1;save();}refreshCart();}
 function reparaturPos(){const p=+prompt('Reparatur-Betrag (€, brutto):')||0;if(!p)return;cart.push({name:'Reparatur',price:p,qty:1,vat:19});refreshCart();}
 function freePos(){const n=prompt('Bezeichnung der Position:');if(!n)return;const p=+prompt('Preis (€, brutto):')||0;cart.push({name:n,price:p,qty:1,vat:19});refreshCart();}
 function posSearch(v){window.__posq=v;}
@@ -2175,11 +2187,25 @@ views.einstellungen=function(){
        <div class="row" style="margin-top:12px">${w.connected?`<span class="pill solid"><span class="d"></span>Verbunden</span><button class="btn" onclick="wgDisconnect()">Trennen</button>`:`<button class="btn pri" onclick="wgConnect()">Verbinden</button><span class="muted" style="font-size:13px">Vertragsprüfung &amp; Schadensmeldung im Auftrag.</span>`}
          <button class="btn" onclick="go('versicherung')">Versicherungsfälle öffnen</button></div>`;})()}
      </div>
-     <div class="card"><b>Benutzer & Rollen</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Geschäftsführung hat Vollzugriff. Mitarbeiter sehen keine Umsätze, Statistik, Buchhaltung oder das Kassenbuch.</p>
+     <div class="card" style="grid-column:1/-1"><b>Benachrichtigungen</b><p class="muted" style="font-size:13px;margin:4px 0 12px">E-Mail (SMTP) und SMS für Auto-Nachrichten &amp; Erinnerungen. Prototyp – im echten System werden hiermit die Nachrichten wirklich verschickt.</p>
+       ${(function(){const nt=ensureSettings().notify;return `
+       <div class="grid g2"><div><label class="f">Absender-Name</label><input class="in" value="${esc(nt.fromName||'')}" placeholder="${esc(SHOP.name)}" onchange="ensureSettings().notify.fromName=this.value;save()"></div>
+       <div><label class="f">SMTP-Server</label><input class="in" value="${esc(nt.smtpHost||'')}" placeholder="smtp.provider.de" onchange="ensureSettings().notify.smtpHost=this.value;save()"></div>
+       <div><label class="f">SMTP-Benutzer</label><input class="in" value="${esc(nt.smtpUser||'')}" placeholder="mail@shop.de" onchange="ensureSettings().notify.smtpUser=this.value;save()"></div>
+       <div><label class="f">SMTP-Passwort</label><input class="in" type="password" placeholder="••••••" onchange="ensureSettings().notify.smtpPass=this.value;save()"></div></div>
+       <div class="integ" style="justify-content:space-between;margin-top:12px"><div><b>SMS-Versand</b><div class="muted" style="font-size:12px">${nt.smsOn?'aktiv':'deaktiviert'}</div></div><button class="switch ${nt.smsOn?'on':''}" onclick="ensureSettings().notify.smsOn=!ensureSettings().notify.smsOn;save();views.einstellungen();paintIcons()"><i></i></button></div>
+       ${nt.smsOn?`<label class="f" style="margin-top:10px">SMS-Gateway</label><input class="in" value="${esc(nt.smsGateway||'')}" placeholder="z. B. sipgate / Twilio – API-Key" onchange="ensureSettings().notify.smsGateway=this.value;save()">`:''}
+       <div class="note" style="margin-top:10px">Vorlagen bearbeitest du im Reiter „Erinnerungen" und je Status unter „Status &amp; Automatisierungen".</div>
+       <div class="row" style="margin-top:12px"><button class="btn" onclick="toast('Testnachricht gesendet (Demo)')">Testnachricht senden</button></div>`;})()}
+     </div>
+     <div class="card"><b>Benutzer & Rollen</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Geschäftsführung hat Vollzugriff. Mitarbeiter-Zugriff ist unten frei einstellbar.</p>
        ${S.users.map(u=>`<div class="listitem"><div class="avatar ${u.role==='inhaber'?'':'out'}">${initials(u.name)}</div><div style="flex:1;min-width:0"><b>${esc(u.name)}${u.id===S.userId?' <span class="tag">Du</span>':''}</b><div class="muted" style="font-size:12px">${ROLE_LABEL[u.role]} · ${u.role==='inhaber'?'Vollzugriff':'operativ (kein Umsatz)'}</div></div>
          <select class="in" style="width:auto;padding:6px 10px" onchange="setUserRole('${u.id}',this.value)"><option value="inhaber"${u.role==='inhaber'?' selected':''}>Geschäftsführung</option><option value="mitarbeiter"${u.role==='mitarbeiter'?' selected':''}>Mitarbeiter</option></select>
          ${u.id===S.userId?'':`<button class="btn sm gho" onclick="removeUser('${u.id}')">Entfernen</button>`}</div>`).join('')}
        <button class="btn" style="margin-top:12px" onclick="addUser()">Mitarbeiter anlegen</button>
+       <label class="f" style="margin-top:16px">Mitarbeiter-Zugriff – welche Bereiche dürfen Mitarbeiter sehen?</label>
+       <div class="row" style="flex-wrap:wrap;gap:8px">${[['statistik','Statistik'],['buchhaltung','Buchhaltung'],['ankauf','Ankauf/Verkauf'],['einstellungen','Einstellungen'],['angebote','Angebote'],['versicherung','Versicherung'],['preise','Modelle & Preise'],['bestellungen','Bestellungen'],['lager','Lager']].map(v=>{const hidden=maHidden().indexOf(v[0])>=0;return `<button class="chip ${hidden?'':'on'}" onclick="toggleMaView('${v[0]}')">${v[1]} ${hidden?'✕':'✓'}</button>`;}).join('')}</div>
+       <div class="muted" style="font-size:12px;margin-top:6px">Grün = für Mitarbeiter sichtbar. Umsätze/Marge bleiben unabhängig davon der Geschäftsführung vorbehalten.</div>
      </div>
    </div>`;
 };
