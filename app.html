@@ -192,7 +192,7 @@
       <a data-view="versicherung"><span class="ic" data-ic="shield"></span> Versicherung <span class="badge" id="bg-ins">0</span></a>
       <div class="grouplbl">Werkstatt</div>
       <a data-view="erinnerungen"><span class="ic" data-ic="bell"></span> Erinnerungen <span class="badge" id="bg-rem">0</span></a>
-      <a data-view="bestellungen"><span class="ic" data-ic="box"></span> Bestellungen</a>
+      <a data-view="bestellungen"><span class="ic" data-ic="box"></span> Bestellungen <span class="badge" id="bg-best">0</span></a>
       <a data-view="lager"><span class="ic" data-ic="arch"></span> Lager &amp; Teile <span class="badge" id="bg-lager">0</span></a>
       <a data-view="ankauf"><span class="ic" data-ic="swap"></span> Ankauf / Verkauf</a>
       <a data-view="preise"><span class="ic" data-ic="tag"></span> Modelle &amp; Preise</a>
@@ -564,6 +564,7 @@ function refreshBadges(){
   const bi=document.getElementById('bg-ins'); if(bi){const n=S.ord.filter(o=>o.ins&&o.ins.on&&['geprueft','eingereicht','freigegeben'].includes(o.ins.status)).length+((S.wgLeads||[]).length); bi.textContent=n; bi.style.display=n?'':'none';}
   const ba=document.getElementById('bg-ang'); if(ba){const n=(S.quotes||[]).filter(q=>['entwurf','offen','angenommen'].includes(q.status)).length+((S.requests||[]).length); ba.textContent=n; ba.style.display=n?'':'none';}
   const bl=document.getElementById('bg-lager'); if(bl){const n=(S.parts||[]).filter(p=>p.stock<=p.min).length; bl.textContent=n; bl.style.display=n?'':'none';}
+  const bo=document.getElementById('bg-best'); if(bo){const n=(S.orders||[]).filter(b=>b.status!=='geliefert'&&b.status!=='storniert').length; bo.textContent=n; bo.style.display=n?'':'none';}
 }
 
 /* ============================ DASHBOARD ============================ */
@@ -1343,25 +1344,54 @@ function previewQueue(i){const r=computeQueue()[i];const rule=S.rules.find(x=>x.
 function fireQueue(i){const r=computeQueue()[i];const rule=S.rules.find(x=>x.id===r.ruleId);logMail(r.o||{cid:''},rule,'manuell aus Liste');toast(r.ch+' an '+r.toName+' gesendet');views.erinnerungen();paintIcons();}
 
 /* ============================ BESTELLUNGEN ============================ */
+/* ============================ BESTELLWESEN (P5) ============================ */
+let procTab='alle';
+function ensureProc(){ let ch=false; (S.orders||[]).forEach(b=>{ if(!b.type){b.type=(b.nr==='Lager'||!b.ref)?'lager':'kunde';ch=true;} if(b.qty===undefined){b.qty=1;ch=true;} if(!b.prio){b.prio='normal';ch=true;} if(!b.created){b.created=today();ch=true;} }); if(ch)save(); }
+const PROC_ST={offen:'Offen',bestellt:'Bestellt',unterwegs:'Unterwegs',geliefert:'Eingetroffen',storniert:'Storniert'};
+const PROC_FLOW=['offen','bestellt','unterwegs','geliefert','storniert'];
+function procReceive(id){const b=S.orders.find(x=>x.id===id);if(!b)return;b.status='geliefert';if(b.partId){stockMove(b.partId,+b.qty||1,'zugang','Bestellung eingetroffen');}const r=S.rules.find(x=>x.id==='w_part');if(r&&r.on){S.mailLog.unshift({t:new Date().toISOString(),to:'Werkstatt',ch:r.ch,rule:r.name,subj:'Ersatzteil eingetroffen: '+(b.part||''),how:'automatisch'});}if(b.ref){const o=S.ord.find(x=>x.id===b.ref);if(o&&o.status==='warten')o.status='bearbeitung';}save();toast('Eingetroffen'+(b.partId?' · Lager gebucht':''));views.bestellungen();paintIcons();refreshBadges();}
+function deliverOrder(id){procReceive(id);}
+function procSetStatus(id,v){if(v==='geliefert'){procReceive(id);return;}const b=S.orders.find(x=>x.id===id);if(b){b.status=v;save();views.bestellungen();paintIcons();refreshBadges();}}
+function procSetPrio(id,v){const b=S.orders.find(x=>x.id===id);if(b){b.prio=v;save();views.bestellungen();paintIcons();}}
+function procDel(id){if(!confirm('Bestellung löschen?'))return;S.orders=S.orders.filter(x=>x.id!==id);save();views.bestellungen();paintIcons();refreshBadges();toast('Bestellung gelöscht');}
+function newStockOrder(){ensureInv();openModal(`<div class="dhead"><b style="flex:1">Lagerbestellung</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+  <div class="dbody"><label class="f">Teil aus Lager (füllt Felder) – oder frei eingeben</label>
+   <select class="in" id="so_part" onchange="var p=S.parts.find(x=>x.id===this.value);if(p){document.getElementById('so_name').value=p.name;document.getElementById('so_sup').value=p.supplier||'';}"><option value="">— frei eingeben —</option>${S.parts.map(p=>`<option value="${p.id}">${esc(p.name)} · Bestand ${p.stock}</option>`).join('')}</select>
+   <label class="f" style="margin-top:10px">Bezeichnung</label><input class="in" id="so_name" placeholder="Teil">
+   <div class="grid g2" style="margin-top:10px"><div><label class="f">Menge</label><input class="in" id="so_qty" type="number" value="5" min="1"></div>
+   <div><label class="f">Lieferant</label><select class="in" id="so_sup"><option value=""></option>${S.suppliers.map(su=>`<option>${esc(su.name)}</option>`).join('')}</select></div></div>
+   <label class="f" style="margin-top:10px">Priorität</label><select class="in" id="so_prio"><option value="normal">Normal</option><option value="dringend">Dringend</option></select>
+   <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn gho" onclick="closeAll()">Abbrechen</button><button class="btn pri" onclick="newStockOrderDo()">Bestellen</button></div></div>`);}
+function newStockOrderDo(){const pid=document.getElementById('so_part').value;const name=document.getElementById('so_name').value.trim();if(!name){toast('Bezeichnung angeben');return;}S.orders.unshift({id:uid('b'),type:'lager',nr:'Lager',partId:pid||'',part:name,qty:+document.getElementById('so_qty').value||1,supplier:document.getElementById('so_sup').value||'',status:'bestellt',prio:document.getElementById('so_prio').value,eta:dPlus(3),ref:'',created:today()});save();closeAll();views.bestellungen();paintIcons();refreshBadges();toast('Lagerbestellung angelegt');}
+function newCustOrder(){const active=S.ord.filter(o=>!o.trashed&&!o.archived&&o.status!=='abgeholt');openModal(`<div class="dhead"><b style="flex:1">Kundenbestellung</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+  <div class="dbody"><label class="f">Für Auftrag</label><select class="in" id="co_ord" onchange="var o=S.ord.find(x=>x.id===this.value);if(o){document.getElementById('co_name').value=oDevLabel(o)+' · '+oIssueLabel(o);}"><option value="">— ohne Auftrag —</option>${active.map(o=>`<option value="${o.id}">${o.nr} · ${esc(cust(o.cid).name)} · ${esc(oDevLabel(o))}</option>`).join('')}</select>
+   <label class="f" style="margin-top:10px">Teil</label><input class="in" id="co_name" placeholder="Teil">
+   <div class="grid g2" style="margin-top:10px"><div><label class="f">Menge</label><input class="in" id="co_qty" type="number" value="1" min="1"></div>
+   <div><label class="f">Lieferant</label><select class="in" id="co_sup"><option value=""></option>${S.suppliers.map(su=>`<option>${esc(su.name)}</option>`).join('')}</select></div></div>
+   <label class="f" style="margin-top:10px">Priorität</label><select class="in" id="co_prio"><option value="normal">Normal</option><option value="dringend">Dringend</option></select>
+   <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn gho" onclick="closeAll()">Abbrechen</button><button class="btn pri" onclick="newCustOrderDo()">Bestellen</button></div></div>`);}
+function newCustOrderDo(){const oid=document.getElementById('co_ord').value;const name=document.getElementById('co_name').value.trim();if(!name){toast('Teil angeben');return;}const o=oid?S.ord.find(x=>x.id===oid):null;S.orders.unshift({id:uid('b'),type:'kunde',nr:o?o.nr:'—',part:name,qty:+document.getElementById('co_qty').value||1,supplier:document.getElementById('co_sup').value||'',status:'bestellt',prio:document.getElementById('co_prio').value,eta:dPlus(3),ref:oid||'',created:today()});if(o&&o.status!=='abgeholt'&&o.status!=='fertig')o.status='warten';save();closeAll();views.bestellungen();paintIcons();refreshBadges();toast('Kundenbestellung angelegt');}
+function reorderLow(partId){ensureInv();const p=S.parts.find(x=>x.id===partId);if(!p)return;const qty=Math.max(1,(p.min*2)-p.stock);S.orders.unshift({id:uid('b'),type:'lager',nr:'Lager',partId,part:p.name,qty,supplier:p.supplier||'',status:'bestellt',prio:'normal',eta:dPlus(3),ref:'',created:today()});save();views.lager();paintIcons();refreshBadges();toast('Nachbestellung: '+p.name+' ×'+qty);}
+function orderPartFor(id){const o=S.ord.find(x=>x.id===id);S.orders.unshift({id:uid('b'),type:'kunde',nr:o.nr,part:oDevLabel(o)+' · '+oIssueLabel(o),qty:1,supplier:'',status:'bestellt',prio:'normal',eta:dPlus(3),ref:o.id,created:today()});o.status='warten';save();closeAll();toast('Ersatzteil bestellt · Auftrag wartet');go('bestellungen');}
+function printProcList(){const open=(S.orders||[]).filter(b=>b.status!=='geliefert'&&b.status!=='storniert');printHTML('Bestellliste',shopHead()+`<h2>Bestellliste</h2><div class="muted">${fmtDate(today())} · ${open.length} offene Positionen</div><table><thead><tr><th>Teil</th><th>Menge</th><th>Lieferant</th><th>Für</th></tr></thead><tbody>${open.map(b=>`<tr><td>${esc(b.part)}</td><td class="mono">${b.qty||1}×</td><td>${esc(b.supplier||'—')}</td><td>${b.type==='kunde'?esc(b.nr):'Lager'}</td></tr>`).join('')||'<tr><td colspan="4">Keine offenen Bestellungen</td></tr>'}</tbody></table>`);}
 views.bestellungen=function(){
-  const m=document.getElementById('main');
-  m.innerHTML=`<div class="between"><div><h1 class="h1">Bestellungen</h1><p class="sub">Ersatzteile – direkt mit Aufträgen verknüpft</p></div>
-     <button class="btn pri" onclick="newPartOrder()">Bestellung</button></div>
-   <div class="card" style="margin-top:16px;padding:0"><table>
-     <thead><tr><th>Für</th><th>Teil</th><th>Lieferant</th><th>Erwartet</th><th>Status</th><th></th></tr></thead>
-     <tbody>${S.orders.map(b=>`<tr>
-       <td><b>${esc(b.nr)}</b></td><td>${esc(b.part)}</td><td>${esc(b.supplier)}</td><td class="mono muted">${fmtDate(b.eta)}${b.eta<today()&&b.status!=='geliefert'?' <span class="tag">überfällig</span>':''}</td>
-       <td>${b.status==='geliefert'?'<span class="pill solid"><span class="d"></span>Geliefert</span>':b.status==='unterwegs'?'<span class="pill"><span class="d"></span>Unterwegs</span>':'<span class="pill soft"><span class="d"></span>Offen</span>'}</td>
-       <td>${b.status!=='geliefert'?`<button class="btn sm" onclick="deliverOrder('${b.id}')">Als geliefert</button>`:''}</td>
-     </tr>`).join('')||'<tr><td colspan="6"><div class="empty">Keine Bestellungen</div></td></tr>'}</tbody></table></div>`;
+  ensureProc(); const m=document.getElementById('main'); const all=S.orders||[];
+  const filt=procTab==='offen'?all.filter(b=>b.status!=='geliefert'&&b.status!=='storniert'):procTab==='kunde'?all.filter(b=>b.type==='kunde'):procTab==='lager'?all.filter(b=>b.type==='lager'):procTab==='geliefert'?all.filter(b=>b.status==='geliefert'):all;
+  const cnt=f=>all.filter(f).length; const tab=(k,l,n)=>`<button class="chip ${procTab===k?'on':''}" onclick="procTab='${k}';views.bestellungen();paintIcons()">${l} · ${n}</button>`;
+  m.innerHTML=`<div class="between"><div><h1 class="h1">Bestellungen</h1><p class="sub">Ersatzteile bestellen – Lager &amp; pro Auftrag</p></div>
+     <div class="row"><button class="btn" onclick="printProcList()">Bestellliste drucken</button><button class="btn" onclick="newCustOrder()">+ Kundenbestellung</button><button class="btn pri" onclick="newStockOrder()">+ Lagerbestellung</button></div></div>
+   <div class="row" style="margin:14px 0;flex-wrap:wrap;gap:8px">${tab('alle','Alle',all.length)}${tab('offen','Offen',cnt(b=>b.status!=='geliefert'&&b.status!=='storniert'))}${tab('kunde','Kundenbestellungen',cnt(b=>b.type==='kunde'))}${tab('lager','Lagerbestellungen',cnt(b=>b.type==='lager'))}${tab('geliefert','Eingetroffen',cnt(b=>b.status==='geliefert'))}</div>
+   <div class="card" style="padding:0;overflow:auto"><table><thead><tr><th>Typ</th><th>Für</th><th>Teil</th><th>Menge</th><th>Lieferant</th><th>Status</th><th>Priorität</th><th>Erwartet</th><th></th></tr></thead>
+     <tbody>${filt.length?filt.map(b=>`<tr>
+       <td>${b.type==='kunde'?'<span class="tag">Kunde</span>':'<span class="tag">Lager</span>'}</td>
+       <td>${b.type==='kunde'?`<b>${esc(b.nr)}</b>`:'<span class="muted">Lager</span>'}</td>
+       <td>${esc(b.part)}</td><td class="mono">${b.qty||1}×</td><td>${esc(b.supplier||'—')}</td>
+       <td><select class="in" style="padding:5px 8px;width:auto" onchange="procSetStatus('${b.id}',this.value)">${PROC_FLOW.map(s=>`<option value="${s}" ${b.status===s?'selected':''}>${PROC_ST[s]}</option>`).join('')}</select></td>
+       <td><select class="in" style="padding:5px 8px;width:auto;${b.prio==='dringend'?'color:#c0392b;font-weight:700':''}" onchange="procSetPrio('${b.id}',this.value)"><option value="normal" ${b.prio!=='dringend'?'selected':''}>Normal</option><option value="dringend" ${b.prio==='dringend'?'selected':''}>Dringend</option></select></td>
+       <td class="muted mono" style="font-size:12px">${fmtDate(b.eta)}${b.eta<today()&&b.status!=='geliefert'&&b.status!=='storniert'?' <span class="tag">überfällig</span>':''}</td>
+       <td style="text-align:right;white-space:nowrap">${b.status!=='geliefert'?`<button class="btn sm pri" onclick="procReceive('${b.id}')">Eingang buchen</button>`:''}<button class="btn sm gho" onclick="procDel('${b.id}')">Löschen</button></td>
+     </tr>`).join(''):`<tr><td colspan="9"><div class="empty">Keine Bestellungen in dieser Ansicht.</div></td></tr>`}</tbody></table></div>`;
 };
-function deliverOrder(id){const b=S.orders.find(x=>x.id===id);b.status='geliefert';
-  const r=S.rules.find(x=>x.id==='w_part'); if(r&&r.on){S.mailLog.unshift({t:new Date().toISOString(),to:'Werkstatt',ch:r.ch,rule:r.name,subj:'Ersatzteil eingetroffen: '+b.nr,how:'automatisch'});}
-  if(b.ref){const o=S.ord.find(x=>x.id===b.ref); if(o&&o.status==='warten'){o.status='bearbeitung';}}
-  save();toast('Als geliefert markiert · Auftrag geht weiter');views.bestellungen();paintIcons();refreshBadges();}
-function newPartOrder(){const part=prompt('Welches Teil bestellen?');if(!part)return;const supplier=prompt('Lieferant:')||'Foneday';
-  S.orders.unshift({id:uid('b'),nr:'Lager',supplier,part,status:'offen',eta:today(),ref:''});save();views.bestellungen();paintIcons();toast('Bestellung angelegt');}
-function orderPartFor(id){const o=S.ord.find(x=>x.id===id);S.orders.unshift({id:uid('b'),nr:o.nr,supplier:'Foneday',part:o.model+' '+o.issue,status:'offen',eta:today(),ref:o.id});o.status='warten';save();closeAll();toast('Teil bestellt · Kunde informiert');go('bestellungen');}
 
 /* ============================ LAGER ============================ */
 /* ============================ WARENWIRTSCHAFT (P2) ============================ */
@@ -1434,7 +1464,7 @@ views.lager=function(){
          <td class="muted" style="font-size:13px">${esc(p.supplier||'—')}</td>
          <td>${p.stock<=p.min?`<span class="pill" style="border-color:#e2681c;color:#e2681c"><span class="d" style="background:#e2681c"></span>${p.stock} / min ${p.min}</span>`:`<b>${p.stock}</b> Stk`}</td>
          <td class="mono">${eur(p.price)}</td><td class="mono">${eur(p.vk||0)}</td><td class="mono">${eur(p.stock*p.price)}</td>
-         <td style="text-align:right;white-space:nowrap"><button class="btn sm gho" onclick="partIn('${p.id}')">+ Eingang</button><button class="btn sm gho" onclick="partOut('${p.id}')">− Abgang</button><button class="btn sm gho" onclick="partInv('${p.id}')">Inventur</button><button class="btn sm gho" onclick="partForm('${p.id}')">Bearb.</button><button class="btn sm gho" onclick="delPart('${p.id}')">Löschen</button></td>
+         <td style="text-align:right;white-space:nowrap">${p.stock<=p.min?`<button class="btn sm" onclick="reorderLow('${p.id}')">Nachbestellen</button>`:''}<button class="btn sm gho" onclick="partIn('${p.id}')">+ Eingang</button><button class="btn sm gho" onclick="partOut('${p.id}')">− Abgang</button><button class="btn sm gho" onclick="partInv('${p.id}')">Inventur</button><button class="btn sm gho" onclick="partForm('${p.id}')">Bearb.</button><button class="btn sm gho" onclick="delPart('${p.id}')">Löschen</button></td>
        </tr>`).join(''):`<tr><td colspan="8"><div class="empty">Keine Teile in dieser Kategorie. „+ Neues Teil" anlegen.</div></td></tr>`}</tbody></table></div>`;
   } else if(lagerTab==='bewegungen'){
     const mv=(S.stockMoves||[]).slice(0,200);
@@ -2586,7 +2616,7 @@ function demoDone(){ if(_demoStop)return; const el=document.getElementById('demo
 
 /* ============================ BOOT ============================ */
 paintIcons();
-(function(){ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); ensureInv(); const n=pullBookings(); const nq=pullRequests(); go('dashboard'); applyNavRole(); if(!curUser())showLogin();
+(function(){ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); ensureInv(); ensureProc(); const n=pullBookings(); const nq=pullRequests(); go('dashboard'); applyNavRole(); if(!curUser())showLogin();
   if(nq) setTimeout(()=>toast(nq+' neue Website-Anfrage'+(nq>1?'n':'')),900);
   if(n) setTimeout(()=>toast(n+' neue Online-Buchung'+(n>1?'en':'')+' übernommen'),500);
 })();
