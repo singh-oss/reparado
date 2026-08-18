@@ -135,7 +135,9 @@ function render(){
       <div class="row"><span>Status seit</span><b>${fmtDate(o.readyAt||o.created)}</b></div>
     </div>
 
-    ${done?`<a class="cta" href="https://${SHOP.google}" target="_blank">Waren Sie zufrieden? Jetzt bewerten</a>`:
+    ${done?`<div class="card" id="revcard"><div style="font-weight:800;font-size:17px;margin-bottom:2px">Wie zufrieden sind Sie mit der Reparatur?</div>
+       <p class="muted" style="font-size:14px;margin-bottom:12px">Ihre Rückmeldung hilft uns.</p>
+       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px"><button class="btn" onclick="rate(1)">Nicht so gut</button><button class="btn" onclick="rate(2)">Gut</button><button class="btn" style="background:#0e7a3c;color:#fff;border-color:#0e7a3c" onclick="rate(3)">Sehr gut</button></div></div>`:
       `<a class="cta" href="tel:${SHOP.phone.replace(/\\s/g,'')}">Rückfrage? ${SHOP.phone} anrufen</a>`}
 
     <div class="foot">${SHOP.name} · ${SHOP.street} · ${SHOP.zip} ${SHOP.city}<br>
@@ -152,6 +154,12 @@ function lookup(wrap,append){
   else wrap.innerHTML=`<h1>Reparatur-Status</h1><p class="sub">Sehen Sie jederzeit, wo Ihre Reparatur steht.</p>`+box;
 }
 function lookupGo(){const v=document.getElementById('nrIn').value.trim();if(!v)return;location.search='?nr='+encodeURIComponent(v);}
+function rate(n){const c=document.getElementById('revcard');if(!c)return;
+  if(n>=3){c.innerHTML='<div style="font-weight:800;font-size:17px">Vielen Dank für Ihr Vertrauen!</div><p class="muted" style="font-size:14px;margin:6px 0 12px">Würden Sie uns mit einer kurzen Google-Bewertung weiterempfehlen? Das hilft uns sehr.</p><a class="cta" href="https://'+SHOP.google+'" target="_blank" onclick="logRev(3,\'\')">Jetzt auf Google bewerten</a>';logRev(3,'');}
+  else{c.innerHTML='<div style="font-weight:800;font-size:17px">Das tut uns leid.</div><p class="muted" style="font-size:14px;margin:6px 0 10px">Was können wir besser machen? Ihr Feedback geht direkt an die Werkstatt – nicht öffentlich.</p><textarea class="in" id="fbtext" rows="3" placeholder="Ihre Rückmeldung…"></textarea><button class="btn" style="width:100%;margin-top:10px;background:#0e7a3c;color:#fff;border-color:#0e7a3c" onclick="sendFb('+n+')">Feedback senden</button>';}
+}
+function logRev(n,t){let arr=[];try{arr=JSON.parse(localStorage.getItem('reparado_feedback')||'[]');}catch(e){}arr.push({nr:param('nr'),rating:n,text:t,ts:Date.now()});localStorage.setItem('reparado_feedback',JSON.stringify(arr));}
+function sendFb(n){const t=(document.getElementById('fbtext')||{}).value||'';logRev(n,t.trim());document.getElementById('revcard').innerHTML='<div style="font-weight:800;font-size:17px">Danke für Ihr Feedback!</div><p class="muted" style="font-size:14px;margin-top:6px">Wir kümmern uns darum und melden uns bei Ihnen.</p>';}
 
 render();
 </script>

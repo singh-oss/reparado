@@ -44,8 +44,8 @@ Wachstums-Motoren (Versandreparatur, B2B, Forecast) · **Echtes System** (DB, Au
 
 | # | Feature | Typ | Effort | Impact | Abhängig |
 |---|---|---|---|---|---|
-| L1 | **📸 Foto-Diagnose** — Gerät fotografieren → KI erkennt Schaden, schlägt Reparatur+Teil+Preis vor (Annahme + online) | Leap ★ | M | ★★★ | erweitert KI-Diagnose |
-| L2 | **⚡ Auto-Angebot aus Anfrage** — Website-Anfrage → KI schreibt Angebot fertig, 1 Klick „senden" | Leap ★ | M | ★★★ | P1, L1 |
+| ✅ L1 | **📸 Foto-Diagnose** — Gerät fotografieren → KI erkennt Schaden, schlägt Reparatur+Teil+Preis vor · **FERTIG 18.8.** (Sim/Prototyp) | Leap ★ | M | ★★★ | erweitert KI-Diagnose |
+| ✅ L2 | **⚡ Auto-Angebot aus Diagnose** — Diagnose/Foto → 1-Klick fertiges Angebot (Gerät/Reparatur/Preis vorbefüllt) · **FERTIG 18.8.** | Leap ★ | M | ★★★ | P1, L1 |
 | L6 | **⭐ Bewertungs-Booster** — nach Abholung nur zufriedene Kunden (Sentiment-Gate) um Google-Bewertung bitten | Leap | S–M | ★★★ | — |
 | L5 | **🔁 Reaktivierung** — KI findet fällige Kunden (Akku vor 18 Mon., Garantie läuft aus) → Outreach | Leap | M | ★★★ | — |
 | ✅ L9 | **💰 Echte Marge pro Auftrag** — Preis − Teilekosten (EK aus Lager) − Arbeitszeit = Gewinn €/%, Verlust rot; Statistik-Kennzahlen · **FERTIG 18.8.** | Leap | M | ★★★ | Teilekosten aus P2 |

@@ -599,6 +599,8 @@ views.dashboard=function(){
        <div><div style="font-size:22px;font-weight:800">${S.calls.filter(c=>c.task&&!c.done).length}</div><div style="opacity:.7;font-size:12px">Aufgaben für dich</div></div>
      </div>
    </div>
+   ${(S.feedback&&S.feedback.length)?`<div class="card" style="margin-top:16px"><div class="between"><b>Kundenstimmen</b><span class="muted" style="font-size:12px">${S.feedback.length} Rückmeldung${S.feedback.length>1?'en':''} · ${(S.feedback||[]).filter(f=>f.rating>=3).length} positiv → Google · ${(S.feedback||[]).filter(f=>f.rating<3).length} zur Bearbeitung</span></div>
+     <div style="margin-top:8px">${S.feedback.slice(0,4).map(f=>`<div class="listitem"><span class="pill ${f.rating>=3?'solid':'soft'}"><span class="d"></span>${f.rating>=3?'Positiv':(f.rating===2?'Neutral':'Kritik')}</span><div style="flex:1;min-width:0"><b>${esc(f.nr||'—')}</b><div class="muted" style="font-size:13px">${esc(f.text||(f.rating>=3?'Auf Google weitergeleitet':'ohne Kommentar'))}</div></div><button class="btn sm gho" onclick="dismissFb('${f.id}')">Erledigt</button></div>`).join('')}</div></div>`:''}
    <div class="grid g2" style="margin-top:16px">
      <div class="card">
        <div class="between"><b>Heute zu tun</b><button class="btn sm gho" onclick="go('kalender')">Alle</button></div>
@@ -739,6 +741,7 @@ function openOrder(id){
      <div class="divider"></div>
      <label class="f">Status-Link für den Kunden</label>
      <div class="row"><input class="in" style="flex:1" readonly value="${track}"><button class="btn" onclick="navigator.clipboard&&navigator.clipboard.writeText('${track}');toast('Link kopiert')">Kopieren</button><button class="btn" onclick="window.open('status.html?nr=${o.nr}','_blank')">Ansehen</button></div>
+     ${o.status==='abgeholt'?`<div class="row" style="margin-top:10px;align-items:center;gap:10px"><button class="btn" onclick="askReview('${o.id}')">${o.reviewAsked?'Bewertung erneut anfragen':'Bewertung anfragen'}</button><span class="muted" style="font-size:12px">${o.reviewAsked?'bereits angefragt':'Zufriedene Kunden werden zu Google geleitet, kritische bleiben intern.'}</span></div>`:''}
 
      <div class="divider"></div>
      <div class="row" style="justify-content:flex-end;gap:8px">${o.archived?`<button class="btn gho" onclick="restoreOrder('${o.id}')">Aus Archiv holen</button>`:`<button class="btn gho" onclick="archiveOrder('${o.id}')">Archivieren</button>`}<button class="btn gho" onclick="trashOrder('${o.id}')">In den Papierkorb</button></div>
@@ -1102,6 +1105,10 @@ function requestToOrder(id){const r=(S.requests||[]).find(x=>x.id===id);if(!r)re
 }
 function dismissRequest(id){S.requests=(S.requests||[]).filter(x=>x.id!==id);save();if(current==='angebote')views.angebote();paintIcons();refreshBadges();toast('Anfrage erledigt');}
 function pullRequests(){let arr=[];try{arr=JSON.parse(localStorage.getItem('reparado_requests')||'[]');}catch(e){}if(!arr.length)return 0;S.requests=S.requests||[];arr.forEach(r=>{S.requests.unshift(Object.assign({id:uid('rq')},r,{ts:r.ts?(typeof r.ts==='number'?new Date(r.ts).toISOString():r.ts):new Date().toISOString()}));});localStorage.removeItem('reparado_requests');save();return arr.length;}
+/* ---- Bewertungs-Booster (L6): Feedback von der Statusseite ---- */
+function pullFeedback(){let arr=[];try{arr=JSON.parse(localStorage.getItem('reparado_feedback')||'[]');}catch(e){}if(!arr.length)return 0;S.feedback=S.feedback||[];arr.forEach(f=>{S.feedback.unshift(Object.assign({id:uid('fb')},f,{ts:f.ts?(typeof f.ts==='number'?new Date(f.ts).toISOString():f.ts):new Date().toISOString()}));});localStorage.removeItem('reparado_feedback');save();return arr.length;}
+function dismissFb(id){S.feedback=(S.feedback||[]).filter(f=>f.id!==id);save();views.dashboard();paintIcons();toast('Erledigt');}
+function askReview(id){const o=S.ord.find(x=>x.id===id);if(!o)return;o.reviewAsked=true;const c=cust(o.cid);S.mailLog.unshift({t:new Date().toISOString(),to:c.name,ch:'E-Mail',rule:'Bewertungsanfrage',subj:'Wie war Ihre Reparatur? '+o.nr,how:'manuell'});save();openOrder(id);toast('Bewertungs-Anfrage an Kunden gesendet (Demo)');}
 
 /* ============================ DRUCK (Etikett, Beleg, Garantie, KVA) ============================ */
 const PRINTCSS=`*{box-sizing:border-box;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#0e7a3c}
@@ -2637,11 +2644,11 @@ function demoDone(){ if(_demoStop)return; const el=document.getElementById('demo
 
 /* ============================ BOOT ============================ */
 paintIcons();
-(function(){ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); ensureInv(); ensureProc(); const n=pullBookings(); const nq=pullRequests(); go('dashboard'); applyNavRole(); if(!curUser())showLogin();
+(function(){ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); ensureInv(); ensureProc(); const n=pullBookings(); const nq=pullRequests(); pullFeedback(); go('dashboard'); applyNavRole(); if(!curUser())showLogin();
   if(nq) setTimeout(()=>toast(nq+' neue Website-Anfrage'+(nq>1?'n':'')),900);
   if(n) setTimeout(()=>toast(n+' neue Online-Buchung'+(n>1?'en':'')+' übernommen'),500);
 })();
-window.addEventListener('focus',()=>{const n=pullBookings(); const nq=pullRequests(); if(n||nq){if(current!=='neworder')go(current);if(n)toast(n+' neue Online-Buchung'+(n>1?'en':'')+' übernommen');else if(nq)toast(nq+' neue Website-Anfrage'+(nq>1?'n':''));}});
+window.addEventListener('focus',()=>{const n=pullBookings(); const nq=pullRequests(); const nf=pullFeedback(); if(n||nq||nf){if(current!=='neworder')go(current);if(n)toast(n+' neue Online-Buchung'+(n>1?'en':'')+' übernommen');else if(nq)toast(nq+' neue Website-Anfrage'+(nq>1?'n':''));else if(nf)toast(nf+' neue Kundenbewertung'+(nf>1?'en':''));}});
 </script>
 </body>
 </html>
