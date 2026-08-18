@@ -182,6 +182,7 @@
       <a data-view="preise"><span class="ic" data-ic="tag"></span> Modelle &amp; Preise</a>
       <div class="grouplbl">Verkauf</div>
       <a data-view="kasse"><span class="ic" data-ic="rcpt"></span> Kasse</a>
+      <a data-view="buchhaltung"><span class="ic" data-ic="book"></span> Buchhaltung <span class="badge" id="bg-beleg">0</span></a>
       <a data-view="statistik"><span class="ic" data-ic="chart"></span> Statistik</a>
       <div class="grouplbl">System</div>
       <a data-view="einstellungen"><span class="ic" data-ic="gear"></span> Einstellungen</a>
@@ -226,6 +227,7 @@ const ICONS={
  swap:'<path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
  tag:'<path d="M3 3h8l10 10-8 8L3 11V3z"/><circle cx="7.5" cy="7.5" r="1.4"/>',
  rcpt:'<rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 8h6M9 12h6M9 16h4"/>',
+ book:'<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19a2 2 0 0 1 2-2h13"/>',
  chart:'<path d="M3 21h18"/><rect x="6" y="10" width="3" height="8"/><rect x="11" y="6" width="3" height="12"/><rect x="16" y="13" width="3" height="5"/>',
  gear:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1l2.1-2.1M17 7l2.1-2.1"/>',
  plus:'<path d="M12 5v14M5 12h14"/>',
@@ -439,6 +441,7 @@ function refreshBadges(){
   document.getElementById('bg-auf').textContent=S.ord.filter(o=>o.status!=='abgeholt').length;
   document.getElementById('bg-rem').textContent=computeQueue().length;
   const bc=document.getElementById('bg-call'); if(bc) bc.textContent=(S.calls||[]).filter(c=>c.task&&!c.done).length;
+  const bb=document.getElementById('bg-beleg'); if(bb) bb.textContent=(S.belege||[]).filter(x=>x.status==='neu').length;
 }
 
 /* ============================ DASHBOARD ============================ */
@@ -1217,6 +1220,14 @@ views.einstellungen=function(){
        <div><label class="f">Öffnungszeiten</label><input class="in" value="${SHOP.hours}"></div></div>
        <div class="note" style="margin-top:12px">Beleg, Etikett, Kostenvoranschlag und Garantie-Nachweis lassen sich direkt aus jedem Auftrag drucken.</div>
      </div>
+     <div class="card"><b>Buchhaltung</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Verfahren, Kontenrahmen, DATEV und Beleg-Postfach.</p>
+       ${(function(){const a=ensureAcct();return `
+       <label class="f">Verfahren</label>
+       <div class="seg" style="width:100%"><button class="${a.mode==='euer'?'on':''}" style="flex:1" onclick="S.acct.mode='euer';save();views.einstellungen();paintIcons()">Einfache Buchführung (EÜR)</button><button class="${a.mode==='doppik'?'on':''}" style="flex:1" onclick="S.acct.mode='doppik';save();views.einstellungen();paintIcons()">Doppelte Buchführung</button></div>
+       <div class="grid g2" style="margin-top:12px"><div><label class="f">Kontenrahmen</label><select class="in" onchange="S.acct.skr=this.value;save()"><option${a.skr==='SKR03'?' selected':''}>SKR03</option><option${a.skr==='SKR04'?' selected':''}>SKR04</option></select></div>
+       <div><label class="f">Beleg-Postfach</label><div class="integ" style="padding:8px 12px;justify-content:space-between"><span style="font-size:13px">E-Mail-Eingang</span><button class="switch ${a.mailConnected?'on':''}" onclick="S.acct.mailConnected=!S.acct.mailConnected;save();views.einstellungen();paintIcons()"><i></i></button></div></div></div>
+       <div class="row" style="margin-top:12px"><span class="pill ${a.datev.connected?'solid':'soft'}"><span class="d"></span>${a.datev.connected?'DATEV verbunden':'DATEV nicht verbunden'}</span><button class="btn" onclick="go('buchhaltung');buchTab='datev';views.buchhaltung();paintIcons()">Buchhaltung öffnen</button></div>`;})()}
+     </div>
      <div class="card"><b>Benutzer & Rollen</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Mehrere Mitarbeiter, klare Rechte.</p>
        <div class="listitem"><div class="avatar">DH</div><div style="flex:1"><b>Inhaber</b><div class="muted" style="font-size:12px">Vollzugriff</div></div><span class="tag">Admin</span></div>
        <div class="listitem"><div class="avatar">MA</div><div style="flex:1"><b>Mitarbeiter</b><div class="muted" style="font-size:12px">Aufträge & Kasse</div></div><span class="tag">Techniker</span></div>
@@ -1259,6 +1270,164 @@ function globalSearch(v){ if(!v){go(current);return;} v=v.toLowerCase();
   const m=document.getElementById('main');
   m.innerHTML=`<h1 class="h1">Suche: „${esc(v)}"</h1><p class="sub">${hits.length} Treffer</p>
     <div class="card" style="margin-top:16px;padding:0"><table><tbody>${hits.map(o=>`<tr onclick="openOrder('${o.id}')"><td><b>${o.nr}</b></td><td>${esc(cust(o.cid).name)}</td><td>${esc(o.model)}</td><td>${esc(o.issue)}</td><td>${statusPill(o.status)}</td></tr>`).join('')||'<tr><td><div class="empty">Nichts gefunden</div></td></tr>'}</tbody></table></div>`;
+}
+
+/* ============================ BUCHHALTUNG (EÜR/Doppik, DATEV, E-Mail-Belege) ============================ */
+let buchTab='overview';
+const KONTEN={erloese:{nr:'8400',label:'Erlöse 19%'},wareneinkauf:{nr:'3400',label:'Wareneingang'},miete:{nr:'4210',label:'Raum/Miete'},telefon:{nr:'4920',label:'Telefon/Internet'},buero:{nr:'4930',label:'Bürobedarf'},versicherung:{nr:'4360',label:'Versicherungen'},werbung:{nr:'4600',label:'Werbung'},kfz:{nr:'4530',label:'Kfz-Kosten'},bank:{nr:'1200',label:'Bank'},kasse:{nr:'1000',label:'Kasse'},kreditor:{nr:'1600',label:'Verbindlichk.'},ust:{nr:'1776',label:'USt 19%'},vst:{nr:'1576',label:'Vorsteuer 19%'}};
+const CAT_LABEL={erloese:'Erlöse',wareneinkauf:'Wareneinkauf',miete:'Miete',telefon:'Telefon/Internet',buero:'Bürobedarf',versicherung:'Versicherung',werbung:'Werbung',kfz:'Kfz'};
+function defaultAcct(){return {mode:'euer',skr:'SKR03',datev:{connected:false,beraterNr:'',mandantNr:''},mailConnected:true,seeded:false};}
+function ensureAcct(){ if(!S.acct){S.acct=defaultAcct();save();} if(!S.acct.seeded)seedAcct(); return S.acct; }
+function seedAcct(){
+  const a=S.acct; const dm=(o)=>{const x=new Date();x.setDate(x.getDate()+o);return x.toISOString().slice(0,10);};
+  const B=[]; let n=1;
+  const addEin=(off,text,gross)=>{const net=gross/1.19;B.push({id:'bk'+(n++),date:dm(off),text,gross,net,vat:gross-net,vatRate:19,dir:'ein',catKey:'erloese',src:'reparatur',status:'gebucht'});};
+  const addAus=(off,text,gross,catKey,rate,src)=>{rate=rate==null?19:rate;const net=rate?gross/(1+rate/100):gross;B.push({id:'bk'+(n++),date:dm(off),text,gross,net,vat:gross-net,vatRate:rate,dir:'aus',catKey,src:src||'manual',status:'gebucht'});};
+  [[-1,'Reparatur REP-1108 · Galaxy S22 Display',250],[-1,'Kassenumsatz Tag',166],[-2,'Reparatur REP-1106 · Ladebuchse',75],[-2,'Reparatur · iPhone 14 Display',179],[-3,'Reparatur · Akkutausch',69],[-3,'Kassenumsatz Tag',231],[-4,'Reparatur · Displaytausch',129],[-4,'Reparatur · Backcover iPhone 15',179],[-5,'Reparatur · Display Pro',269],[-5,'Kassenumsatz Tag',142],[-6,'Reparatur · Kameraglas',59],[-6,'Reparatur · Displaytausch S23',209],[-7,'Reparatur · Displaytausch iPhone 15',249],[-7,'Kassenumsatz Tag',204],[-8,'Reparatur · Akku + Display',198],[-9,'Reparatur · Displaytausch',149],[-9,'Kassenumsatz Tag',187],[-10,'Reparatur · Wasserschaden-Reinigung',120],[-10,'Reparatur · Akkutausch',69],[-11,'Reparatur · Displaytausch',159],[-12,'Kassenumsatz Tag',176],[-12,'Reparatur · Backcover',175],[-13,'Reparatur · Display + Akku',299]].forEach(e=>addEin(e[0],e[1],e[2]));
+  addAus(-4,'Foneday · Ersatzteile RE-24020',412.00,'wareneinkauf',19,'email');
+  addAus(-7,'GSMparts · Displays 2026-5501',588.00,'wareneinkauf',19,'email');
+  addAus(-1,'Miete Werkstatt',950.00,'miete',0,'email');
+  addAus(-6,'Deutsche Telekom · Juli',79.90,'telefon',19,'email');
+  addAus(-11,'Allianz · Betriebshaftpflicht',48.50,'versicherung',19,'email');
+  S.bookings=B;
+  S.belege=[
+   {id:'bl1',from:'Foneday B.V.',email:'billing@foneday.com',subject:'Ihre Rechnung RE-24188 – Ersatzteile',date:dm(0),invNo:'RE-24188',gross:342.00,vatRate:19,catKey:'wareneinkauf',due:dm(14),confidence:97,status:'neu',source:'email'},
+   {id:'bl2',from:'Deutsche Telekom',email:'rechnung@telekom.de',subject:'Ihre Telekom Rechnung August 2026',date:dm(0),invNo:'2026-8801921',gross:79.90,vatRate:19,catKey:'telefon',due:dm(10),confidence:99,status:'neu',source:'email'},
+   {id:'bl3',from:'Hausverwaltung Balingen',email:'buchhaltung@hv-balingen.de',subject:'Miete Gewerbe September',date:dm(-1),invNo:'M-2026-09',gross:950.00,vatRate:0,catKey:'miete',due:dm(3),confidence:95,status:'neu',source:'email'},
+   {id:'bl4',from:'GSMparts GmbH',email:'invoice@gsmparts.de',subject:'Rechnung 2026-5567 – Display-Lieferung',date:dm(-1),invNo:'2026-5567',gross:588.00,vatRate:19,catKey:'wareneinkauf',due:dm(13),confidence:96,status:'neu',source:'email'}
+  ];
+  S.belege.forEach(b=>{b.net=b.vatRate?b.gross/(1+b.vatRate/100):b.gross;b.vat=b.gross-b.net;});
+  a.seeded=true; save();
+}
+views.buchhaltung=function(){
+  const a=ensureAcct(); const m=document.getElementById('main');
+  const inbox=S.belege.filter(b=>b.status==='neu');
+  m.innerHTML=`<div class="between"><div><h1 class="h1">Buchhaltung</h1><p class="sub">${a.mode==='euer'?'Einnahmen-Überschuss-Rechnung (EÜR)':'Doppelte Buchführung'} · Kontenrahmen ${a.skr}${a.datev.connected?' · DATEV verbunden':''}</p></div>
+     <div class="row"><span class="pill soft"><span class="d"></span>${a.mode==='euer'?'EÜR':'Doppik'}</span><button class="btn" onclick="datevExport()">DATEV-Export</button></div></div>
+   <div class="seg" style="margin:16px 0">
+     <button class="${buchTab==='overview'?'on':''}" onclick="buchTab='overview';views.buchhaltung();paintIcons()">Übersicht</button>
+     <button class="${buchTab==='belege'?'on':''}" onclick="buchTab='belege';views.buchhaltung();paintIcons()">Belege-Eingang${inbox.length?' · '+inbox.length:''}</button>
+     <button class="${buchTab==='journal'?'on':''}" onclick="buchTab='journal';views.buchhaltung();paintIcons()">Buchungen</button>
+     <button class="${buchTab==='datev'?'on':''}" onclick="buchTab='datev';views.buchhaltung();paintIcons()">DATEV</button>
+   </div><div id="buchBody"></div>`;
+  document.getElementById('buchBody').innerHTML=({overview:buchOverview,belege:buchBelege,journal:buchJournal,datev:buchDatev}[buchTab])();
+};
+function buchOverview(){
+  const a=S.acct; const bk=S.bookings.filter(b=>isThisMonth(b.date));
+  const ein=bk.filter(b=>b.dir==='ein').reduce((s,b)=>s+b.gross,0);
+  const aus=bk.filter(b=>b.dir==='aus').reduce((s,b)=>s+b.gross,0);
+  const ustEin=bk.filter(b=>b.dir==='ein').reduce((s,b)=>s+b.vat,0);
+  const vst=bk.filter(b=>b.dir==='aus').reduce((s,b)=>s+b.vat,0);
+  const zahllast=ustEin-vst;
+  const ueberschuss=(a.mode==='euer')?(ein-aus):((ein-ustEin)-(aus-vst));
+  const inbox=S.belege.filter(b=>b.status==='neu');
+  const by={};bk.filter(b=>b.dir==='aus').forEach(b=>by[b.catKey]=(by[b.catKey]||0)+b.gross);const maxC=Math.max(1,...Object.values(by));
+  return `<div class="grid g4">
+    <div class="card kpi"><div class="n">${eur(ein)}</div><div class="l">Einnahmen (Monat)</div></div>
+    <div class="card kpi"><div class="n">${eur(aus)}</div><div class="l">Ausgaben (Monat)</div></div>
+    <div class="card kpi"><div class="n">${eur(ueberschuss)}</div><div class="l">${a.mode==='euer'?'Überschuss (EÜR)':'Gewinn'}</div></div>
+    <div class="card kpi"><div class="n">${eur(zahllast)}</div><div class="l">USt-Zahllast</div></div>
+   </div>
+   ${inbox.length?`<div class="card" style="margin-top:16px;border:1px solid var(--green)"><div class="between"><div><b>${inbox.length} neue Rechnung(en) im Posteingang</b><div class="muted" style="font-size:13px">Automatisch aus deinem E-Mail-Postfach erkannt – ein Klick zum Verbuchen.</div></div><button class="btn pri" onclick="buchTab='belege';views.buchhaltung();paintIcons()">Belege prüfen</button></div></div>`:''}
+   <div class="grid g2" style="margin-top:16px">
+     <div class="card"><b>USt-Voranmeldung (Monat)</b>
+       <div class="between" style="margin-top:12px;font-size:14px"><span>Umsatzsteuer (Erlöse 19 %)</span><b class="mono">${eur(ustEin)}</b></div>
+       <div class="between" style="margin-top:6px;font-size:14px"><span>abziehbare Vorsteuer</span><b class="mono">− ${eur(vst)}</b></div>
+       <div class="divider"></div><div class="between"><b>Zahllast an Finanzamt</b><b style="font-size:18px">${eur(zahllast)}</b></div>
+     </div>
+     <div class="card"><b>Ausgaben nach Kategorie</b><div style="margin-top:12px">${Object.entries(by).sort((x,y)=>y[1]-x[1]).map(([k,v])=>`<div style="margin-bottom:10px"><div class="between" style="font-size:13px;margin-bottom:3px"><span>${CAT_LABEL[k]||k}</span><b class="mono">${eur(v)}</b></div><div class="bar"><i style="width:${v/maxC*100}%"></i></div></div>`).join('')||'<div class="muted">Keine Ausgaben</div>'}</div></div>
+   </div>`;
+}
+function buchBelege(){
+  const inbox=S.belege.filter(b=>b.status==='neu');const done=S.belege.filter(b=>b.status==='gebucht');
+  return `<div class="between"><div><b>E-Mail-Posteingang · erkannte Rechnungen</b><div class="muted" style="font-size:13px">Postfach ${S.acct.mailConnected?'verbunden':'nicht verbunden'} · Rechnungen werden automatisch per KI/OCR erkannt.</div></div><button class="btn" onclick="uploadBeleg()">Beleg hochladen</button></div>
+   <div class="card" style="margin-top:14px;padding:0">${inbox.length?inbox.map(b=>`
+     <div class="listitem" style="padding:14px 16px;cursor:pointer" onclick="belegDetail('${b.id}')">
+       <div class="avatar out">${initials(b.from)}</div>
+       <div style="flex:1;min-width:0"><b>${esc(b.from)}</b> <span class="tag">Rechnung erkannt · ${b.confidence}%</span><div class="muted" style="font-size:13px">${esc(b.subject)} · ${esc(b.invNo)}</div></div>
+       <div style="text-align:right;min-width:110px"><b>${eur(b.gross)}</b><div class="muted" style="font-size:12px">${CAT_LABEL[b.catKey]} · ${KONTEN[b.catKey].nr}</div></div>
+       <button class="btn sm pri" onclick="event.stopPropagation();buchenBeleg('${b.id}')">Buchen</button>
+     </div>`).join(''):'<div class="empty">Posteingang leer – alle Rechnungen verbucht.</div>'}</div>
+   ${done.length?`<div class="muted" style="font-size:13px;margin:16px 0 8px">Zuletzt verbucht</div><div class="card" style="padding:0">${done.slice(0,5).map(b=>`<div class="listitem" style="padding:12px 16px"><div style="flex:1"><b>${esc(b.from)}</b> · ${esc(b.invNo)}<div class="muted" style="font-size:13px">${eur(b.gross)} · ${CAT_LABEL[b.catKey]}</div></div><span class="pill soft"><span class="d"></span>gebucht</span></div>`).join('')}</div>`:''}
+   <div class="note" style="margin-top:14px">So funktioniert's: Dein E-Mail-Postfach wird angebunden; eingehende Rechnungen (PDF) werden automatisch erkannt (Lieferant, Betrag, USt, Konto) und landen hier. „Buchen" überträgt sie direkt in deine Buchhaltung — im ${S.acct.mode==='euer'?'EÜR':'Doppik'}-Verfahren.</div>`;
+}
+function belegPrevText(gross,rate,catKey){const net=rate?gross/(1+rate/100):gross;const vat=gross-net;
+  if(S.acct.mode==='euer')return 'Ausgabe '+eur(gross)+' · '+CAT_LABEL[catKey]+(vat?' · Vorsteuer '+eur(vat):' · steuerfrei');
+  return 'Soll '+KONTEN[catKey].nr+' '+eur(net)+(vat?' + Soll '+KONTEN.vst.nr+' '+eur(vat):'')+'  an  Haben '+KONTEN.kreditor.nr+' '+eur(gross);}
+function bdPrev(){const g=+document.getElementById('bd_gross').value||0;const r=+document.getElementById('bd_rate').value;const c=document.getElementById('bd_cat').value;const el=document.getElementById('bd_prev');if(el)el.textContent=belegPrevText(g,r,c);}
+function belegDetail(id){
+  const b=S.belege.find(x=>x.id===id); if(!b)return;
+  openDrawerHTML(`<div class="dhead"><b style="flex:1">Rechnung · ${esc(b.from)}</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+   <div class="dbody">
+     <div class="callhdr"><div class="avatar out">${initials(b.from)}</div><div style="flex:1;min-width:0"><b>${esc(b.from)}</b><div class="muted" style="font-size:13px">${esc(b.email)} · ${esc(b.subject)}</div></div><span class="pill soft"><span class="d"></span>KI-erkannt ${b.confidence}%</span></div>
+     <div class="note" style="margin-top:12px">Automatisch aus der E-Mail erkannt. Bitte prüfen – Felder sind editierbar.</div>
+     <div class="grid g2" style="margin-top:14px">
+       <div><label class="f">Lieferant</label><input class="in" id="bd_from" value="${esc(b.from)}"></div>
+       <div><label class="f">Rechnungsnr.</label><input class="in" id="bd_inv" value="${esc(b.invNo)}"></div>
+       <div><label class="f">Rechnungsdatum</label><input class="in" type="date" id="bd_date" value="${b.date}"></div>
+       <div><label class="f">Fällig</label><input class="in" type="date" id="bd_due" value="${b.due}"></div>
+       <div><label class="f">Brutto (€)</label><input class="in" type="number" id="bd_gross" value="${b.gross}" onchange="bdPrev()"></div>
+       <div><label class="f">USt-Satz (%)</label><select class="in" id="bd_rate" onchange="bdPrev()"><option${b.vatRate==19?' selected':''}>19</option><option${b.vatRate==7?' selected':''}>7</option><option${b.vatRate==0?' selected':''}>0</option></select></div>
+       <div style="grid-column:span 2"><label class="f">Kategorie / Konto</label><select class="in" id="bd_cat" onchange="bdPrev()">${['wareneinkauf','miete','telefon','buero','versicherung','werbung','kfz'].map(k=>`<option value="${k}"${b.catKey===k?' selected':''}>${CAT_LABEL[k]} (${KONTEN[k].nr})</option>`).join('')}</select></div>
+     </div>
+     <div class="note" style="margin-top:12px">Buchungsvorschlag (${S.acct.mode==='euer'?'EÜR':'Doppik'}): <b id="bd_prev"></b></div>
+     <div class="row" style="margin-top:16px;justify-content:flex-end"><button class="btn gho" onclick="closeAll()">Abbrechen</button><button class="btn pri" onclick="buchenBeleg('${b.id}',true)">In Buchhaltung buchen</button></div>
+   </div>`);
+  setTimeout(bdPrev,30);
+}
+function buchenBeleg(id,fromDrawer){
+  const b=S.belege.find(x=>x.id===id); if(!b||b.status==='gebucht')return;
+  if(fromDrawer){b.from=document.getElementById('bd_from').value;b.invNo=document.getElementById('bd_inv').value;b.date=document.getElementById('bd_date').value;b.due=document.getElementById('bd_due').value;b.gross=+document.getElementById('bd_gross').value||b.gross;b.vatRate=+document.getElementById('bd_rate').value;b.catKey=document.getElementById('bd_cat').value;}
+  b.net=b.vatRate?b.gross/(1+b.vatRate/100):b.gross;b.vat=b.gross-b.net;
+  S.bookings.unshift({id:'bk'+Date.now(),date:b.date,text:b.from+' · '+b.invNo,gross:b.gross,net:b.net,vat:b.vat,vatRate:b.vatRate,dir:'aus',catKey:b.catKey,src:b.source,belegRef:b.invNo,status:'gebucht'});
+  b.status='gebucht'; save(); closeAll();
+  toast('Rechnung verbucht: '+b.from+' · '+eur(b.gross)); views.buchhaltung(); paintIcons(); refreshBadges();
+}
+function uploadBeleg(){
+  const inp=document.createElement('input');inp.type='file';inp.accept='application/pdf,image/*';
+  inp.onchange=function(){const f=inp.files&&inp.files[0];const nm=f?f.name.replace(/\.[^.]+$/,'').slice(0,24):'Beleg';const gross=Math.round((40+Math.random()*280)*100)/100;
+    const b={id:'bl'+Date.now(),from:nm||'Lieferant',email:'upload',subject:'Hochgeladen: '+(f?f.name:'Beleg.pdf'),date:today(),invNo:'—',gross,vatRate:19,catKey:'buero',due:today(),confidence:90,status:'neu',source:'upload'};
+    b.net=b.gross/1.19;b.vat=b.gross-b.net;S.belege.unshift(b);save();toast('PDF erkannt – bitte prüfen');views.buchhaltung();paintIcons();refreshBadges();};
+  inp.click();
+}
+function buchJournal(){
+  const a=S.acct; const bk=S.bookings.slice(0,60);
+  if(a.mode==='euer'){
+    return `<div class="card" style="padding:0;overflow:auto"><table>
+      <thead><tr><th>Datum</th><th>Text</th><th>Kategorie</th><th>Einnahme</th><th>Ausgabe</th><th>USt/VSt</th></tr></thead>
+      <tbody>${bk.map(b=>`<tr><td class="mono muted">${fmtDate(b.date)}</td><td>${esc(b.text)}</td><td><span class="tag">${b.dir==='ein'?'Erlöse':(CAT_LABEL[b.catKey]||b.catKey)}</span></td><td class="mono">${b.dir==='ein'?eur(b.gross):''}</td><td class="mono">${b.dir==='aus'?eur(b.gross):''}</td><td class="mono muted">${b.vatRate?eur(b.vat)+' ('+b.vatRate+'%)':'—'}</td></tr>`).join('')}</tbody></table></div>
+      <div class="note" style="margin-top:14px">Einnahmen-Überschuss-Rechnung (§4 Abs. 3 EStG): Gewinn = Betriebseinnahmen − Betriebsausgaben (Zufluss-/Abfluss-Prinzip).</div>`;
+  }
+  return `<div class="card" style="padding:0;overflow:auto"><table>
+     <thead><tr><th>Datum</th><th>Buchungstext</th><th>Soll</th><th>Haben</th><th>Betrag</th></tr></thead>
+     <tbody>${bk.map(b=>{const soll=b.dir==='ein'?KONTEN.bank:KONTEN[b.catKey];const haben=b.dir==='ein'?KONTEN.erloese:KONTEN.kreditor;return `<tr><td class="mono muted">${fmtDate(b.date)}</td><td>${esc(b.text)}${b.vat?'<div class="muted" style="font-size:11px">inkl. '+(b.dir==='ein'?'USt → '+KONTEN.ust.nr:'VSt → '+KONTEN.vst.nr)+' '+eur(b.vat)+'</div>':''}</td><td><b>${soll.nr}</b> <span class="muted">${soll.label}</span></td><td><b>${haben.nr}</b> <span class="muted">${haben.label}</span></td><td class="mono">${eur(b.gross)}</td></tr>`;}).join('')}</tbody></table></div>
+     <div class="note" style="margin-top:14px">Doppelte Buchführung (${a.skr}): jede Buchung Soll an Haben; Umsatzsteuer auf ${KONTEN.ust.nr}, Vorsteuer auf ${KONTEN.vst.nr}.</div>`;
+}
+function buchDatev(){
+  const a=S.acct; const cnt=S.bookings.filter(b=>isThisMonth(b.date)).length;
+  return `<div class="grid g2">
+    <div class="card"><b>DATEV-Anbindung</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Exportiere Buchungen als DATEV-Buchungsstapel (EXTF) für den Steuerberater – oder verbinde DATEVconnect online.</p>
+      <div class="grid g2"><div><label class="f">Berater-Nr.</label><input class="in" id="dv_ber" value="${a.datev.beraterNr||''}" placeholder="1234567"></div>
+      <div><label class="f">Mandanten-Nr.</label><input class="in" id="dv_man" value="${a.datev.mandantNr||''}" placeholder="55001"></div></div>
+      <div class="row" style="margin-top:12px"><button class="btn pri" onclick="datevConnect()">${a.datev.connected?'Aktualisieren':'Verbinden'}</button><button class="btn" onclick="datevExport()">EXTF-Stapel exportieren</button></div>
+      ${a.datev.connected?'<div class="note" style="margin-top:12px;border:1px solid var(--green)">DATEV verbunden · Berater '+esc(a.datev.beraterNr)+' / Mandant '+esc(a.datev.mandantNr)+' · '+a.skr+'</div>':''}
+    </div>
+    <div class="card"><b>Was exportiert wird</b>
+      <div class="listitem"><div style="flex:1">Buchungsstapel (aktueller Monat)</div><span class="tag">${cnt} Sätze</span></div>
+      <div class="listitem"><div style="flex:1">Format</div><span class="tag">DATEV EXTF 700 · CSV</span></div>
+      <div class="listitem"><div style="flex:1">Kontenrahmen</div><span class="tag">${a.skr}</span></div>
+      <div class="note" style="margin-top:12px">Der Steuerberater importiert die Datei direkt in DATEV Rechnungswesen. Belege (PDF) lassen sich als DATEV-Belegbild mitgeben.</div>
+    </div></div>`;
+}
+function datevConnect(){const a=S.acct;a.datev.beraterNr=document.getElementById('dv_ber').value||'1234567';a.datev.mandantNr=document.getElementById('dv_man').value||'55001';a.datev.connected=true;save();toast('DATEV verbunden');views.buchhaltung();paintIcons();}
+function datevExport(){
+  const a=ensureAcct(); const bk=S.bookings.filter(b=>isThisMonth(b.date)); const ym=today().slice(0,7);
+  const head='"EXTF";700;21;"Buchungsstapel";13;;;;;;"'+(a.datev.beraterNr||'1234567')+'";"'+(a.datev.mandantNr||'55001')+'";'+today().replace(/-/g,'')+';'+(a.skr==='SKR04'?'04':'03')+';;;;;;;;;;;;;;';
+  const cols='Umsatz;Soll/Haben-Kz;WKZ;Konto;Gegenkonto;BU-Schlüssel;Belegdatum;Belegfeld1;Buchungstext;Steuersatz';
+  const rows=bk.map(b=>{const soll=b.dir==='ein'?KONTEN.bank.nr:KONTEN[b.catKey].nr;const gegen=b.dir==='ein'?KONTEN.erloese.nr:KONTEN.kreditor.nr;return [b.gross.toFixed(2).replace('.',','),'S','EUR',soll,gegen,'',b.date.slice(8,10)+b.date.slice(5,7),(b.belegRef||'').slice(0,12),'"'+String(b.text).replace(/"/g,'')+'"',b.vatRate].join(';');});
+  const csv=[head,cols].concat(rows).join('\r\n');
+  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download='EXTF_Buchungsstapel_'+ym+'.csv';document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);
+  toast('DATEV-Export erstellt: '+bk.length+' Buchungssätze');
 }
 
 /* ============================ KI-DIAGNOSE (Techniker) ============================ */
@@ -1601,7 +1770,7 @@ function demoDone(){ if(_demoStop)return; const el=document.getElementById('demo
 
 /* ============================ BOOT ============================ */
 paintIcons();
-(function(){const n=pullBookings(); go('dashboard');
+(function(){ensureAcct(); const n=pullBookings(); go('dashboard');
   if(n) setTimeout(()=>toast(n+' neue Online-Buchung'+(n>1?'en':'')+' übernommen'),500);
 })();
 window.addEventListener('focus',()=>{const n=pullBookings(); if(n){go(current);toast(n+' neue Online-Buchung'+(n>1?'en':'')+' übernommen');}});
