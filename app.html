@@ -328,7 +328,7 @@ function seed(){
     {id:'wl1',name:'Sandra Böhm',tel:'+49 151 22887744',brand:'Apple',model:'iPhone 14',issue:'Displaytausch (Sturzschaden)',vertrag:'WG-8840012',selbst:0,recv:d(0)},
     {id:'wl2',name:'Murat Yıldız',tel:'+49 160 5566778',brand:'Samsung',model:'Galaxy S23',issue:'Displaytausch (Glasbruch)',vertrag:'WG-8839551',selbst:25,recv:d(0)},
   ];
-  return {v:7, cust, ord, parts, orders, sold:[], counter:1119, rules: defaultRules(), sales, cash:{connected:''}, mailLog:[], calls:seedCalls(), phone:defaultPhone(), users:defaultUsers(), userId:'u1', insurance:defaultInsurance(), wgLeads};
+  return {v:7, cust, ord, parts, orders, sold:[], counter:1119, rules: defaultRules(), sales, cash:{connected:''}, mailLog:[], calls:seedCalls(), phone:defaultPhone(), users:defaultUsers(), userId:'u1', insurance:defaultInsurance(), wgLeads, drafts:[]};
 }
 function defaultPhone(){return {active:true, mode:'overflow',
   greeting:'Herzlich willkommen bei Dein Handy Doc. Ich bin die digitale Assistentin. Wie kann ich Ihnen helfen?',
@@ -486,7 +486,9 @@ function tryLogin(){if(_loginPin===_loginUser.pin){S.userId=_loginUser.id;save()
 function addUser(){const name=prompt('Name des Mitarbeiters:');if(!name)return;const pin=((prompt('4-stellige PIN:','0000')||'0000').replace(/\D/g,'')+'0000').slice(0,4);S.users.push({id:uid('u'),name,role:'mitarbeiter',pin});save();views.einstellungen();paintIcons();toast('Mitarbeiter angelegt: '+name);}
 function removeUser(id){if(id===S.userId)return;const u=S.users.find(x=>x.id===id);if(!u)return;if(!confirm('Benutzer '+u.name+' entfernen?'))return;S.users=S.users.filter(x=>x.id!==id);save();views.einstellungen();paintIcons();toast('Benutzer entfernt');}
 function setUserRole(id,role){const u=S.users.find(x=>x.id===id);if(!u)return;if(u.role==='inhaber'&&role==='mitarbeiter'&&S.users.filter(x=>x.role==='inhaber').length<=1){toast('Mindestens eine Geschäftsführung nötig');views.einstellungen();return;}u.role=role;save();if(id===S.userId)applyNavRole();views.einstellungen();paintIcons();toast('Rolle geändert');}
-function go(v){ if(!canView(v)){toast('Keine Berechtigung');v='dashboard';} current=v;
+function go(v){
+  if(current==='neworder'&&NO&&v!=='neworder'){noCollect();if(!NO.editId&&noHasContent()){noSaveDraft();toast('Als Entwurf gespeichert');}NO=null;}
+  if(!canView(v)){toast('Keine Berechtigung');v='dashboard';} current=v;
   document.querySelectorAll('#nav a').forEach(a=>a.classList.toggle('active',a.dataset.view===v));
   document.getElementById('side').classList.remove('show');
   window.scrollTo(0,0);
@@ -568,6 +570,9 @@ views.auftraege=function(){
    <div class="row" style="margin:16px 0">
      ${['alle',...STFLOW].map(s=>`<button class="chip ${aufFilter===s?'on':''}" onclick="aufFilter='${s}';views.auftraege();paintIcons()">${s==='alle'?'Alle':STATUS[s].lbl} · ${counts[s]||0}</button>`).join('')}
    </div>
+   ${(S.drafts&&S.drafts.length)?`<div class="card" style="margin-bottom:14px;border:1px dashed var(--green);background:var(--green-tint,#eaf4ee)"><div class="between"><b>Entwürfe (${S.drafts.length})</b><span class="muted" style="font-size:12px">Nicht abgeschlossene Aufträge – jederzeit fortsetzen</span></div>
+     <div style="margin-top:8px">${S.drafts.map(d=>`<div class="listitem"><div class="lg">${ic('clip')}</div><div style="flex:1;min-width:0"><b>${esc(d.title||'Entwurf')}</b><div class="muted" style="font-size:12px">Zuletzt bearbeitet ${fmtDateTime(d.updatedAt)}</div></div>
+       <button class="btn sm pri" onclick="resumeDraft('${d.id}')">Weiter bearbeiten</button><button class="btn sm gho" onclick="discardDraft('${d.id}')">Verwerfen</button></div>`).join('')}</div></div>`:''}
    <div class="card" style="padding:0;overflow:auto">
     <table><thead><tr><th>Nr.</th><th>Kunde</th><th>Gerät</th><th>Fehler</th><th>Preis</th><th>Status</th><th>Fällig</th></tr></thead>
     <tbody>${list.map(o=>`<tr onclick="openOrder('${o.id}')">
@@ -606,6 +611,12 @@ function openOrder(id){
        <div><label class="f">Garantie</label><div style="font-weight:700">${o.warranty} Monate${warrUntil?' · bis '+fmtDate(warrUntil):' (ab Abholung)'}</div></div>
        <div><label class="f">Annahme</label><div style="font-weight:700">${o.sig?'Unterschrieben':'Keine Unterschrift'}</div>${o.sig?`<img src="${o.sig}" alt="Unterschrift" style="height:40px;margin-top:4px;border:1px solid var(--line);border-radius:6px;background:#fff">`:''}</div>
      </div>
+     ${(o.fach||(o.lock&&o.lock!=='Keine')||o.ref||o.technikerId)?`<div class="grid g2" style="margin-top:14px">
+       ${o.fach?`<div><label class="f">Lagerfach</label><div style="font-weight:700">${esc(o.fach)}</div></div>`:''}
+       ${(o.lock&&o.lock!=='Keine')?`<div><label class="f">Displaysperre</label><div style="font-weight:700">${esc(o.lock)}${o.lockval?' · '+esc(o.lockval):''}</div></div>`:''}
+       ${o.ref?`<div><label class="f">Referenz</label><div style="font-weight:700">${esc(o.ref)}</div></div>`:''}
+       ${o.technikerId?`<div><label class="f">Techniker</label><div style="font-weight:700">${esc(((S.users||[]).find(u=>u.id===o.technikerId)||{}).name||'—')}</div></div>`:''}
+     </div>`:''}
      ${o.notes?`<div class="note" style="margin-top:12px">Notiz: ${esc(o.notes)}</div>`:''}
 
      <label class="f" style="margin-top:18px">Status ändern</label>
@@ -688,53 +699,161 @@ function saveSig(id){const c=document.getElementById('sig');const o=S.ord.find(x
   if(!window.__sigDirty){toast('Bitte zuerst unterschreiben');return;}
   o.sig=c.toDataURL('image/png');save();closeAll();toast('Unterschrift gespeichert');openOrder(id);}
 
-/* ============================ NEUER / EDIT AUFTRAG ============================ */
-function newOrder(){ orderForm(null); }
-function editOrder(id){ orderForm(S.ord.find(x=>x.id===id)); }
-function orderForm(o){
-  const edit=!!o;
-  const custOpts=S.cust.map(c=>`<option value="${c.id}" ${o&&o.cid===c.id?'selected':''}>${esc(c.name)}</option>`).join('');
-  openModal(`<div class="dhead"><b style="flex:1">${edit?'Auftrag bearbeiten':'Neuer Auftrag'}</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
-   <div class="dbody">
-     <label class="f">Kunde</label>
-     <div class="row"><select class="in" id="f_cid" style="flex:1">${custOpts}</select><button class="btn" onclick="quickCustomer()">Neu</button></div>
+/* ============================ NEUER / EDIT AUFTRAG (Reparatur-Eingang, mit Entwurf) ============================ */
+function priceFor(brand,model,type){const base=BASEPRICE[type]; if(base===undefined)return ''; const models=CATALOG[brand]||[]; const i=models.indexOf(model); const f=i>=0?1+((i%3)*0.06):1; const bf=brand==='Apple'?1.2:(brand==='Samsung'?1.12:(brand==='Sonstige'||!brand?1:1.05)); return Math.round(base*bf*f);}
+function blankDevice(){return {typ:'Smartphone',brand:'',model:'',imei:'',fach:'',ref:'',reparatur:'',price:'',qual:'Original',warranty:6};}
+function blankForm(){return {draftId:'',editId:'',cid:'',typ:'Privat',anrede:'Herr',firma:'',vorname:'',nachname:'',tel:'+49 ',mail:'',plz:'',stadt:'',adr:'',lock:'Keine',lockval:'',devices:[blankDevice()],prio:'Standard',technikerId:'',notes:'',terminMode:'kein',appt:'',due:today(),sig:''};}
+let NO=null;
+function newOrder(){ closeAll(); NO=blankForm(); NO.draftId=uid('dr'); current='neworder'; renderNewOrder(); }
+function editOrder(id){ closeAll(); const o=S.ord.find(x=>x.id===id); if(!o)return; NO=orderToForm(o); NO.editId=id; current='neworder'; renderNewOrder(); }
+function resumeDraft(did){ closeAll(); const d=(S.drafts||[]).find(x=>x.id===did); if(!d)return; NO=Object.assign(blankForm(),JSON.parse(JSON.stringify(d.data))); NO.draftId=did; NO.editId=''; current='neworder'; renderNewOrder(); }
+function orderToForm(o){const c=cust(o.cid);const nm=(c.name||'').split(' ');const f=blankForm();f.cid=o.cid;f.typ=c.typ||'Privat';f.firma=c.firma||'';f.anrede=c.anrede||'Herr';f.vorname=nm.slice(0,-1).join(' ')||nm[0]||'';f.nachname=nm.length>1?nm[nm.length-1]:'';f.tel=c.tel||'+49 ';f.mail=c.mail||'';f.plz=c.plz||'';f.stadt=c.stadt||'';f.adr=c.adr||'';f.lock=o.lock||'Keine';f.lockval=o.lockval||'';f.prio=o.prio||'Standard';f.technikerId=o.technikerId||'';f.notes=o.notes||'';f.due=o.due||today();f.appt=o.appt||'';f.terminMode=o.appt?'termin':'kein';f.sig=o.sig||'';f.devices=[{typ:o.devtyp||'Smartphone',brand:o.brand||'',model:o.model||'',imei:o.imei||'',fach:o.fach||'',ref:o.ref||'',reparatur:o.issue||'',price:(o.price!==undefined?o.price:''),qual:o.qual||'Original',warranty:o.warranty||6}];return f;}
+function noHasContent(){ if(!NO)return false; const d=NO.devices[0]||{}; return !!(NO.vorname||NO.nachname||(NO.tel||'').replace(/\D/g,'').length>3||NO.firma||NO.mail||d.brand||d.model||d.reparatur||NO.notes); }
+function noTitleOf(){const nm=((NO.vorname+' '+NO.nachname).trim())||NO.firma||'Unbenannter Kunde';const d=NO.devices[0]||{};const dev=[d.brand,d.model].filter(Boolean).join(' ');return nm+(dev?' · '+dev:'');}
+function noCollect(){ if(!NO)return; const g=id=>{const e=document.getElementById(id);return e?e.value:'';};
+  NO.typ=g('no_typ')||NO.typ;NO.anrede=g('no_anrede');NO.firma=g('no_firma');NO.vorname=g('no_vorname');NO.nachname=g('no_nachname');NO.tel=g('no_tel');NO.mail=g('no_mail');NO.plz=g('no_plz');NO.stadt=g('no_stadt');NO.adr=g('no_adr');NO.lockval=g('no_lockval');
+  NO.prio=g('no_prio')||NO.prio;NO.technikerId=g('no_tech');NO.notes=g('no_notes');NO.due=g('no_due')||NO.due;NO.appt=g('no_appt');
+  const tm=document.querySelector('input[name=no_termin]:checked');if(tm)NO.terminMode=tm.value;
+  const lk=document.querySelector('input[name=no_lock]:checked');if(lk)NO.lock=lk.value;
+  NO.devices.forEach((d,i)=>{d.typ=g('dev'+i+'_typ')||d.typ;d.brand=g('dev'+i+'_brand');d.model=g('dev'+i+'_model');d.imei=g('dev'+i+'_imei');d.fach=g('dev'+i+'_fach');d.ref=g('dev'+i+'_ref');d.reparatur=g('dev'+i+'_reparatur');d.price=g('dev'+i+'_price');d.qual=g('dev'+i+'_qual')||d.qual;d.warranty=g('dev'+i+'_warranty')||d.warranty;});
+}
+function noSaveDraft(){ if(!NO||NO.editId)return; if(!noHasContent())return; S.drafts=S.drafts||[];
+  const rec={id:NO.draftId,data:JSON.parse(JSON.stringify(NO)),updatedAt:new Date().toISOString(),title:noTitleOf()};
+  const ex=S.drafts.find(x=>x.id===NO.draftId); if(ex)Object.assign(ex,rec); else S.drafts.unshift(rec); save(); }
+let _noT=null; function noSaveDraftDebounced(){clearTimeout(_noT);_noT=setTimeout(()=>{noCollect();noSaveDraft();},600);}
+function noAutosave(){noCollect();noSaveDraft();}
+function noBrandChange(i){noCollect();NO.devices[i].model='';renderNewOrder();}
+function noPrice(i){noCollect();const d=NO.devices[i];if(d.brand&&d.reparatur){const p=priceFor(d.brand,d.model,d.reparatur);if(p!==''){const e=document.getElementById('dev'+i+'_price');if(e)e.value=p;d.price=p;}}noSaveDraft();}
+function noQuickPick(i){const v=(document.getElementById('dev'+i+'_search').value||'').trim();if(!v)return;noCollect();const brand=Object.keys(CATALOG).find(b=>v.toLowerCase().startsWith(b.toLowerCase()));const d=NO.devices[i];if(brand){d.brand=brand;const rest=v.slice(brand.length).trim();const mm=(CATALOG[brand]||[]).find(x=>x.toLowerCase()===rest.toLowerCase());d.model=mm||rest;}else{d.model=v;}if(d.brand&&d.reparatur){const p=priceFor(d.brand,d.model,d.reparatur);if(p!=='')d.price=p;}renderNewOrder();}
+function noAddDevice(){noCollect();NO.devices.push(blankDevice());renderNewOrder();}
+function noRemoveDevice(i){noCollect();NO.devices.splice(i,1);renderNewOrder();}
+function noTyp(){noCollect();renderNewOrder();}
+function noLock(){noCollect();renderNewOrder();}
+function noTermin(){noCollect();renderNewOrder();}
+function noPickCustomer(){const el=document.getElementById('no_search');const v=(el&&el.value||'').trim();if(!v)return;const tel=v.split('·').pop().trim();let c=S.cust.find(x=>(x.name+' · '+x.tel)===v)||S.cust.find(x=>x.tel===tel)||S.cust.find(x=>x.name&&v.toLowerCase().includes(x.name.toLowerCase()));if(!c)return;noCollect();NO.cid=c.id;const nm=(c.name||'').split(' ');NO.vorname=nm.slice(0,-1).join(' ')||nm[0]||'';NO.nachname=nm.length>1?nm[nm.length-1]:'';NO.tel=c.tel||NO.tel;NO.mail=c.mail||'';NO.adr=c.adr||'';NO.plz=c.plz||'';NO.stadt=c.stadt||'';NO.typ=c.typ||'Privat';NO.firma=c.firma||'';NO.anrede=c.anrede||'Herr';renderNewOrder();toast('Kunde übernommen: '+c.name);}
+function noSign(){ openModal(`<div class="dhead"><b style="flex:1">Unterschrift des Kunden</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+  <div class="dbody"><div class="note" style="margin-bottom:12px">Der Kunde bestätigt die Auftragserteilung und die Kenntnisnahme des Hinweises zur Datensicherung. Für Datenverlust wird keine Haftung übernommen.</div>
+  <div class="sigwrap"><canvas id="sig" width="520" height="150"></canvas></div>
+  <div class="row" style="margin-top:12px;justify-content:space-between"><button class="btn gho" onclick="clearSig()">Löschen</button><button class="btn pri" onclick="noSaveSig()">Übernehmen</button></div></div>`); setTimeout(initSig,30); }
+function noSaveSig(){const c=document.getElementById('sig');if(!window.__sigDirty){toast('Bitte zuerst unterschreiben');return;}noCollect();NO.sig=c.toDataURL('image/png');noSaveDraft();closeAll();renderNewOrder();}
+function noSaveExit(){noCollect();if(noHasContent()){noSaveDraft();toast('Als Entwurf gespeichert');}NO=null;go('auftraege');}
+function noCancel(){noCollect();if(!NO.editId&&noHasContent()){if(!confirm('Auftrag verwerfen? Der ungespeicherte Entwurf wird gelöscht.'))return;S.drafts=(S.drafts||[]).filter(x=>x.id!==NO.draftId);save();}NO=null;go('auftraege');}
+function noFinalize(){ noCollect();
+  if(!NO.vorname&&!NO.nachname&&!NO.firma){toast('Bitte Kundennamen angeben');return;}
+  if((NO.tel||'').replace(/\D/g,'').length<5){toast('Bitte Telefonnummer angeben');return;}
+  const d0=NO.devices[0]||{}; if(!d0.brand&&!d0.model){toast('Bitte Gerät (Marke/Modell) angeben');return;}
+  if(!d0.reparatur){toast('Bitte Reparaturart angeben');return;}
+  for(const d of NO.devices){ if((d.brand||d.model)&&!d.reparatur){toast('Bitte für jedes Gerät eine Reparaturart angeben');return;} }
+  const name=((NO.vorname+' '+NO.nachname).trim())||NO.firma; const digits=(NO.tel||'').replace(/\D/g,'');
+  let c=NO.cid?S.cust.find(x=>x.id===NO.cid):null;
+  if(!c)c=S.cust.find(x=>x.tel&&x.tel.replace(/\D/g,'')===digits&&digits.length>5);
+  if(!c){c={id:uid('c'),name,tel:NO.tel,mail:NO.mail,adr:NO.adr,plz:NO.plz,stadt:NO.stadt,typ:NO.typ,firma:NO.firma,anrede:NO.anrede};S.cust.push(c);}
+  else{c.name=name;c.tel=NO.tel;c.mail=NO.mail||c.mail;c.adr=NO.adr||c.adr;c.plz=NO.plz||c.plz;c.stadt=NO.stadt||c.stadt;c.typ=NO.typ;c.firma=NO.firma;c.anrede=NO.anrede;}
+  if(NO.editId){const o=S.ord.find(x=>x.id===NO.editId);if(o){Object.assign(o,{cid:c.id,devtyp:d0.typ,brand:d0.brand,model:d0.model,issue:d0.reparatur,qual:d0.qual,price:+d0.price||0,prio:NO.prio,warranty:+d0.warranty||6,imei:d0.imei,fach:d0.fach,ref:d0.ref,lock:NO.lock,lockval:NO.lockval,appt:NO.terminMode==='termin'?NO.appt:'',due:NO.due,notes:NO.notes,technikerId:NO.technikerId,sig:NO.sig||o.sig});}save();toast('Auftrag gespeichert');NO=null;go('auftraege');return;}
+  let firstNr='';
+  NO.devices.forEach((d,i)=>{ if(!d.reparatur||(!d.brand&&!d.model))return; const nr='REP-'+(S.counter++); if(!firstNr)firstNr=nr;
+    const o={id:uid('o'),nr,cid:c.id,devtyp:d.typ,brand:d.brand,model:d.model,imei:d.imei,fach:d.fach,ref:d.ref,lock:NO.lock,lockval:NO.lockval,issue:d.reparatur,qual:d.qual,price:+d.price||0,status:'offen',prio:NO.prio,created:today(),due:NO.due,appt:NO.terminMode==='termin'?NO.appt:'',notes:NO.notes,readyAt:'',warranty:+d.warranty||6,sig:NO.sig||'',source:'',technikerId:NO.technikerId};
+    S.ord.unshift(o); const rc=S.rules.find(x=>x.id==='r_confirm'); if(rc&&rc.on&&c.mail)logMail(o,rc,'automatisch (Anlage)'); });
+  S.drafts=(S.drafts||[]).filter(x=>x.id!==NO.draftId); save();
+  const n=NO.devices.filter(d=>d.brand||d.model||d.reparatur).length;
+  toast(n>1?(n+' Aufträge angelegt ('+firstNr+' …)'):('Auftrag '+firstNr+' angelegt')); NO=null; go('auftraege');
+}
+function noDevBlock(d,i){
+  const models=CATALOG[d.brand]||[];
+  const modelOpts=['<option value="">Modell wählen…</option>'].concat(models.map(mm=>`<option ${d.model===mm?'selected':''}>${esc(mm)}</option>`));
+  if(d.model&&models.indexOf(d.model)<0)modelOpts.push(`<option selected>${esc(d.model)}</option>`);
+  const brandOpts=['<option value="">Marke wählen…</option>'].concat(Object.keys(CATALOG).map(b=>`<option ${d.brand===b?'selected':''}>${b}</option>`));
+  return `<div class="card" style="background:var(--soft);border:0;margin-top:12px">
+    <div class="between"><b>Gerät ${i+1}</b>${i>0?`<button class="btn sm gho" onclick="noRemoveDevice(${i})">Entfernen</button>`:''}</div>
+    <label class="f" style="margin-top:10px">Geräte-Schnellsuche</label>
+    <input class="in" id="dev${i}_search" list="allDevices" placeholder="z. B. „iph 15 p“ → Apple iPhone 15 Pro" onchange="noQuickPick(${i})">
+    <div class="grid g2" style="margin-top:10px">
+      <div><label class="f">Gerätetyp *</label><select class="in" id="dev${i}_typ">${GERAETETYPEN.map(t=>`<option ${d.typ===t?'selected':''}>${t}</option>`).join('')}</select></div>
+      <div><label class="f">Marke *</label><select class="in" id="dev${i}_brand" onchange="noBrandChange(${i})">${brandOpts.join('')}</select></div>
+      <div><label class="f">Modell *</label><select class="in" id="dev${i}_model" onchange="noPrice(${i})">${modelOpts.join('')}</select></div>
+      <div><label class="f">IMEI / Seriennummer</label><input class="in" id="dev${i}_imei" value="${esc(d.imei)}" placeholder="optional"></div>
+      <div><label class="f">Reparaturfach-Nr.</label><input class="in" id="dev${i}_fach" value="${esc(d.fach)}" placeholder="z. B. Fach 42"></div>
+      <div><label class="f">Referenznummer</label><input class="in" id="dev${i}_ref" value="${esc(d.ref)}" placeholder="Kundenreferenz / Auftragsnr."></div>
+    </div>
+    <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin-top:10px">
+      <div><label class="f">Reparaturart *</label><input class="in" id="dev${i}_reparatur" list="allRepairs" value="${esc(d.reparatur)}" placeholder="Tippen zum Suchen oder Auswählen…" onchange="noPrice(${i})"></div>
+      <div><label class="f">Preis (€)</label><input class="in" id="dev${i}_price" type="number" value="${d.price!==''?d.price:''}" placeholder="0.00"></div>
+      <div><label class="f">Qualität</label><select class="in" id="dev${i}_qual"><option ${d.qual==='Original'?'selected':''}>Original</option><option ${d.qual==='Kopie'?'selected':''}>Kopie</option></select></div>
+    </div>
+    <div class="grid g2" style="margin-top:10px"><div><label class="f">Garantie (Monate)</label><select class="in" id="dev${i}_warranty">${[6,12,24,0].map(w=>`<option ${(+d.warranty)===w?'selected':''}>${w}</option>`).join('')}</select></div></div>
+  </div>`;
+}
+function renderNewOrder(){
+  const m=document.getElementById('main'); if(!m||!NO)return;
+  document.querySelectorAll('#nav a').forEach(a=>a.classList.remove('active'));
+  document.getElementById('side').classList.remove('show'); window.scrollTo(0,0);
+  const c=NO; const techs=S.users||[];
+  m.innerHTML=`
+  <datalist id="allDevices">${Object.entries(CATALOG).flatMap(([b,ms])=>ms.map(mm=>`<option value="${esc(b+' '+mm)}"></option>`)).join('')}</datalist>
+  <datalist id="allRepairs">${REPAIRS.map(r=>`<option value="${esc(r)}"></option>`).join('')}</datalist>
+  <div id="noForm">
+   <div class="between" style="flex-wrap:wrap;gap:12px">
+     <div><button class="btn sm gho" onclick="noCancel()">← Zurück</button>
+       <h1 class="h1" style="margin-top:8px">${NO.editId?'Auftrag bearbeiten':'Neuer Auftrag'}</h1>
+       <p class="sub">Reparatur-Eingang${NO.editId?'':' · wird automatisch als Entwurf gesichert'}</p></div>
+     <div class="row">${NO.editId?'':'<button class="btn" onclick="noSaveExit()">Als Entwurf speichern</button>'}<button class="btn pri cta" onclick="noFinalize()">${NO.editId?'Speichern':'Auftrag erstellen'}</button></div>
+   </div>
+
+   <div class="card" style="margin-top:16px"><b>Kunde</b>
+     <label class="f" style="margin-top:10px">Bestehenden Kunden suchen</label>
+     <input class="in" id="no_search" list="custList" placeholder="Name oder Telefonnummer…" onchange="noPickCustomer()">
+     <datalist id="custList">${S.cust.map(x=>`<option value="${esc(x.name+' · '+x.tel)}"></option>`).join('')}</datalist>
      <div class="grid g2" style="margin-top:12px">
-       <div><label class="f">Marke</label><input class="in" id="f_brand" value="${o?esc(o.brand):''}" placeholder="Apple, Samsung …"></div>
-       <div><label class="f">Modell</label><input class="in" id="f_model" value="${o?esc(o.model):''}" placeholder="iPhone 13"></div>
-       <div><label class="f">Reparatur / Fehler</label><input class="in" id="f_issue" value="${o?esc(o.issue):''}" placeholder="Displaytausch"></div>
-       <div><label class="f">Preis (€)</label><input class="in" id="f_price" type="number" value="${o?o.price:''}" placeholder="0.00"></div>
-       <div><label class="f">Qualität</label><select class="in" id="f_qual"><option${o&&o.qual==='Original'?' selected':''}>Original</option><option${o&&o.qual==='Kopie'?' selected':''}>Kopie</option></select></div>
-       <div><label class="f">Priorität</label><select class="in" id="f_prio"><option${o&&o.prio==='Standard'?' selected':''}>Standard</option><option${o&&o.prio==='Express'?' selected':''}>Express</option></select></div>
-       <div><label class="f">Garantie (Monate)</label><select class="in" id="f_warr"><option${o&&o.warranty==6?' selected':''}>6</option><option${o&&o.warranty==12?' selected':''}>12</option><option${o&&o.warranty==24?' selected':''}>24</option><option${o&&o.warranty==0?' selected':''}>0</option></select></div>
-       <div><label class="f">IMEI / Seriennr.</label><input class="in" id="f_imei" value="${o?esc(o.imei):''}" placeholder="optional"></div>
-       <div><label class="f">Termin (optional)</label><input class="in" id="f_appt" type="date" value="${o?o.appt:''}"></div>
-       <div><label class="f">Fällig bis</label><input class="in" id="f_due" type="date" value="${o?o.due:today()}"></div>
+       <div><label class="f">Kundentyp</label><select class="in" id="no_typ" onchange="noTyp()">${['Privat','Firma'].map(t=>`<option ${c.typ===t?'selected':''}>${t}</option>`).join('')}</select></div>
+       <div><label class="f">Anrede</label><select class="in" id="no_anrede">${['Herr','Frau','Divers',''].map(a=>`<option value="${a}" ${c.anrede===a?'selected':''}>${a||'—'}</option>`).join('')}</select></div>
+       ${c.typ==='Firma'?`<div style="grid-column:1/-1"><label class="f">Firmenname</label><input class="in" id="no_firma" value="${esc(c.firma)}"></div>`:''}
+       <div><label class="f">Vorname *</label><input class="in" id="no_vorname" value="${esc(c.vorname)}"></div>
+       <div><label class="f">Nachname *</label><input class="in" id="no_nachname" value="${esc(c.nachname)}"></div>
+       <div><label class="f">Telefon *</label><input class="in" id="no_tel" value="${esc(c.tel)}"></div>
+       <div><label class="f">E-Mail</label><input class="in" id="no_mail" value="${esc(c.mail)}" placeholder="optional"></div>
+       <div><label class="f">PLZ</label><input class="in" id="no_plz" value="${esc(c.plz)}" placeholder="72336"></div>
+       <div><label class="f">Stadt</label><input class="in" id="no_stadt" value="${esc(c.stadt)}"></div>
+       <div style="grid-column:1/-1"><label class="f">Adresse</label><input class="in" id="no_adr" value="${esc(c.adr)}" placeholder="Straße und Hausnummer"></div>
      </div>
-     <label class="f" style="margin-top:12px">Notiz</label><textarea class="in" id="f_notes" rows="2" placeholder="Interne Notiz …">${o?esc(o.notes):''}</textarea>
-     ${edit?'':`<div class="note" style="margin-top:12px">Beim Anlegen wird automatisch eine Auftragsbestätigung an den Kunden vorbereitet (sofern eine E-Mail vorliegt). Die Unterschrift bei Annahme können Sie danach im Auftrag erfassen.</div>`}
-     <div class="row" style="margin-top:16px;justify-content:flex-end">
-       <button class="btn gho" onclick="closeAll()">Abbrechen</button>
-       <button class="btn pri" onclick="saveOrder(${o?`'${o.id}'`:'null'})">${edit?'Speichern':'Auftrag anlegen'}</button>
+   </div>
+
+   <div class="card" style="margin-top:16px"><b>Displaysperre</b><p class="muted" style="font-size:13px;margin:4px 0 10px">Die Werkstatt benötigt für den Funktionstest ggf. Zugang zum Gerät.</p>
+     <div class="row">${['Muster (Pattern)','Passwort / PIN','Keine'].map(l=>`<label class="chip ${NO.lock===l?'on':''}" style="cursor:pointer"><input type="radio" name="no_lock" value="${l}" ${NO.lock===l?'checked':''} onchange="noLock()" style="display:none">${l}</label>`).join('')}</div>
+     <div id="no_lockcode" style="${(NO.lock&&NO.lock!=='Keine')?'':'display:none'};margin-top:10px"><label class="f">Code / Muster (Hinweis für die Werkstatt)</label><input class="in" id="no_lockval" value="${esc(NO.lockval)}" placeholder="z. B. 1-2-3-6-9 oder PIN 0000"></div>
+   </div>
+
+   <div class="card" style="margin-top:16px"><b>Gerät &amp; Fehlerbeschreibung</b>
+     ${NO.devices.map((d,i)=>noDevBlock(d,i)).join('')}
+     ${NO.devices.length<3?`<button class="btn" style="margin-top:12px;width:100%" onclick="noAddDevice()">+ Weiteres Gerät hinzufügen (optional)</button>`:''}
+     <label class="f" style="margin-top:14px">Detaillierte Informationen &amp; Notizen</label>
+     <textarea class="in" id="no_notes" rows="3" placeholder="z. B. Daten sichern, Schutzfolie aufbringen, Kundenhinweise, technische Hinweise…">${esc(NO.notes)}</textarea>
+   </div>
+
+   <div class="card" style="margin-top:16px"><b>Auftragsdetails</b>
+     <div class="grid g2" style="margin-top:10px">
+       <div><label class="f">Priorität *</label><select class="in" id="no_prio">${PRIOS.map(p=>`<option ${NO.prio===p?'selected':''}>${p}</option>`).join('')}</select></div>
+       <div><label class="f">Techniker zuweisen (optional)</label><select class="in" id="no_tech"><option value="">Keinem zugewiesen</option>${techs.map(u=>`<option value="${u.id}" ${NO.technikerId===u.id?'selected':''}>${esc(u.name)} (${ROLE_LABEL[u.role]})</option>`).join('')}</select></div>
+       <div><label class="f">Fällig bis</label><input class="in" id="no_due" type="date" value="${NO.due}"></div>
+       <div><label class="f">Termin</label><div class="row">${[['kein','Kein Termin'],['termin','Termin vereinbaren']].map(t=>`<label class="chip ${NO.terminMode===t[0]?'on':''}" style="cursor:pointer"><input type="radio" name="no_termin" value="${t[0]}" ${NO.terminMode===t[0]?'checked':''} onchange="noTermin()" style="display:none">${t[1]}</label>`).join('')}</div></div>
+       <div id="no_apptwrap" style="${NO.terminMode==='termin'?'':'display:none'}"><label class="f">Termin-Datum</label><input class="in" id="no_appt" type="date" value="${NO.appt}"></div>
      </div>
-   </div>`);
+     <div class="divider"></div>
+     <label class="f">Unterschrift des Kunden (Annahme)</label>
+     <div class="row" style="align-items:center;gap:12px">${NO.sig?`<img src="${NO.sig}" style="height:54px;border:1px solid var(--line);border-radius:8px;background:#fff">`:'<span class="muted" style="font-size:13px">Noch keine Unterschrift erfasst</span>'}<button class="btn" onclick="noSign()">${NO.sig?'Unterschrift ändern':'Unterschrift erfassen'}</button></div>
+   </div>
+
+   <div class="row" style="margin:18px 0 48px;justify-content:flex-end;flex-wrap:wrap;gap:10px">
+     <button class="btn gho" onclick="noCancel()">Abbrechen</button>
+     ${NO.editId?'':'<button class="btn" onclick="noSaveExit()">Als Entwurf speichern</button>'}
+     <button class="btn pri cta" onclick="noFinalize()">${NO.editId?'Speichern':'Auftrag erstellen'}</button>
+   </div>
+  </div>`;
+  const f=document.getElementById('noForm'); if(f){f.addEventListener('input',noSaveDraftDebounced);f.addEventListener('change',noSaveDraftDebounced);}
+  paintIcons();
 }
-function saveOrder(id){
-  const g=x=>document.getElementById(x).value;
-  const data={cid:g('f_cid'),brand:g('f_brand'),model:g('f_model'),issue:g('f_issue'),price:+g('f_price')||0,
-    qual:g('f_qual'),prio:g('f_prio'),warranty:+g('f_warr'),imei:g('f_imei'),appt:g('f_appt'),due:g('f_due'),notes:g('f_notes')};
-  if(id){ Object.assign(S.ord.find(x=>x.id===id),data); toast('Auftrag gespeichert'); }
-  else{ const nr='REP-'+(S.counter++); const o={id:uid('o'),nr,status:'offen',created:today(),readyAt:'',sig:'',source:'',...data};
-    S.ord.unshift(o);
-    const r=S.rules.find(x=>x.id==='r_received'); if(r&&r.on&&cust(o.cid).mail) logMail(o,r,'automatisch (Anlage)');
-    toast('Auftrag '+nr+' angelegt'); }
-  save(); closeAll(); go('auftraege');
-}
-function quickCustomer(){
-  const name=prompt('Name des Kunden:'); if(!name)return;
-  const tel=prompt('Telefon:')||''; const mail=prompt('E-Mail (optional):')||'';
-  const c={id:uid('c'),name,tel,mail,adr:''}; S.cust.push(c); save();
-  toast('Kunde angelegt'); orderForm(null); document.getElementById('f_cid').value=c.id;
-}
+views.neworder=function(){ if(!NO)NO=blankForm(); renderNewOrder(); };
+function discardDraft(id){ if(!confirm('Entwurf verwerfen?'))return; S.drafts=(S.drafts||[]).filter(x=>x.id!==id); save(); views.auftraege(); paintIcons(); refreshBadges(); toast('Entwurf verworfen'); }
+function fmtDateTime(iso){if(!iso)return '';const d=new Date(iso);return d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})+' '+d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});}
 
 /* ============================ DRUCK (Etikett, Beleg, Garantie, KVA) ============================ */
 const PRINTCSS=`*{box-sizing:border-box;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#0e7a3c}
@@ -1035,13 +1154,24 @@ function buyDevice(){const model=prompt('Gerät (z. B. iPhone 12 128GB):');if(!m
 
 /* ============================ PREISE ============================ */
 const CATALOG={
-  Apple:['iPhone 15 Pro','iPhone 15','iPhone 14 Pro','iPhone 14','iPhone 13','iPhone 12','iPhone 11','iPhone SE'],
-  Samsung:['Galaxy S24','Galaxy S23','Galaxy A56','Galaxy A34','Galaxy A14','Galaxy S22'],
-  Xiaomi:['Redmi Note 14 Pro 5G','Redmi Note 13','Redmi Note 8 Pro','Mi 11'],
-  Huawei:['P30 Pro','P40 Lite','Mate 20'],
+  Apple:['iPhone 16 Pro Max','iPhone 16 Pro','iPhone 16 Plus','iPhone 16','iPhone 15 Pro Max','iPhone 15 Pro','iPhone 15 Plus','iPhone 15','iPhone 14 Pro Max','iPhone 14 Pro','iPhone 14 Plus','iPhone 14','iPhone 13 Pro Max','iPhone 13 Pro','iPhone 13','iPhone 13 mini','iPhone 12 Pro Max','iPhone 12 Pro','iPhone 12','iPhone 12 mini','iPhone 11 Pro Max','iPhone 11 Pro','iPhone 11','iPhone XS Max','iPhone XS','iPhone XR','iPhone X','iPhone SE (2022)','iPhone SE (2020)','iPhone 8 Plus','iPhone 8','iPad Pro 12,9','iPad Air','iPad 10','iPad mini'],
+  Samsung:['Galaxy S24 Ultra','Galaxy S24+','Galaxy S24','Galaxy S23 Ultra','Galaxy S23+','Galaxy S23','Galaxy S22 Ultra','Galaxy S22+','Galaxy S22','Galaxy S21 Ultra','Galaxy S21','Galaxy S21 FE','Galaxy A56','Galaxy A55','Galaxy A54','Galaxy A35','Galaxy A34','Galaxy A25','Galaxy A15','Galaxy A14','Galaxy A05s','Galaxy Z Flip5','Galaxy Z Fold5','Galaxy Note 20 Ultra','Galaxy Note 10'],
+  Xiaomi:['Redmi Note 14 Pro+ 5G','Redmi Note 14 Pro 5G','Redmi Note 13 Pro','Redmi Note 13','Redmi Note 12 Pro','Redmi Note 12','Redmi Note 11','Redmi Note 8 Pro','Redmi 13C','Redmi 12','Poco X6 Pro','Poco F5','Xiaomi 14','Xiaomi 13T Pro','Mi 11'],
+  Huawei:['P60 Pro','P50 Pro','P40 Pro','P40 Lite','P30 Pro','P30 Lite','Mate 50 Pro','Mate 20 Pro','Mate 20','Nova 11','Y6'],
+  Google:['Pixel 9 Pro','Pixel 9','Pixel 8 Pro','Pixel 8','Pixel 8a','Pixel 7 Pro','Pixel 7','Pixel 6a','Pixel 6'],
+  OnePlus:['12','11','Nord 3','Nord CE 3','10 Pro','9 Pro','8T','Nord 2'],
+  Oppo:['Find X5 Pro','Reno 10 Pro','Reno 8','A98','A78','A57'],
+  Motorola:['Edge 40 Pro','Edge 40','Moto G84','Moto G54','Moto G73','Moto G23'],
+  Nokia:['G60','G42','G22','X30','5.4'],
+  Sony:['Xperia 1 V','Xperia 5 V','Xperia 10 V'],
+  Honor:['Magic6 Pro','Magic5','90','70','X8b'],
+  Sonstige:[],
 };
 const REPTYPES=['Displaytausch','Akkutausch','Ladebuchse','Kameraglas','Backcover','Software'];
-const BASEPRICE={Displaytausch:129,Akkutausch:59,Ladebuchse:69,Kameraglas:39,Backcover:79,Software:49};
+const BASEPRICE={Displaytausch:129,Akkutausch:59,Ladebuchse:69,Kameraglas:39,Backcover:79,Software:49,'Backcover / Rückglas':79,'Rückkamera':89,'Frontkamera':69,'Hörmuschel (Ohrlautsprecher)':49,'Lautsprecher':49,'Mikrofon':49,'Power-Button':45,'Lautstärke-Taste':45,'Wasserschaden-Behandlung':79,'Datenrettung':99,'SIM-Kartenleser':55,'Vibrationsmotor':45,'Diagnose':0};
+const REPAIRS=['Displaytausch','Akkutausch','Ladebuchse','Rückkamera','Frontkamera','Kameraglas','Backcover / Rückglas','Hörmuschel (Ohrlautsprecher)','Lautsprecher','Mikrofon','Power-Button','Lautstärke-Taste','Wasserschaden-Behandlung','Datenrettung','SIM-Kartenleser','Vibrationsmotor','Software','Diagnose'];
+const GERAETETYPEN=['Smartphone','Tablet','Smartwatch','Laptop','Konsole','E-Scooter','Kopfhörer','Sonstiges'];
+const PRIOS=['Standard','Express','Versand','Kostenvoranschlag (KVA)'];
 let priceBrand='Apple';
 views.preise=function(){
   const m=document.getElementById('main');
