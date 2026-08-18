@@ -704,9 +704,9 @@ function priceFor(brand,model,type){const base=BASEPRICE[type]; if(base===undefi
 function blankDevice(){return {typ:'Smartphone',brand:'',model:'',imei:'',fach:'',ref:'',reparatur:'',price:'',qual:'Original',warranty:6};}
 function blankForm(){return {draftId:'',editId:'',cid:'',typ:'Privat',anrede:'Herr',firma:'',vorname:'',nachname:'',tel:'+49 ',mail:'',plz:'',stadt:'',adr:'',lock:'Keine',lockval:'',devices:[blankDevice()],prio:'Standard',technikerId:'',notes:'',terminMode:'kein',appt:'',due:today(),sig:''};}
 let NO=null;
-function newOrder(){ closeAll(); NO=blankForm(); NO.draftId=uid('dr'); current='neworder'; renderNewOrder(); }
-function editOrder(id){ closeAll(); const o=S.ord.find(x=>x.id===id); if(!o)return; NO=orderToForm(o); NO.editId=id; current='neworder'; renderNewOrder(); }
-function resumeDraft(did){ closeAll(); const d=(S.drafts||[]).find(x=>x.id===did); if(!d)return; NO=Object.assign(blankForm(),JSON.parse(JSON.stringify(d.data))); NO.draftId=did; NO.editId=''; current='neworder'; renderNewOrder(); }
+function newOrder(){ closeAll(); NO=blankForm(); NO.draftId=uid('dr'); current='neworder'; renderNewOrder(); window.scrollTo(0,0); }
+function editOrder(id){ closeAll(); const o=S.ord.find(x=>x.id===id); if(!o)return; NO=orderToForm(o); NO.editId=id; current='neworder'; renderNewOrder(); window.scrollTo(0,0); }
+function resumeDraft(did){ closeAll(); const d=(S.drafts||[]).find(x=>x.id===did); if(!d)return; NO=Object.assign(blankForm(),JSON.parse(JSON.stringify(d.data))); NO.draftId=did; NO.editId=''; current='neworder'; renderNewOrder(); window.scrollTo(0,0); }
 function orderToForm(o){const c=cust(o.cid);const nm=(c.name||'').split(' ');const f=blankForm();f.cid=o.cid;f.typ=c.typ||'Privat';f.firma=c.firma||'';f.anrede=c.anrede||'Herr';f.vorname=nm.slice(0,-1).join(' ')||nm[0]||'';f.nachname=nm.length>1?nm[nm.length-1]:'';f.tel=c.tel||'+49 ';f.mail=c.mail||'';f.plz=c.plz||'';f.stadt=c.stadt||'';f.adr=c.adr||'';f.lock=o.lock||'Keine';f.lockval=o.lockval||'';f.prio=o.prio||'Standard';f.technikerId=o.technikerId||'';f.notes=o.notes||'';f.due=o.due||today();f.appt=o.appt||'';f.terminMode=o.appt?'termin':'kein';f.sig=o.sig||'';f.devices=[{typ:o.devtyp||'Smartphone',brand:o.brand||'',model:o.model||'',imei:o.imei||'',fach:o.fach||'',ref:o.ref||'',reparatur:o.issue||'',price:(o.price!==undefined?o.price:''),qual:o.qual||'Original',warranty:o.warranty||6}];return f;}
 function noHasContent(){ if(!NO)return false; const d=NO.devices[0]||{}; return !!(NO.vorname||NO.nachname||(NO.tel||'').replace(/\D/g,'').length>3||NO.firma||NO.mail||d.brand||d.model||d.reparatur||NO.notes); }
 function noTitleOf(){const nm=((NO.vorname+' '+NO.nachname).trim())||NO.firma||'Unbenannter Kunde';const d=NO.devices[0]||{};const dev=[d.brand,d.model].filter(Boolean).join(' ');return nm+(dev?' · '+dev:'');}
@@ -785,8 +785,9 @@ function noDevBlock(d,i){
 }
 function renderNewOrder(){
   const m=document.getElementById('main'); if(!m||!NO)return;
+  const _sy=window.scrollY;
   document.querySelectorAll('#nav a').forEach(a=>a.classList.remove('active'));
-  document.getElementById('side').classList.remove('show'); window.scrollTo(0,0);
+  document.getElementById('side').classList.remove('show');
   const c=NO; const techs=S.users||[];
   m.innerHTML=`
   <datalist id="allDevices">${Object.entries(CATALOG).flatMap(([b,ms])=>ms.map(mm=>`<option value="${esc(b+' '+mm)}"></option>`)).join('')}</datalist>
@@ -824,7 +825,7 @@ function renderNewOrder(){
 
    <div class="card" style="margin-top:16px"><b>Gerät &amp; Fehlerbeschreibung</b>
      ${NO.devices.map((d,i)=>noDevBlock(d,i)).join('')}
-     ${NO.devices.length<3?`<button class="btn" style="margin-top:12px;width:100%" onclick="noAddDevice()">+ Weiteres Gerät hinzufügen (optional)</button>`:''}
+     ${(!NO.editId&&NO.devices.length<3)?`<button class="btn" style="margin-top:12px;width:100%" onclick="noAddDevice()">+ Weiteres Gerät hinzufügen (optional)</button>`:''}
      <label class="f" style="margin-top:14px">Detaillierte Informationen &amp; Notizen</label>
      <textarea class="in" id="no_notes" rows="3" placeholder="z. B. Daten sichern, Schutzfolie aufbringen, Kundenhinweise, technische Hinweise…">${esc(NO.notes)}</textarea>
    </div>
@@ -849,7 +850,7 @@ function renderNewOrder(){
    </div>
   </div>`;
   const f=document.getElementById('noForm'); if(f){f.addEventListener('input',noSaveDraftDebounced);f.addEventListener('change',noSaveDraftDebounced);}
-  paintIcons();
+  paintIcons(); window.scrollTo(0,_sy);
 }
 views.neworder=function(){ if(!NO)NO=blankForm(); renderNewOrder(); };
 function discardDraft(id){ if(!confirm('Entwurf verwerfen?'))return; S.drafts=(S.drafts||[]).filter(x=>x.id!==id); save(); views.auftraege(); paintIcons(); refreshBadges(); toast('Entwurf verworfen'); }
