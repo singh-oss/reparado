@@ -193,7 +193,7 @@
       <div class="grouplbl">Werkstatt</div>
       <a data-view="erinnerungen"><span class="ic" data-ic="bell"></span> Erinnerungen <span class="badge" id="bg-rem">0</span></a>
       <a data-view="bestellungen"><span class="ic" data-ic="box"></span> Bestellungen</a>
-      <a data-view="lager"><span class="ic" data-ic="arch"></span> Lager &amp; Teile</a>
+      <a data-view="lager"><span class="ic" data-ic="arch"></span> Lager &amp; Teile <span class="badge" id="bg-lager">0</span></a>
       <a data-view="ankauf"><span class="ic" data-ic="swap"></span> Ankauf / Verkauf</a>
       <a data-view="preise"><span class="ic" data-ic="tag"></span> Modelle &amp; Preise</a>
       <div class="grouplbl">Verkauf</div>
@@ -558,6 +558,7 @@ function refreshBadges(){
   const bb=document.getElementById('bg-beleg'); if(bb) bb.textContent=(S.belege||[]).filter(x=>x.status==='neu').length;
   const bi=document.getElementById('bg-ins'); if(bi){const n=S.ord.filter(o=>o.ins&&o.ins.on&&['geprueft','eingereicht','freigegeben'].includes(o.ins.status)).length+((S.wgLeads||[]).length); bi.textContent=n; bi.style.display=n?'':'none';}
   const ba=document.getElementById('bg-ang'); if(ba){const n=(S.quotes||[]).filter(q=>['entwurf','offen','angenommen'].includes(q.status)).length+((S.requests||[]).length); ba.textContent=n; ba.style.display=n?'':'none';}
+  const bl=document.getElementById('bg-lager'); if(bl){const n=(S.parts||[]).filter(p=>p.stock<=p.min).length; bl.textContent=n; bl.style.display=n?'':'none';}
 }
 
 /* ============================ DASHBOARD ============================ */
@@ -1356,25 +1357,103 @@ function newPartOrder(){const part=prompt('Welches Teil bestellen?');if(!part)re
 function orderPartFor(id){const o=S.ord.find(x=>x.id===id);S.orders.unshift({id:uid('b'),nr:o.nr,supplier:'Foneday',part:o.model+' '+o.issue,status:'offen',eta:today(),ref:o.id});o.status='warten';save();closeAll();toast('Teil bestellt · Kunde informiert');go('bestellungen');}
 
 /* ============================ LAGER ============================ */
+/* ============================ WARENWIRTSCHAFT (P2) ============================ */
+let lagerTab='lager', lagerCat='alle';
+function ensureInv(){ let ch=false;
+  if(!S.stockMoves){S.stockMoves=[
+    {id:'mv1',ts:new Date(Date.now()-86400000*2).toISOString(),partId:'p2',name:'iPhone 13 Display (OLED)',type:'zugang',qty:5,before:0,after:5,reason:'Wareneingang · Foneday'},
+    {id:'mv2',ts:new Date(Date.now()-86400000).toISOString(),partId:'p2',name:'iPhone 13 Display (OLED)',type:'abgang',qty:-1,before:5,after:4,reason:'Verbraucht · Reparatur'},
+    {id:'mv3',ts:new Date(Date.now()-3600000*5).toISOString(),partId:'p3',name:'iPhone 13 Akku',type:'inventur',qty:-1,before:2,after:1,reason:'Inventur-Korrektur'}];ch=true;}
+  if(!S.suppliers){S.suppliers=[{id:'sup1',name:'Foneday',contact:'service@foneday.de',note:'Displays & Akkus'},{id:'sup2',name:'GSMparts',contact:'',note:''},{id:'sup3',name:'ASWO',contact:'',note:'Ersatzteile'}];ch=true;}
+  if(!S.partCats){S.partCats=Array.from(new Set(['Display','Akku','Ladebuchse','Kamera','Backcover','Kleinteile','Zubehör','Sonstige'].concat((S.parts||[]).map(p=>p.cat).filter(Boolean))));ch=true;}
+  (S.parts||[]).forEach((p,i)=>{if(p.vk===undefined){p.vk=Math.round((p.price||0)*2.2);ch=true;}if(p.supplier===undefined){p.supplier=['Foneday','GSMparts','ASWO'][i%3];ch=true;}});
+  if(ch)save();
+}
+function invLagerwert(){return (S.parts||[]).reduce((s,p)=>s+(p.stock||0)*(p.price||0),0);}
+function invStueck(){return (S.parts||[]).reduce((s,p)=>s+(p.stock||0),0);}
+function invLow(){return (S.parts||[]).filter(p=>p.stock<=p.min).length;}
+function stockMove(id,delta,type,reason){const p=S.parts.find(x=>x.id===id);if(!p)return;const before=p.stock||0;p.stock=Math.max(0,before+delta);S.stockMoves.unshift({id:uid('mv'),ts:new Date().toISOString(),partId:id,name:p.name,type,qty:p.stock-before,before,after:p.stock,reason:reason||''});save();}
+function stockSet(id,val,type,reason){const p=S.parts.find(x=>x.id===id);if(!p)return;const before=p.stock||0;p.stock=Math.max(0,val);S.stockMoves.unshift({id:uid('mv'),ts:new Date().toISOString(),partId:id,name:p.name,type,qty:p.stock-before,before,after:p.stock,reason:reason||''});save();}
+function partIn(id){const q=Math.abs(+((prompt('Wareneingang – wie viele Stück hinzufügen?','1'))||0));if(!q)return;stockMove(id,q,'zugang','Wareneingang');views.lager();paintIcons();refreshBadges();toast('Wareneingang gebucht: +'+q);}
+function partOut(id){const q=Math.abs(+((prompt('Abgang/Verbrauch – wie viele Stück abbuchen?','1'))||0));if(!q)return;stockMove(id,-q,'abgang','Abgang/Verbrauch');views.lager();paintIcons();refreshBadges();toast('Abgang gebucht: -'+q);}
+function partInv(id){const p=S.parts.find(x=>x.id===id);const v=prompt('Inventur – tatsächlicher Bestand:',String(p.stock));if(v===null||v==='')return;stockSet(id,Math.max(0,+v||0),'inventur','Inventur-Korrektur');views.lager();paintIcons();refreshBadges();toast('Inventur gebucht');}
+function adjPart(id,d){stockMove(id,d,'korrektur','Schnellkorrektur');views.lager();paintIcons();refreshBadges();}
+function delPart(id){if(!confirm('Teil löschen?'))return;S.parts=S.parts.filter(x=>x.id!==id);save();views.lager();paintIcons();refreshBadges();toast('Teil gelöscht');}
+function newPart(){partForm(null);}
+function partForm(id){ensureInv();const p=id?S.parts.find(x=>x.id===id):null;const edit=!!p;
+  openModal(`<div class="dhead"><b style="flex:1">${edit?'Teil bearbeiten':'Neues Teil'}</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+  <div class="dbody">
+   <label class="f">Bezeichnung *</label><input class="in" id="pt_name" value="${p?esc(p.name):''}" placeholder="z. B. iPhone 15 Display (OLED)">
+   <div class="grid g2" style="margin-top:10px">
+     <div><label class="f">Kategorie</label><select class="in" id="pt_cat">${S.partCats.map(c=>`<option ${p&&p.cat===c?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
+     <div><label class="f">Artikelnr. (SKU)</label><input class="in" id="pt_sku" value="${p?esc(p.sku):''}" placeholder="optional"></div>
+     <div><label class="f">Bestand</label><input class="in" id="pt_stock" type="number" value="${p?p.stock:0}"></div>
+     <div><label class="f">Mindestbestand</label><input class="in" id="pt_min" type="number" value="${p?p.min:2}"></div>
+     <div><label class="f">Einkaufspreis EK (€)</label><input class="in" id="pt_ek" type="number" value="${p?p.price:''}" placeholder="0.00"></div>
+     <div><label class="f">Verkaufspreis VK (€)</label><input class="in" id="pt_vk" type="number" value="${p&&p.vk!==undefined?p.vk:''}" placeholder="0.00"></div>
+     <div style="grid-column:1/-1"><label class="f">Lieferant</label><select class="in" id="pt_sup"><option value=""></option>${S.suppliers.map(su=>`<option ${p&&p.supplier===su.name?'selected':''}>${esc(su.name)}</option>`).join('')}</select></div>
+   </div>
+   <div class="row" style="margin-top:16px;justify-content:flex-end"><button class="btn gho" onclick="closeAll()">Abbrechen</button><button class="btn pri" onclick="savePart(${p?`'${p.id}'`:'null'})">${edit?'Speichern':'Anlegen'}</button></div>
+  </div>`);
+}
+function savePart(id){const g=x=>document.getElementById(x).value;const name=g('pt_name').trim();if(!name){toast('Bitte Bezeichnung angeben');return;}
+  const data={cat:g('pt_cat'),name,sku:g('pt_sku')||('ART-'+Math.floor(Math.random()*9000+1000)),min:+g('pt_min')||0,price:+g('pt_ek')||0,vk:+g('pt_vk')||0,supplier:g('pt_sup')};
+  if(id){Object.assign(S.parts.find(x=>x.id===id),data);const ns=+g('pt_stock')||0;stockSet(id,ns,'korrektur','Bearbeitung');toast('Teil gespeichert');}
+  else{const p={id:uid('p'),stock:0,...data};S.parts.push(p);const ns=+g('pt_stock')||0;if(ns>0)stockMove(p.id,ns,'zugang','Ersteinbuchung');toast('Teil angelegt');}
+  save();closeAll();views.lager();paintIcons();refreshBadges();}
+function catManage(){ensureInv();openModal(`<div class="dhead"><b style="flex:1">Kategorien</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div><div class="dbody"><div class="row" style="flex-wrap:wrap;gap:8px">${S.partCats.map(c=>`<span class="pill soft" style="gap:8px;padding:8px 12px"><span class="d"></span>${esc(c)} <a onclick="catDelInv('${qa(c)}')" style="cursor:pointer;color:#c0392b;font-weight:800">✕</a></span>`).join('')}</div><button class="btn" style="margin-top:14px" onclick="catAddInv()">+ Kategorie</button></div>`);}
+function catAddInv(){const c=(prompt('Neue Kategorie:')||'').trim();if(!c)return;if(!S.partCats.includes(c))S.partCats.push(c);save();catManage();}
+function catDelInv(c){S.partCats=S.partCats.filter(x=>x!==c);save();catManage();}
+function supAdd(){const n=(prompt('Name des Lieferanten:')||'').trim();if(!n)return;const c=prompt('Kontakt (E-Mail/Tel, optional):')||'';S.suppliers.push({id:uid('sup'),name:n,contact:c,note:''});save();views.lager();paintIcons();toast('Lieferant angelegt');}
+function supDel(id){if(!confirm('Lieferant löschen?'))return;S.suppliers=S.suppliers.filter(x=>x.id!==id);save();views.lager();paintIcons();}
+function supEdit(id,f,v){const su=S.suppliers.find(x=>x.id===id);if(su){su[f]=v;save();}}
 views.lager=function(){
-  const m=document.getElementById('main');
-  const low=S.parts.filter(p=>p.stock<p.min).length;
-  const val=S.parts.reduce((s,p)=>s+p.stock*p.price,0);
-  m.innerHTML=`<div class="between"><div><h1 class="h1">Lager &amp; Teile</h1><p class="sub">${S.parts.length} Artikel · Lagerwert ${eur(val)}</p></div>
-     <button class="btn pri" onclick="newPart()">Teil</button></div>
-   ${low?`<div class="note" style="margin-top:14px;border:1px solid #0e7a3c;background:#fff"><b>${low} Teil(e) unter Mindestbestand</b> – die Werkstatt-Erinnerung „Lagerbestand niedrig" ist dafür aktiv.</div>`:''}
-   <div class="card" style="margin-top:16px;padding:0"><table>
-     <thead><tr><th>Artikel</th><th>Kategorie</th><th>SKU</th><th>Bestand</th><th>Wert</th><th></th></tr></thead>
-     <tbody>${S.parts.map(p=>`<tr>
-       <td><b>${esc(p.name)}</b></td><td><span class="tag">${esc(p.cat)}</span></td><td class="mono muted">${esc(p.sku)}</td>
-       <td>${p.stock<p.min?`<span class="pill dash"><span class="d"></span>${p.stock} / min ${p.min}</span>`:`<b>${p.stock}</b> Stk`}</td>
-       <td class="mono">${eur(p.stock*p.price)}</td>
-       <td><div class="row"><button class="btn sm gho" onclick="adjPart('${p.id}',1)">+</button><button class="btn sm gho" onclick="adjPart('${p.id}',-1)">–</button></div></td>
-     </tr>`).join('')}</tbody></table></div>`;
+  ensureInv(); const m=document.getElementById('main');
+  const tabBtn=(k,l)=>`<button class="chip ${lagerTab===k?'on':''}" onclick="lagerTab='${k}';views.lager();paintIcons()">${l}</button>`;
+  let body='';
+  if(lagerTab==='lager'){
+    const cats=['alle',...S.partCats.filter(c=>S.parts.some(p=>p.cat===c))];
+    if(lagerCat!=='alle'&&!S.parts.some(p=>p.cat===lagerCat))lagerCat='alle';
+    const list=S.parts.filter(p=>lagerCat==='alle'?true:p.cat===lagerCat);
+    body=`<div class="row" style="margin:14px 0;gap:8px;flex-wrap:wrap;align-items:center">
+       <button class="btn sm pri" onclick="newPart()">+ Neues Teil</button><button class="btn sm" onclick="catManage()">Kategorien</button>
+       <span style="flex:1"></span>
+       ${cats.map(c=>`<button class="chip ${lagerCat===c?'on':''}" onclick="lagerCat=${c==='alle'?"'alle'":"'"+qa(c)+"'"};views.lager();paintIcons()">${c==='alle'?'Alle':esc(c)+' · '+S.parts.filter(p=>p.cat===c).length}</button>`).join('')}
+     </div>
+     <div class="card" style="padding:0;overflow:auto"><table><thead><tr><th>Artikel</th><th>Kategorie</th><th>Lieferant</th><th>Bestand</th><th>EK</th><th>VK</th><th>Lagerwert</th><th></th></tr></thead>
+       <tbody>${list.length?list.map(p=>`<tr>
+         <td><b>${esc(p.name)}</b><div class="muted mono" style="font-size:12px">${esc(p.sku||'')}</div></td>
+         <td><span class="tag">${esc(p.cat)}</span></td>
+         <td class="muted" style="font-size:13px">${esc(p.supplier||'—')}</td>
+         <td>${p.stock<=p.min?`<span class="pill" style="border-color:#e2681c;color:#e2681c"><span class="d" style="background:#e2681c"></span>${p.stock} / min ${p.min}</span>`:`<b>${p.stock}</b> Stk`}</td>
+         <td class="mono">${eur(p.price)}</td><td class="mono">${eur(p.vk||0)}</td><td class="mono">${eur(p.stock*p.price)}</td>
+         <td style="text-align:right;white-space:nowrap"><button class="btn sm gho" onclick="partIn('${p.id}')">+ Eingang</button><button class="btn sm gho" onclick="partOut('${p.id}')">− Abgang</button><button class="btn sm gho" onclick="partInv('${p.id}')">Inventur</button><button class="btn sm gho" onclick="partForm('${p.id}')">Bearb.</button><button class="btn sm gho" onclick="delPart('${p.id}')">Löschen</button></td>
+       </tr>`).join(''):`<tr><td colspan="8"><div class="empty">Keine Teile in dieser Kategorie. „+ Neues Teil" anlegen.</div></td></tr>`}</tbody></table></div>`;
+  } else if(lagerTab==='bewegungen'){
+    const mv=(S.stockMoves||[]).slice(0,200);
+    const tl={zugang:['Zugang','#0e7a3c'],abgang:['Abgang','#c0392b'],inventur:['Inventur','#6b7280'],korrektur:['Korrektur','#d99a00']};
+    body=`<div class="card" style="margin-top:14px;padding:0;overflow:auto"><table><thead><tr><th>Zeitpunkt</th><th>Teil</th><th>Art</th><th>Menge</th><th>Bestand</th><th>Grund</th></tr></thead>
+      <tbody>${mv.length?mv.map(x=>{const t=tl[x.type]||['—','#888'];return `<tr><td class="muted mono" style="font-size:12px">${fmtDateTime(x.ts)}</td><td>${esc(x.name)}</td><td><span class="pill" style="border-color:${t[1]};color:${t[1]}"><span class="d" style="background:${t[1]}"></span>${t[0]}</span></td><td class="mono" style="color:${x.qty>=0?'#0e7a3c':'#c0392b'}">${x.qty>=0?'+':''}${x.qty}</td><td class="mono">${x.before}→${x.after}</td><td class="muted" style="font-size:13px">${esc(x.reason||'')}</td></tr>`;}).join(''):`<tr><td colspan="6"><div class="empty">Noch keine Lagerbewegungen.</div></td></tr>`}</tbody></table></div>`;
+  } else {
+    body=`<div class="between" style="margin:14px 0"><b>Lieferanten</b><button class="btn sm pri" onclick="supAdd()">+ Lieferant</button></div>
+     <div class="card" style="padding:0;overflow:auto"><table><thead><tr><th>Name</th><th>Kontakt</th><th>Notiz</th><th>Teile</th><th></th></tr></thead>
+       <tbody>${S.suppliers.map(su=>`<tr><td><b>${esc(su.name)}</b></td>
+         <td><input class="in" style="padding:5px 8px" value="${esc(su.contact||'')}" onchange="supEdit('${su.id}','contact',this.value)"></td>
+         <td><input class="in" style="padding:5px 8px" value="${esc(su.note||'')}" onchange="supEdit('${su.id}','note',this.value)"></td>
+         <td class="mono">${S.parts.filter(p=>p.supplier===su.name).length}</td>
+         <td style="text-align:right"><button class="btn sm gho" onclick="supDel('${su.id}')">Löschen</button></td></tr>`).join('')}</tbody></table></div>`;
+  }
+  m.innerHTML=`<div class="between"><div><h1 class="h1">Warenwirtschaft</h1><p class="sub">Lager, Wareneingang, Inventur, Bewegungen &amp; Lieferanten</p></div>
+     <button class="btn pri" onclick="newPart()">Neues Teil</button></div>
+   <div class="grid g4" style="margin-top:16px">
+     <div class="card kpi"><div class="n">${eur(invLagerwert())}</div><div class="l">Lagerwert</div><div class="t">EK × Bestand</div></div>
+     <div class="card kpi"><div class="n">${S.parts.length}</div><div class="l">Artikel</div><div class="t">im Sortiment</div></div>
+     <div class="card kpi"><div class="n">${invStueck()}</div><div class="l">Stück gesamt</div><div class="t">auf Lager</div></div>
+     <div class="card kpi"><div class="n" style="${invLow()?'color:#e2681c':''}">${invLow()}</div><div class="l">Niedrige Bestände</div><div class="t">≤ Mindestbestand</div></div>
+   </div>
+   <div class="row" style="margin-top:14px">${tabBtn('lager','Lager')}${tabBtn('bewegungen','Bewegungen')}${tabBtn('lieferanten','Lieferanten')}</div>
+   ${body}`;
 };
-function adjPart(id,d){const p=S.parts.find(x=>x.id===id);p.stock=Math.max(0,p.stock+d);save();views.lager();paintIcons();refreshBadges();}
-function newPart(){const name=prompt('Teilebezeichnung:');if(!name)return;const cat=prompt('Kategorie:')||'Sonstige';const stock=+prompt('Bestand:')||0;
-  S.parts.push({id:uid('p'),cat,name,sku:'NEU-'+Math.floor(Math.random()*900),stock,min:2,price:+prompt('EK-Preis (€):')||0});save();views.lager();paintIcons();toast('Teil angelegt');}
 
 /* ============================ ANKAUF/VERKAUF ============================ */
 views.ankauf=function(){
@@ -2459,7 +2538,7 @@ function demoDone(){ if(_demoStop)return; const el=document.getElementById('demo
 
 /* ============================ BOOT ============================ */
 paintIcons();
-(function(){ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); const n=pullBookings(); const nq=pullRequests(); go('dashboard'); applyNavRole(); if(!curUser())showLogin();
+(function(){ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); ensureInv(); const n=pullBookings(); const nq=pullRequests(); go('dashboard'); applyNavRole(); if(!curUser())showLogin();
   if(nq) setTimeout(()=>toast(nq+' neue Website-Anfrage'+(nq>1?'n':'')),900);
   if(n) setTimeout(()=>toast(n+' neue Online-Buchung'+(n>1?'en':'')+' übernommen'),500);
 })();
