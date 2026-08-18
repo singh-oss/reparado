@@ -67,12 +67,13 @@ Wachstums-Motoren (Versandreparatur, B2B, Forecast) · **Echtes System** (DB, Au
 
 | # | Feature | Typ | Effort | Impact |
 |---|---|---|---|---|
-| L12 | **🖼️ Live-Status mit Foto-Updates** (killt „ist-es-fertig"-Anrufe) | Leap | M | ★★ |
+| ✅ L12 | **🖼️ Live-Status mit Foto-Updates** (Werkstattfotos auf der Kunden-Statusseite) · **FERTIG 18.8.** | Leap | M | ★★ |
 | L13 | **📱 Digitale Geräte-Akte per QR** (Historie/Garantie/frühere Reparaturen) | Leap | M | ★★ |
 | L14 | **🖥️ Self-Check-in-Terminal** (Kiosk-Modus ausbauen zur Selbstannahme) | Leap | S–M | ★★ |
 | L15 | **🛡️ Garantie-Portal** für Kunden (Status sehen, Fall melden) | Leap | M | ★ |
-| L7 | **📦 „Nicht abgeholt"-Workflow** (eskalierend + Lagergebühr) | Leap | S–M | ★★ |
-| L8 | **🛒 Upsell an der Kasse** (Panzerglas/Hülle vorschlagen) | Leap | S | ★ |
+| ✅ L7 | **📦 „Nicht abgeholt"-Workflow** (eskalierende Stufen + Lagergebühr) · **FERTIG 18.8.** | Leap | S–M | ★★ |
+| ✅ L8 | **🛒 Upsell an der Kasse** (Zubehör bei Reparatur im Warenkorb) · **FERTIG 18.8.** | Leap | S | ★ |
+| ✅ B2 | **Fotos am Auftrag** (Upload+Galerie im Drawer, aus Diagnose übernommen) · **FERTIG 18.8.** | Leap | S–M | ★★ |
 | L18 | **⚖️ Rechtssichere digitale Übergabe** (Datenverlust-Waiver/DSGVO signiert) | Leap | S | ★★ |
 | L4 | **💬 Proaktive Kundenkommunikation** (Empfangskraft treibt aktiv) | Leap | M | ★★ |
 | L3 | **🔧 Techniker-Playbook** (KI-Reparaturanleitung, macht Azubis produktiv) | Leap | M | ★★ |
