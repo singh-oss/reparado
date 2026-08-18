@@ -493,7 +493,12 @@ function searchOrders(){ return visRole().filter(o=>!o.trashed); } /* Suche: ink
 function ordArchived(){ return visRole().filter(o=>o.archived&&!o.trashed); }
 function ordTrashed(){ return visRole().filter(o=>o.trashed); }
 /* ---- Systemeinstellungen (P8): Nummernschema, Pflichtfelder, AGB ---- */
-function ensureSettings(){ if(!S.settings){S.settings={orderPrefix:'REP-',quotePrefix:'AN-',required:{imei:false,mail:false,adr:false,sig:false},agb:'Für die Reparatur gelten unsere Allgemeinen Geschäftsbedingungen. Bei Datenverlust wird keine Haftung übernommen – bitte sichern Sie Ihre Daten vor der Abgabe. Die Gewährleistung bezieht sich auf die durchgeführte Reparatur und das eingesetzte Ersatzteil, nicht auf Folgeschäden durch Sturz, Feuchtigkeit oder unsachgemäße Handhabung. Nicht abgeholte Geräte werden nach 90 Tagen kostenpflichtig eingelagert.'};save();} const s=S.settings; if(!s.required)s.required={imei:false,mail:false,adr:false,sig:false}; if(!s.orderPrefix)s.orderPrefix='REP-'; if(!s.quotePrefix)s.quotePrefix='AN-'; return s; }
+function ensureSettings(){ if(!S.settings){S.settings={orderPrefix:'REP-',quotePrefix:'AN-',required:{imei:false,mail:false,adr:false,sig:false},agb:'Für die Reparatur gelten unsere Allgemeinen Geschäftsbedingungen. Bei Datenverlust wird keine Haftung übernommen – bitte sichern Sie Ihre Daten vor der Abgabe. Die Gewährleistung bezieht sich auf die durchgeführte Reparatur und das eingesetzte Ersatzteil, nicht auf Folgeschäden durch Sturz, Feuchtigkeit oder unsachgemäße Handhabung. Nicht abgeholte Geräte werden nach 90 Tagen kostenpflichtig eingelagert.'};save();} const s=S.settings; if(!s.required)s.required={imei:false,mail:false,adr:false,sig:false}; if(!s.orderPrefix)s.orderPrefix='REP-'; if(!s.quotePrefix)s.quotePrefix='AN-'; if(s.hourlyRate===undefined)s.hourlyRate=60; return s; }
+/* ---- Marge pro Auftrag (L9) ---- */
+function orderPartsCost(o){return ((o&&o.parts)||[]).reduce((s,p)=>s+(+p.ek||0)*(+p.qty||0),0);}
+function orderLaborCost(o){const rate=ensureSettings().hourlyRate||0;return Math.round((+((o&&o.laborMin)||0))/60*rate*100)/100;}
+function orderMargin(o){return oTotal(o)-orderPartsCost(o)-orderLaborCost(o);}
+function orderMarginPct(o){const rev=oTotal(o);return rev>0?Math.round(orderMargin(o)/rev*100):0;}
 function nextOrderNr(){ return (ensureSettings().orderPrefix||'REP-')+(S.counter++); }
 function nextQuoteNr(){ S.quoteCounter=(S.quoteCounter||1000); return (ensureSettings().quotePrefix||'AN-')+(S.quoteCounter++); }
 function eur(n){return '€ '+Number(n||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2});}
@@ -709,6 +714,8 @@ function openOrder(id){
        ${o.technikerId?`<div><label class="f">Techniker</label><div style="font-weight:700">${esc(((S.users||[]).find(u=>u.id===o.technikerId)||{}).name||'—')}</div></div>`:''}
      </div>`:''}
      ${o.notes?`<div class="note" style="margin-top:12px">Notiz: ${esc(o.notes)}</div>`:''}
+
+     ${margeCard(o)}
 
      <label class="f" style="margin-top:18px">Status ändern</label>
      <div class="row" style="flex-wrap:wrap;gap:8px">${statusFlow().map(s=>`<button class="chip ${o.status===s?'on':''}" onclick="setStatus('${o.id}','${s}')" style="${o.status===s?`background:${statusColor(s)};border-color:${statusColor(s)};color:#fff`:''}">${esc(statusLabel(s))}</button>`).join('')}</div>
@@ -1455,6 +1462,36 @@ views.lager=function(){
    ${body}`;
 };
 
+/* ---- Marge-Karte + Teile-Zuweisung im Auftrag (L9) ---- */
+function margeCard(o){
+  const rev=oTotal(o), pc=orderPartsCost(o), lc=orderLaborCost(o), mg=orderMargin(o), pct=orderMarginPct(o);
+  const col=mg<0?'#c0392b':(rev>0&&mg<rev*0.2?'#d99a00':'#0e7a3c');
+  return `<div class="card" style="margin-top:14px;border:1px solid var(--line)"><div class="between"><b>Wirtschaftlichkeit</b><span class="muted" style="font-size:12px">nur intern</span></div>
+    <div class="between" style="padding:6px 0"><span>Umsatz</span><b class="mono">${eur(rev)}</b></div>
+    <div style="padding:6px 0;border-top:1px solid var(--line)">
+      <div class="between"><span class="muted" style="font-size:13px">Teilekosten (EK)</span><b class="mono" style="color:#c0392b">− ${eur(pc)}</b></div>
+      ${((o.parts)||[]).map((p,i)=>`<div class="between" style="padding:3px 0 3px 10px"><span class="muted" style="font-size:12px">${esc(p.name)} ×${p.qty} · EK ${eur(p.ek)}</span><span style="display:flex;gap:8px;align-items:center"><span class="mono" style="font-size:12px">${eur(p.ek*p.qty)}</span><a onclick="ordDelPart('${o.id}',${i})" style="cursor:pointer;color:#c0392b;font-weight:800">✕</a></span></div>`).join('')}
+      <button class="btn sm gho" style="margin-top:6px" onclick="ordAddPart('${o.id}')">+ Teil aus Lager verbauen</button>
+    </div>
+    <div class="between" style="padding:8px 0;border-top:1px solid var(--line);align-items:center"><span class="muted" style="font-size:13px">Arbeitszeit (${ensureSettings().hourlyRate} €/h)</span><span style="display:flex;gap:6px;align-items:center"><input class="in" style="width:78px;padding:5px 8px" type="number" value="${o.laborMin||0}" onchange="ordSetLabor('${o.id}',this.value)"><span class="muted" style="font-size:12px">Min</span><b class="mono" style="color:#c0392b">− ${eur(lc)}</b></span></div>
+    <div class="between" style="padding:9px 0;border-top:2px solid ${col}"><b>Marge</b><b style="font-size:19px;color:${col}">${eur(mg)} · ${pct}%</b></div>
+    ${mg<0?'<div class="note" style="margin-top:6px;border:1px solid #c0392b;color:#c0392b"><b>Verlust</b> – der Preis deckt Teile- und Arbeitskosten nicht.</div>':''}
+  </div>`;
+}
+function ordAddPart(orderId){ensureInv();const o=S.ord.find(x=>x.id===orderId);if(!o)return;
+  openModal(`<div class="dhead"><b style="flex:1">Teil aus Lager verbauen</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+   <div class="dbody"><label class="f">Teil</label><select class="in" id="op_part">${S.parts.map(p=>`<option value="${p.id}">${esc(p.name)} · Bestand ${p.stock} · EK ${eur(p.price)}</option>`).join('')||'<option value="">Keine Teile im Lager</option>'}</select>
+   <label class="f" style="margin-top:10px">Menge</label><input class="in" id="op_qty" type="number" value="1" min="1">
+   <div class="note" style="margin-top:10px">Die Menge wird dem Lager abgebucht (Bewegung „Abgang") und als Teilekosten dem Auftrag zugerechnet.</div>
+   <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn gho" onclick="closeAll()">Abbrechen</button><button class="btn pri" onclick="ordAddPartDo('${orderId}')">Verbauen</button></div></div>`);
+}
+function ordAddPartDo(orderId){const o=S.ord.find(x=>x.id===orderId);const pid=document.getElementById('op_part').value;if(!pid){toast('Kein Teil im Lager – erst anlegen');return;}const qty=Math.max(1,+document.getElementById('op_qty').value||1);const p=S.parts.find(x=>x.id===pid);if(!p)return;
+  o.parts=o.parts||[];o.parts.push({partId:pid,name:p.name,qty,ek:p.price});
+  stockMove(pid,-qty,'abgang','Verbaut in '+o.nr);
+  save();closeAll();openOrder(orderId);refreshBadges();toast('Teil verbaut · Lager gebucht');}
+function ordDelPart(orderId,idx){const o=S.ord.find(x=>x.id===orderId);if(!o||!o.parts)return;const p=o.parts[idx];if(p&&p.partId){stockMove(p.partId,+p.qty,'zugang','Storno Verbau '+o.nr);}o.parts.splice(idx,1);save();openOrder(orderId);refreshBadges();toast('Teil entfernt · Lager zurückgebucht');}
+function ordSetLabor(orderId,min){const o=S.ord.find(x=>x.id===orderId);if(o){o.laborMin=Math.max(0,+min||0);save();openOrder(orderId);}}
+
 /* ============================ ANKAUF/VERKAUF ============================ */
 views.ankauf=function(){
   const m=document.getElementById('main');
@@ -1734,6 +1771,8 @@ views.statistik=function(){
   const rep=S.ord.filter(o=>(o.status==='abgeholt'||o.status==='fertig')&&isThisMonth(o.pickedAt||o.readyAt||o.created)).reduce((s,o)=>s+(+o.price||0),0);
   const sale=S.sales.filter(x=>isThisMonth(x.t)).reduce((s,x)=>s+x.total,0);
   const total=rep+sale;
+  const doneM=S.ord.filter(o=>(o.status==='abgeholt'||o.status==='fertig')&&isThisMonth(o.pickedAt||o.readyAt||o.created));
+  const mMargin=doneM.reduce((s,o)=>s+orderMargin(o),0), mMaterial=doneM.reduce((s,o)=>s+orderPartsCost(o),0), mLabor=doneM.reduce((s,o)=>s+orderLaborCost(o),0), mLoss=doneM.filter(o=>orderMargin(o)<0).length, mPct=rep>0?Math.round(mMargin/rep*100):0;
   const byType={};S.ord.forEach(o=>byType[o.issue]=(byType[o.issue]||0)+1);
   const top=Object.entries(byType).sort((a,b)=>b[1]-a[1]).slice(0,6);
   const maxT=Math.max(1,...top.map(t=>t[1]));
@@ -1744,6 +1783,13 @@ views.statistik=function(){
      <div class="card kpi"><div class="n">${eur(sale)}</div><div class="l">Kasse / Verkauf</div></div>
      <div class="card kpi"><div class="n">${S.ord.filter(o=>o.status==='abgeholt').length}</div><div class="l">Abgeschlossen</div></div>
    </div>
+   <div class="grid g4" style="margin-top:16px">
+     <div class="card kpi"><div class="n" style="color:${mMargin<0?'#c0392b':'#0e7a3c'}">${eur(mMargin)}</div><div class="l">Marge (Gewinn)</div><div class="t">${mPct}% vom Reparatur-Umsatz</div></div>
+     <div class="card kpi"><div class="n">${eur(mMaterial)}</div><div class="l">Materialkosten</div><div class="t">verbaute Teile (EK)</div></div>
+     <div class="card kpi"><div class="n">${eur(mLabor)}</div><div class="l">Arbeitskosten</div><div class="t">erfasste Zeit</div></div>
+     <div class="card kpi"><div class="n" style="${mLoss?'color:#e2681c':''}">${mLoss}</div><div class="l">Verlust-Reparaturen</div><div class="t">Preis unter Kosten</div></div>
+   </div>
+   <div class="note" style="margin-top:12px">Marge = Umsatz − Teilekosten (EK aus dem Lager) − Arbeitszeit (${ensureSettings().hourlyRate} €/h). Teile pro Auftrag im Auftragsfenster unter „Wirtschaftlichkeit" verbuchen.</div>
    <div class="grid g2" style="margin-top:16px">
      <div class="card"><b>Häufigste Reparaturen</b><div style="margin-top:14px">${top.map(t=>`
        <div style="margin-bottom:12px"><div class="between" style="margin-bottom:4px"><span>${esc(t[0])}</span><b>${t[1]}</b></div><div class="bar"><i style="width:${t[1]/maxT*100}%"></i></div></div>`).join('')}</div></div>
@@ -1829,6 +1875,8 @@ views.einstellungen=function(){
          <div><label class="f">Auftragsnummer-Präfix</label><input class="in" value="${esc(st.orderPrefix)}" onchange="ensureSettings().orderPrefix=this.value.trim()||'REP-';save();views.einstellungen();paintIcons()"><div class="muted" style="font-size:12px;margin-top:4px">Nächste Nummer: ${esc(st.orderPrefix)}${S.counter}</div></div>
          <div><label class="f">Angebotsnummer-Präfix</label><input class="in" value="${esc(st.quotePrefix)}" onchange="ensureSettings().quotePrefix=this.value.trim()||'AN-';save();views.einstellungen();paintIcons()"><div class="muted" style="font-size:12px;margin-top:4px">Nächste Nummer: ${esc(st.quotePrefix)}${S.quoteCounter||1002}</div></div>
        </div>
+       <label class="f" style="margin-top:12px">Stundensatz Arbeitszeit (€/h) – für die Margenrechnung pro Auftrag</label>
+       <input class="in" style="max-width:200px" type="number" value="${st.hourlyRate}" onchange="ensureSettings().hourlyRate=+this.value||0;save()">
        <label class="f" style="margin-top:12px">Pflichtfelder bei der Annahme</label>
        <div class="row" style="flex-wrap:wrap;gap:8px">${[['mail','E-Mail'],['adr','Adresse'],['imei','IMEI/Seriennummer'],['sig','Unterschrift']].map(f=>`<button class="chip ${st.required[f[0]]?'on':''}" onclick="var s=ensureSettings();s.required['${f[0]}']=!s.required['${f[0]}'];save();views.einstellungen();paintIcons()">${f[1]}</button>`).join('')}</div>
        <div class="muted" style="font-size:12px;margin-top:6px">Aktive Pflichtfelder blockieren das Anlegen eines Auftrags, bis sie ausgefüllt sind.</div>
