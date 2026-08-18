@@ -57,8 +57,8 @@ Wachstums-Motoren (Versandreparatur, B2B, Forecast) · **Echtes System** (DB, Au
 |---|---|---|---|---|---|
 | ✅ P2 | **Warenwirtschaft** — Kategorien, Wareneingang, Inventur, Lagerbewegungen, Lieferanten, Lagerwert, niedrige Bestände (EK/VK) · **FERTIG 18.8.** (offen: Eingangsrechnungen/IMAP → mit Buchhaltung) | Parität 🔴 | L | ★★★ | — |
 | ✅ P5 | **Bestellwesen** — Lager- vs. Kundenbestellung, Lieferant, Bestellliste drucken, Filter/Status/Priorität, Eingang→Lager, Nachbestellen bei Unterbestand · **FERTIG 18.8.** | Parität 🟠 | M | ★★ | P2 |
-| L10 | **🔎 Ersatzteil-Preisvergleich** über Lieferanten + Preishistorie | Leap | M | ★★ | P2 |
-| L11 | **♻️ Auto-Nachbestellung** bei niedrigem Bestand | Leap | S | ★★ | P2 |
+| ✅ L10 | **🔎 Ersatzteil-Preisvergleich** über Lieferanten + Preishistorie · **FERTIG 18.8.** | Leap | M | ★★ | P2 |
+| ✅ L11 | **♻️ Auto-Nachbestellung** bei niedrigem Bestand (Setting + Sammelknopf) · **FERTIG 18.8.** | Leap | S | ★★ | P2 |
 | P6 | **Ankauf/Verkauf-Tiefe** — Profit je Gerät, Lagerwert, Status Reserviert, Import | Parität 🟠 | M | ★ | — |
 | P4 | **Wunsch-Handy-Liste** — Kundenmerkliste + Auto-Benachrichtigung bei Ankauf | Parität 🟠 | S | ★ | P6 |
 

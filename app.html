@@ -1583,19 +1583,79 @@ function ordSetLabor(orderId,min){const o=S.ord.find(x=>x.id===orderId);if(o){o.
 
 /* ============================ ANKAUF/VERKAUF ============================ */
 views.ankauf=function(){
-  const m=document.getElementById('main');
-  m.innerHTML=`<div class="between"><div><h1 class="h1">Ankauf / Verkauf</h1><p class="sub">Gebrauchtgeräte-Handel</p></div>
-     <button class="btn pri" onclick="buyDevice()">Gerät ankaufen</button></div>
-   <div class="grid g3" style="margin-top:16px">
-     <div class="card kpi"><div class="n">${S.sold.length}</div><div class="l">Geräte im Bestand</div></div>
-     <div class="card kpi"><div class="n">${eur(S.sold.reduce((s,x)=>s+x.buy,0))}</div><div class="l">Ankaufswert</div></div>
-     <div class="card kpi"><div class="n">${eur(S.sold.filter(x=>x.sellPrice).reduce((s,x)=>s+(x.sellPrice-x.buy),0))}</div><div class="l">Marge (verkauft)</div></div>
+  ensureTrade(); const m=document.getElementById('main');
+  const all=S.sold; const avail=all.filter(x=>x.status==='verfuegbar'),res=all.filter(x=>x.status==='reserviert'),sold=all.filter(x=>x.status==='verkauft');
+  const lagerwert=avail.concat(res).reduce((s,x)=>s+(+x.buy||0),0), marge=sold.reduce((s,x)=>s+((+x.sellPrice||0)-(+x.buy||0)),0);
+  const filt=ankaufTab==='verfuegbar'?avail:ankaufTab==='reserviert'?res:ankaufTab==='verkauft'?sold:all;
+  const tab=(k,l,n)=>`<button class="chip ${ankaufTab===k?'on':''}" onclick="ankaufTab='${k}';views.ankauf();paintIcons()">${l} · ${n}</button>`;
+  m.innerHTML=`<div class="between"><div><h1 class="h1">Ankauf / Verkauf</h1><p class="sub">Gebrauchtgeräte-Handel – Bestand, Marge & Status</p></div>
+     <div class="row"><button class="btn" onclick="importDevices()">Geräte importieren</button><button class="btn pri" onclick="buyDevice()">Gerät ankaufen</button></div></div>
+   <div class="grid g4" style="margin-top:16px">
+     <div class="card kpi"><div class="n">${avail.length}</div><div class="l">Verfügbar</div><div class="t">${res.length} reserviert</div></div>
+     <div class="card kpi"><div class="n">${eur(lagerwert)}</div><div class="l">Lagerwert</div><div class="t">Ankauf im Bestand</div></div>
+     <div class="card kpi"><div class="n" style="color:${marge<0?'#c0392b':'#0e7a3c'}">${eur(marge)}</div><div class="l">Marge (verkauft)</div><div class="t">${sold.length} verkauft</div></div>
+     <div class="card kpi"><div class="n">${all.length}</div><div class="l">Geräte gesamt</div></div>
    </div>
-   <div class="card" style="margin-top:16px;padding:0"><table><thead><tr><th>Gerät</th><th>Ankauf</th><th>Verkauf</th><th>Profit</th><th>Status</th></tr></thead>
-     <tbody>${S.sold.map(x=>`<tr><td><b>${esc(x.model)}</b></td><td class="mono">${eur(x.buy)}</td><td class="mono">${x.sellPrice?eur(x.sellPrice):'—'}</td><td class="mono">${x.sellPrice?eur(x.sellPrice-x.buy):'—'}</td><td>${x.sellPrice?'<span class="pill soft"><span class="d"></span>Verkauft</span>':'<span class="pill"><span class="d"></span>Verfügbar</span>'}</td></tr>`).join('')||'<tr><td colspan="5"><div class="empty">Noch kein Gerät im Bestand. Mit „Gerät ankaufen" starten.</div></td></tr>'}</tbody></table></div>`;
+   <div class="row" style="margin:14px 0;flex-wrap:wrap;gap:8px">${tab('alle','Alle',all.length)}${tab('verfuegbar','Verfügbar',avail.length)}${tab('reserviert','Reserviert',res.length)}${tab('verkauft','Verkauft',sold.length)}</div>
+   <div class="card" style="padding:0;overflow:auto"><table><thead><tr><th>Gerät</th><th>Zustand</th><th>Ankauf</th><th>Verkauf</th><th>Profit</th><th>Status</th><th></th></tr></thead>
+     <tbody>${filt.length?filt.map(x=>{const prof=(+x.sellPrice||0)-(+x.buy||0);const ppct=x.buy?Math.round(prof/x.buy*100):0;const col=TRADE_ST[x.status]||['—','#888'];return `<tr>
+       <td><b>${esc(x.model)}</b>${x.imei?`<div class="muted mono" style="font-size:12px">IMEI ${esc(x.imei)}</div>`:''}</td>
+       <td><span class="tag">${esc(x.cond||'—')}</span></td>
+       <td class="mono">${eur(x.buy)}<div class="muted" style="font-size:11px">${fmtDate(x.buyDate)}</div></td>
+       <td class="mono">${x.sellPrice?eur(x.sellPrice):'—'}</td>
+       <td class="mono" style="color:${x.sellPrice?(prof>=0?'#0e7a3c':'#c0392b'):'#888'}">${x.sellPrice?(eur(prof)+' · '+ppct+'%'):'—'}</td>
+       <td><span class="pill" style="border-color:${col[1]};color:${col[1]}"><span class="d" style="background:${col[1]}"></span>${col[0]}</span></td>
+       <td style="text-align:right;white-space:nowrap">${x.status!=='verkauft'?`<button class="btn sm pri" onclick="sellDevice('${x.id}')">Verkaufen</button>`:''}${x.status==='verfuegbar'?`<button class="btn sm gho" onclick="reserveDevice('${x.id}',1)">Reservieren</button>`:''}${x.status==='reserviert'?`<button class="btn sm gho" onclick="reserveDevice('${x.id}',0)">Freigeben</button>`:''}<button class="btn sm gho" onclick="delSold('${x.id}')">Löschen</button></td>
+     </tr>`;}).join(''):`<tr><td colspan="7"><div class="empty">Keine Geräte in dieser Ansicht.</div></td></tr>`}</tbody></table></div>
+   ${wishCard()}`;
 };
-function buyDevice(){const model=prompt('Gerät (z. B. iPhone 12 128GB):');if(!model)return;const buy=+prompt('Ankaufspreis (€):')||0;
-  S.sold.push({id:uid('s'),model,buy,sellPrice:0});save();views.ankauf();paintIcons();toast('Gerät angekauft');}
+/* ---- Wunsch-Handy (P4) ---- */
+function ensureWishes(){if(!S.wishes){S.wishes=[{id:'w1',customer:'Julia Ott',tel:'+49 176 1112223',device:'iPhone 13',note:'128 GB, gern schwarz',status:'wartend',created:today()}];save();}}
+function matchWishes(model){ensureWishes();const ml=(model||'').toLowerCase();let hit=0;S.wishes.forEach(w=>{if(w.status==='wartend'&&w.device&&ml.indexOf(w.device.toLowerCase())>=0){w.status='gefunden';w.foundModel=model;hit++;}});if(hit){save();toast(hit+' Wunsch-Handy-Treffer! Kunde kann benachrichtigt werden.');}}
+function wishAdd(){ensureWishes();openModal(`<div class="dhead"><b style="flex:1">Wunsch-Handy eintragen</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+  <div class="dbody"><div class="grid g2"><div><label class="f">Kunde</label><input class="in" id="w_cust"></div><div><label class="f">Telefon</label><input class="in" id="w_tel"></div></div>
+   <label class="f" style="margin-top:10px">Gesuchtes Gerät</label><input class="in" id="w_dev" placeholder="z. B. iPhone 13">
+   <label class="f" style="margin-top:10px">Notiz</label><input class="in" id="w_note" placeholder="Speicher, Farbe, Budget…">
+   <div class="note" style="margin-top:10px">Sobald ein passendes Modell im Ankauf auftaucht, wird der Eintrag automatisch als „gefunden" markiert.</div>
+   <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn gho" onclick="closeAll()">Abbrechen</button><button class="btn pri" onclick="wishAddDo()">Eintragen</button></div></div>`);}
+function wishAddDo(){const g=id=>document.getElementById(id).value;const dev=g('w_dev').trim();if(!dev){toast('Gerät angeben');return;}S.wishes=S.wishes||[];S.wishes.unshift({id:uid('w'),customer:g('w_cust'),tel:g('w_tel'),device:dev,note:g('w_note'),status:'wartend',created:today()});save();closeAll();views.ankauf();paintIcons();toast('Wunsch-Handy eingetragen');}
+function wishNotify(id){const w=S.wishes.find(x=>x.id===id);if(!w)return;w.status='benachrichtigt';S.mailLog.unshift({t:new Date().toISOString(),to:w.customer||'Kunde',ch:'E-Mail',rule:'Wunsch-Handy verfügbar',subj:'Ihr gesuchtes '+w.device+' ist da',how:'manuell'});save();views.ankauf();paintIcons();toast('Kunde benachrichtigt (Demo)');}
+function wishDel(id){S.wishes=(S.wishes||[]).filter(x=>x.id!==id);save();views.ankauf();paintIcons();}
+function wishCard(){ensureWishes();const ws=S.wishes||[];const waiting=ws.filter(w=>w.status==='wartend').length,found=ws.filter(w=>w.status==='gefunden').length;
+  return `<div class="card" style="margin-top:16px"><div class="between"><b>Wunsch-Handy-Liste</b><div class="row"><span class="muted" style="font-size:12px;align-self:center">${waiting} wartend · ${found} gefunden</span><button class="btn sm pri" onclick="wishAdd()">+ Eintrag</button></div></div>
+   <p class="muted" style="font-size:13px;margin:4px 0 10px">Kunden suchen ein bestimmtes Gebrauchtgerät. Taucht es im Ankauf auf, gibt es automatisch einen Treffer.</p>
+   ${ws.length?ws.map(w=>`<div class="listitem"><span class="pill ${w.status==='gefunden'?'solid':'soft'}"><span class="d"></span>${w.status==='gefunden'?'Gefunden':(w.status==='benachrichtigt'?'Benachrichtigt':'Wartend')}</span>
+     <div style="flex:1;min-width:0"><b>${esc(w.device)}</b> <span class="muted" style="font-size:12px">${esc(w.customer||'')}${w.note?' · '+esc(w.note):''}</span></div>
+     ${w.status==='gefunden'?`<button class="btn sm pri" onclick="wishNotify('${w.id}')">Kunde benachrichtigen</button>`:''}<button class="btn sm gho" onclick="wishDel('${w.id}')">Löschen</button></div>`).join(''):'<div class="empty">Keine Einträge. Kundenwunsch mit „+ Eintrag" erfassen.</div>'}
+  </div>`;
+}
+let ankaufTab='alle';
+const TRADE_ST={verfuegbar:['Verfügbar','#0e7a3c'],reserviert:['Reserviert','#8b5cf6'],verkauft:['Verkauft','#6b7280']};
+function ensureTrade(){ let ch=false; if(!S.sold)S.sold=[];
+  if(!S.tradeInit){ S.tradeInit=true; ch=true; if(!S.sold.length){S.sold=[
+    {id:'sd1',model:'iPhone 11 128GB',imei:'356789112233',cond:'Gut',buy:120,buyDate:today(),from:'Laufkundschaft',sellPrice:0,sellDate:'',to:'',status:'verfuegbar'},
+    {id:'sd2',model:'Galaxy S21 128GB',imei:'',cond:'Sehr gut',buy:150,buyDate:today(),from:'',sellPrice:239,sellDate:today(),to:'',status:'verkauft'},
+    {id:'sd3',model:'iPhone 12 64GB',imei:'',cond:'Gut',buy:180,buyDate:today(),from:'',sellPrice:0,sellDate:'',to:'Vorgemerkt',status:'reserviert'}];}}
+  S.sold.forEach(x=>{if(!x.status){x.status=x.sellPrice?'verkauft':'verfuegbar';ch=true;}if(x.imei===undefined){x.imei='';ch=true;}if(x.cond===undefined){x.cond='Gut';ch=true;}if(!x.buyDate){x.buyDate=today();ch=true;}});
+  if(ch)save(); }
+function buyDevice(){ensureTrade();openModal(`<div class="dhead"><b style="flex:1">Gerät ankaufen</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+  <div class="dbody"><label class="f">Gerät</label><input class="in" id="bd_model" placeholder="z. B. iPhone 12 128GB">
+   <div class="grid g2" style="margin-top:10px"><div><label class="f">IMEI / Seriennr.</label><input class="in" id="bd_imei" placeholder="optional"></div>
+   <div><label class="f">Zustand</label><select class="in" id="bd_cond"><option>Neuwertig</option><option selected>Sehr gut</option><option>Gut</option><option>Gebraucht</option><option>Defekt</option></select></div>
+   <div><label class="f">Ankaufspreis (€)</label><input class="in" id="bd_buy" type="number" placeholder="0.00"></div>
+   <div><label class="f">Angekauft von (optional)</label><input class="in" id="bd_from" placeholder="Name"></div></div>
+   <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn gho" onclick="closeAll()">Abbrechen</button><button class="btn pri" onclick="buyDeviceDo()">Ankaufen</button></div></div>`);}
+function buyDeviceDo(){const g=id=>document.getElementById(id).value;const model=g('bd_model').trim();if(!model){toast('Gerät angeben');return;}S.sold.push({id:uid('s'),model,imei:g('bd_imei'),cond:g('bd_cond'),buy:+g('bd_buy')||0,buyDate:today(),from:g('bd_from'),sellPrice:0,sellDate:'',to:'',status:'verfuegbar'});save();closeAll();views.ankauf();paintIcons();toast('Gerät angekauft');checkWishes(model);}
+function sellDevice(id){const x=S.sold.find(s=>s.id===id);if(!x)return;openModal(`<div class="dhead"><b style="flex:1">Gerät verkaufen</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+  <div class="dbody"><div class="muted" style="font-size:13px">${esc(x.model)} · Ankauf ${eur(x.buy)}</div>
+   <label class="f" style="margin-top:10px">Verkaufspreis (€)</label><input class="in" id="sd_price" type="number" value="${Math.round((x.buy||0)*1.5)}">
+   <label class="f" style="margin-top:10px">Käufer (optional)</label><input class="in" id="sd_to" placeholder="Name">
+   <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn gho" onclick="closeAll()">Abbrechen</button><button class="btn pri" onclick="sellDeviceDo('${id}')">Verkaufen</button></div></div>`);}
+function sellDeviceDo(id){const x=S.sold.find(s=>s.id===id);if(!x)return;x.sellPrice=+document.getElementById('sd_price').value||0;x.to=document.getElementById('sd_to').value;x.sellDate=today();x.status='verkauft';save();closeAll();views.ankauf();paintIcons();toast('Verkauft · Marge '+eur(x.sellPrice-x.buy));}
+function reserveDevice(id,on){const x=S.sold.find(s=>s.id===id);if(x){x.status=on?'reserviert':'verfuegbar';save();views.ankauf();paintIcons();}}
+function delSold(id){if(!confirm('Gerät löschen?'))return;S.sold=S.sold.filter(s=>s.id!==id);save();views.ankauf();paintIcons();toast('Gelöscht');}
+function importDevices(){toast('Geräte-Import (Demo) – CSV/Händlerfeed später');}
+function checkWishes(model){ if(typeof matchWishes==='function') matchWishes(model); }
 
 /* ============================ PREISE ============================ */
 const CATALOG={
@@ -2696,7 +2756,7 @@ function demoDone(){ if(_demoStop)return; const el=document.getElementById('demo
 
 /* ============================ BOOT ============================ */
 paintIcons();
-(function(){ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); ensureInv(); ensureProc(); const n=pullBookings(); const nq=pullRequests(); pullFeedback(); go('dashboard'); applyNavRole(); if(!curUser())showLogin();
+(function(){ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); ensureInv(); ensureProc(); ensureTrade(); const n=pullBookings(); const nq=pullRequests(); pullFeedback(); go('dashboard'); applyNavRole(); if(!curUser())showLogin();
   if(nq) setTimeout(()=>toast(nq+' neue Website-Anfrage'+(nq>1?'n':'')),900);
   if(n) setTimeout(()=>toast(n+' neue Online-Buchung'+(n>1?'en':'')+' übernommen'),500);
 })();
