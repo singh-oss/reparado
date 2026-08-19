@@ -93,7 +93,7 @@ Wachstums-Motoren (Versandreparatur, B2B, Forecast) · **Echtes System** (DB, Au
 | ✅ L21 | **🏢 B2B-Verträge** — eigener Reiter „Verträge": 3 SLA-Pakete (Basis/Business/Premium: Reaktionszeit, Priorität, Reparaturrabatt), Gerätepool je Firma, monatliche Sammelrechnung (Pauschale + Pool-Reparaturen mit Vertragsrabatt, druckbar), MRR-KPI, Vertragsstatus aktiv/pausiert/gekündigt · **FERTIG 19.8.** | Leap | L | ★★ |
 | ✅ L17 | **📈 Forecast + Filial-Benchmark** — Statistik: Umsatz-Prognose (lineare Hochrechnung Monatsende + Vergleich 3-Monats-Schnitt) & Filial-Benchmark (Rang im Franchise-Netz, hochgerechneter Umsatz/⌀-Ticket/Rating je Filiale); 200 archivierte Historie-Aufträge für glaubwürdige Trends (v11) · **FERTIG 19.8.** | Leap | M | ★ |
 | ✅ L19 | **🏥 Mehr Versicherer + Direktabrechnung** — 5 Versicherer (Wertgarantie/Assona/SchutzKlick/hepster mit Fachhändler-Direktabrechnung, AppleCare+ ohne → Kunde zahlt voll + Nachweis); Fall-Anlage mit Versichererauswahl, provider-generische Claim-Nr/Labels/Schadensmeldung, Multi-Versicherer-Verbindung in Einstellungen · **FERTIG 19.8.** | Leap | M | ★ |
-| P11 | **Integrationen** — HelloCash, SumUp, Lexware, Google Bewertungen | Parität 🟠 | M | ★ |
+| ✅ P11 | **Integrationen** — SumUp/HelloCash (steuern Kartenzahlung), Lexware Office (Beleg-Export-Aktion), Google Bewertungen (Link fließt in Bewertungsanfrage + Vorlagen); Connect-Modals mit Konfig, Verbindungsstatus je Anbindung · **FERTIG 19.8.** | Parität 🟠 | M | ★ |
 
 ---
 
