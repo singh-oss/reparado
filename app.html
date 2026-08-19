@@ -199,6 +199,7 @@
       <a data-view="preise"><span class="ic" data-ic="tag"></span> Modelle &amp; Preise</a>
       <div class="grouplbl">Verkauf</div>
       <a data-view="kasse"><span class="ic" data-ic="rcpt"></span> Kasse</a>
+      <a data-view="vertraege"><span class="ic" data-ic="contract"></span> Verträge (B2B) <span class="badge" id="bg-vert">0</span></a>
       <a data-view="buchhaltung"><span class="ic" data-ic="book"></span> Buchhaltung <span class="badge" id="bg-beleg">0</span></a>
       <a data-view="statistik"><span class="ic" data-ic="chart"></span> Statistik</a>
       <div class="grouplbl">System</div>
@@ -263,6 +264,7 @@ const ICONS={
  phone:'<path d="M6.6 10.8a15 15 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.24 11 11 0 0 0 3.5.56 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.6a1 1 0 0 1 1 1 11 11 0 0 0 .56 3.5 1 1 0 0 1-.24 1z"/>',
  diag:'<path d="M12 3l1.7 4.1L18 8.8l-4.3 1.7L12 15l-1.7-4.5L6 8.8l4.3-1.7L12 3z"/><path d="M18.5 14l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9.9-2.1z"/>',
  truck:'<rect x="1" y="6" width="13" height="10" rx="1"/><path d="M14 9h4l3 3v4h-7z"/><circle cx="5.5" cy="18" r="1.7"/><circle cx="17.5" cy="18" r="1.7"/>',
+ contract:'<path d="M6 2h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/><path d="M14 2v5h5"/><path d="M8 13h8M8 17h5"/>',
 };
 function ic(name,size){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" width="'+(size||18)+'" height="'+(size||18)+'">'+(ICONS[name]||'')+'</svg>';}
 function paintIcons(){document.querySelectorAll('[data-ic]').forEach(e=>{if(!e.__done){e.innerHTML=ic(e.dataset.ic, e.classList.contains('ic')?18:18);e.__done=1;}});}
@@ -584,6 +586,7 @@ function refreshBadges(){
   const bl=document.getElementById('bg-lager'); if(bl){const n=(S.parts||[]).filter(p=>p.stock<=p.min).length; bl.textContent=n; bl.style.display=n?'':'none';}
   const bo=document.getElementById('bg-best'); if(bo){const n=(S.orders||[]).filter(b=>b.status!=='geliefert'&&b.status!=='storniert').length; bo.textContent=n; bo.style.display=n?'':'none';}
   const bs=document.getElementById('bg-ship'); if(bs){const n=(S.shipments||[]).filter(s=>['transit_in','received','repair'].includes(s.status)).length; bs.textContent=n; bs.style.display=n?'':'none';}
+  const bv=document.getElementById('bg-vert'); if(bv){const n=(S.contracts||[]).reduce((a,c)=>a+(c.bills||[]).filter(b=>b.status!=='bezahlt').length,0); bv.textContent=n; bv.style.display=n?'':'none';}
   const bn=document.getElementById('bg-notif'); if(bn){const n=((S.requests||[]).length)+((S.feedback||[]).length)+((S.warrantyClaims||[]).length)+(typeof uncollectedOrders==='function'?uncollectedOrders().length:0)+((S.drafts||[]).length); bn.textContent=n; bn.style.display=n?'':'none';}
 }
 
@@ -1686,6 +1689,106 @@ function photoSection(o){const ph=o.photos||[];return `<label class="f" style="m
   ${ph.length?'<div class="muted" style="font-size:12px;margin-top:4px">Diese Fotos sieht der Kunde live auf seiner Status-Seite.</div>':''}`;
 }
 
+/* ============================ B2B-VERTRÄGE (L21) ============================ */
+const SLA_PLANS={
+  basis:{lbl:'Basis',rate:49,discount:10,responseH:48,priority:'Standard',color:'#6b7280',perks:['48h Reaktionszeit','10% Rabatt auf Reparaturen','Sammelrechnung monatlich']},
+  business:{lbl:'Business',rate:149,discount:15,responseH:24,priority:'Vorrang',color:'#2563eb',perks:['24h Reaktionszeit','Vorrang-Bearbeitung','15% Rabatt','1 Leihgerät inklusive']},
+  premium:{lbl:'Premium',rate:349,discount:20,responseH:4,priority:'Höchste',color:'#7c3aed',perks:['4h Reaktionszeit','Höchste Priorität','20% Rabatt','Leihgerätepool','Abholung & Rückbringung']}
+};
+function ensureContracts(){ if(!S.contracts){ S.contractCounter=2001;
+    S.contracts=[
+      {id:'ct_d1',nr:'BV-2001',firma:'Kanzlei Vogt & Partner',contact:'Frau Vogt',tel:'+49 7433 112233',mail:'office@kanzlei-vogt.de',plan:'business',started:dPlus(-95),status:'aktiv',
+        pool:[{model:'iPhone 14 Pro',imei:'356789101234567',note:'Geschäftsführung'},{model:'iPhone 13',imei:'356789101299887',note:'Empfang'},{model:'iPad Air',imei:'—',note:'Konferenz'}],
+        bills:[{ym:dPlus(-35).slice(0,7),base:149,repairs:[{ordNr:'REP-1090',label:'iPhone 13 Displaytausch',amount:127.5}],total:276.5,status:'bezahlt'},{ym:dPlus(-5).slice(0,7),base:149,repairs:[],total:149,status:'offen'}]},
+      {id:'ct_d2',nr:'BV-2002',firma:'Autohaus Berger GmbH',contact:'Herr Berger',tel:'+49 7433 445566',mail:'it@autohaus-berger.de',plan:'premium',started:dPlus(-160),status:'aktiv',
+        pool:[{model:'Samsung Galaxy S23',imei:'357111202333444',note:'Verkauf 1'},{model:'Samsung Galaxy S23',imei:'357111202333445',note:'Verkauf 2'},{model:'Samsung Tab S9',imei:'—',note:'Werkstatt'},{model:'iPhone 15',imei:'358222303444555',note:'Chef'}],
+        bills:[{ym:dPlus(-5).slice(0,7),base:349,repairs:[{ordNr:'REP-1102',label:'Galaxy S23 Akkutausch',amount:47.2}],total:396.2,status:'offen'}]},
+      {id:'ct_d3',nr:'BV-2003',firma:'Bäckerei Schmid',contact:'Herr Schmid',tel:'+49 7433 778899',mail:'schmid@baeckerei-schmid.de',plan:'basis',started:dPlus(-40),status:'aktiv',
+        pool:[{model:'iPhone SE',imei:'359333404555666',note:'Filiale Zentrum'}],bills:[]}
+    ]; }
+  return S.contracts; }
+function slaDef(k){return SLA_PLANS[k]||SLA_PLANS.basis;}
+function contractMRR(){return ensureContracts().filter(c=>c.status==='aktiv').reduce((s,c)=>s+slaDef(c.plan).rate,0);}
+function contractPill(c){const d=slaDef(c.plan);return `<span class="pill" style="border-color:${d.color};color:${d.color}"><span class="d" style="background:${d.color}"></span>${d.lbl}</span>`;}
+function contractRepairsThisMonth(c){const ym=today().slice(0,7);const d=slaDef(c.plan);
+  return (S.ord||[]).filter(o=>{const cu=cust(o.cid);return cu.firma&&cu.firma===c.firma&&(o.created||'').slice(0,7)===ym;})
+    .map(o=>({ordNr:o.nr,label:oDevLabel(o)+' '+oIssueLabel(o),amount:Math.round(oTotal(o)*(1-d.discount/100)*100)/100}));
+}
+function contractBill(id){const c=ensureContracts().find(x=>x.id===id);if(!c)return;const ym=today().slice(0,7);
+  if((c.bills||[]).some(b=>b.ym===ym)){toast('Für '+ym+' existiert bereits eine Rechnung');return;}
+  const d=slaDef(c.plan);const reps=contractRepairsThisMonth(c);const total=Math.round((d.rate+reps.reduce((s,r)=>s+r.amount,0))*100)/100;
+  c.bills=c.bills||[];c.bills.unshift({ym,base:d.rate,repairs:reps,total,status:'offen'});
+  S.mailLog.unshift({t:new Date().toISOString(),to:c.firma,ch:'E-Mail',rule:'B2B-Sammelrechnung',subj:'Ihre Servicerechnung '+ym+' · '+eur(total),how:'Vertrags-Abrechnung'});
+  save();refreshBadges();contractOpen(id);toast('Monatsrechnung '+ym+' erstellt · '+eur(total));
+}
+function contractBillPaid(id,ym){const c=ensureContracts().find(x=>x.id===id);if(!c)return;const b=(c.bills||[]).find(x=>x.ym===ym);if(b){b.status='bezahlt';save();refreshBadges();contractOpen(id);toast('Als bezahlt markiert');}}
+function contractBillPrint(id,ym){const c=ensureContracts().find(x=>x.id===id);if(!c)return;const b=(c.bills||[]).find(x=>x.ym===ym);if(!b)return;const d=slaDef(c.plan);
+  printHTML('Servicerechnung '+c.firma+' '+ym, shopHead()+`<h2>Servicerechnung · ${ym}</h2><div class="muted">Vertrag ${c.nr} · ${d.lbl}-Servicevertrag</div>
+    <div class="box" style="margin-top:12px"><b>${esc(c.firma)}</b><br><span class="muted">${esc(c.contact||'')} · ${esc(c.mail||'')}</span></div>
+    <table><thead><tr><th>Position</th><th style="text-align:right">Betrag</th></tr></thead><tbody>
+    <tr><td>Servicepauschale ${d.lbl} (${ym})</td><td style="text-align:right">${eur(b.base)}</td></tr>
+    ${b.repairs.map(r=>`<tr><td>${esc(r.label)} <span class="muted">(${r.ordNr}, inkl. ${d.discount}% Vertragsrabatt)</span></td><td style="text-align:right">${eur(r.amount)}</td></tr>`).join('')}
+    </tbody></table><div class="tot"><span>Gesamt</span><span>${eur(b.total)}</span></div>
+    <div class="foot">Servicevertrag ${d.lbl} · Reaktionszeit ${d.responseH}h · ${d.discount}% Rabatt auf Reparaturen. Zahlbar innerhalb 14 Tagen.<br>Vielen Dank für die vertrauensvolle Zusammenarbeit.</div>`);
+}
+function contractStatus(id,st){const c=ensureContracts().find(x=>x.id===id);if(!c)return;c.status=st;save();refreshBadges();contractOpen(id);toast('Vertrag '+({aktiv:'aktiviert',pausiert:'pausiert',gekuendigt:'gekündigt'})[st]);}
+function contractDel(id){const c=ensureContracts().find(x=>x.id===id);if(!c)return;if(!confirm('Vertrag '+c.nr+' ('+c.firma+') löschen?'))return;S.contracts=ensureContracts().filter(x=>x.id!==id);save();refreshBadges();closeAll();views.vertraege();toast('Vertrag gelöscht');}
+function contractAddDevice(id){const c=ensureContracts().find(x=>x.id===id);if(!c)return;const model=(prompt('Modell des Pool-Geräts:')||'').trim();if(!model)return;const note=(prompt('Bezeichnung/Abteilung (optional):')||'').trim();const imei=(prompt('IMEI/Seriennr. (optional):')||'').trim()||'—';c.pool=c.pool||[];c.pool.push({model,imei,note});save();contractOpen(id);toast('Gerät zum Pool hinzugefügt');}
+function contractDelDevice(id,i){const c=ensureContracts().find(x=>x.id===id);if(!c||!c.pool)return;c.pool.splice(i,1);save();contractOpen(id);}
+function contractNew(){
+  openModal(`<div class="dhead"><b style="flex:1">Neuer B2B-Servicevertrag</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+   <div class="dbody">
+     <div class="grid g2"><div><label class="f">Firma</label><input class="in" id="ct_firma"></div><div><label class="f">Ansprechpartner</label><input class="in" id="ct_contact"></div></div>
+     <div class="grid g2" style="margin-top:10px"><div><label class="f">Telefon</label><input class="in" id="ct_tel" value="+49 "></div><div><label class="f">E-Mail</label><input class="in" id="ct_mail"></div></div>
+     <label class="f" style="margin-top:12px">Servicepaket (SLA)</label>
+     <div class="grid g3" style="margin-top:6px">${Object.keys(SLA_PLANS).map(k=>{const d=SLA_PLANS[k];return `<label class="card" style="cursor:pointer;padding:12px;margin:0"><input type="radio" name="ct_plan" value="${k}" ${k==='business'?'checked':''} style="margin-bottom:6px"><div style="font-weight:800;color:${d.color}">${d.lbl}</div><div style="font-size:18px;font-weight:800">${eur(d.rate)}<span class="muted" style="font-size:12px;font-weight:500">/Mt</span></div><ul style="margin:8px 0 0;padding-left:16px;font-size:12px;color:#555;line-height:1.5">${d.perks.map(p=>`<li>${p}</li>`).join('')}</ul></label>`;}).join('')}</div>
+     <div class="row" style="margin-top:14px"><button class="btn pri" onclick="contractNewDo()">Vertrag anlegen</button><button class="btn gho" onclick="closeAll()">Abbrechen</button></div>
+   </div>`);
+}
+function contractNewDo(){const g=id=>(document.getElementById(id)||{}).value||'';const firma=g('ct_firma').trim();if(!firma){toast('Bitte Firmenname angeben');return;}
+  const plan=(document.querySelector('input[name=ct_plan]:checked')||{}).value||'business';
+  const c={id:uid('ct'),nr:'BV-'+(S.contractCounter=(S.contractCounter||2000)+1),firma,contact:g('ct_contact').trim(),tel:g('ct_tel').trim(),mail:g('ct_mail').trim(),plan,started:today(),status:'aktiv',pool:[],bills:[]};
+  ensureContracts().unshift(c);S.mailLog.unshift({t:new Date().toISOString(),to:firma,ch:'E-Mail',rule:'B2B-Vertrag',subj:'Willkommen im '+slaDef(plan).lbl+'-Servicevertrag',how:'Vertrag'});save();closeAll();refreshBadges();views.vertraege();toast('Vertrag angelegt: '+firma);
+  setTimeout(()=>contractOpen(c.id),150);
+}
+function contractOpen(id){const c=ensureContracts().find(x=>x.id===id);if(!c)return;const d=slaDef(c.plan);const ym=today().slice(0,7);const hasThis=(c.bills||[]).some(b=>b.ym===ym);const preview=contractRepairsThisMonth(c);
+  openDrawerHTML(`<div class="dhead"><b style="flex:1">${esc(c.firma)} · ${c.nr}</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+   <div class="dbody">
+     <div class="row" style="gap:8px;align-items:center">${contractPill(c)}<span class="pill ${c.status==='aktiv'?'soft':'dash'}"><span class="d"></span>${({aktiv:'Aktiv',pausiert:'Pausiert',gekuendigt:'Gekündigt'})[c.status]}</span></div>
+     <div class="muted" style="font-size:13px;margin-top:6px">${esc(c.contact||'')} · ${esc(c.tel||'')} · ${esc(c.mail||'')}<br>Laufend seit ${fmtDate(c.started)}</div>
+     <div class="card" style="margin-top:12px;background:var(--soft)"><div class="between"><b>${d.lbl}-Vertrag</b><b>${eur(d.rate)}/Mt</b></div>
+       <div class="muted" style="font-size:13px;margin-top:4px">Reaktionszeit ${d.responseH}h · Priorität ${d.priority} · ${d.discount}% Reparatur-Rabatt</div></div>
+     <div class="between" style="margin-top:16px"><b>Gerätepool (${(c.pool||[]).length})</b><button class="btn sm" onclick="contractAddDevice('${c.id}')">＋ Gerät</button></div>
+     ${(c.pool||[]).length?(c.pool.map((p,i)=>`<div class="listitem"><div style="flex:1"><b>${esc(p.model)}</b><div class="muted" style="font-size:12px">${esc(p.note||'')}${p.imei&&p.imei!=='—'?' · IMEI '+esc(p.imei):''}</div></div><button class="btn sm gho" onclick="contractDelDevice('${c.id}',${i})">×</button></div>`).join('')):'<div class="empty" style="padding:12px">Noch keine Geräte im Pool.</div>'}
+     <div class="between" style="margin-top:16px"><b>Abrechnung</b><button class="btn sm pri" onclick="contractBill('${c.id}')" ${hasThis?'disabled title="Rechnung für diesen Monat existiert"':''}>Monatsrechnung ${ym}</button></div>
+     ${!hasThis&&preview.length?`<div class="note" style="margin-top:8px">Diesen Monat abrechenbar: Pauschale ${eur(d.rate)} + ${preview.length} Reparatur(en) (${d.discount}% Rabatt) = <b>${eur(d.rate+preview.reduce((s,r)=>s+r.amount,0))}</b></div>`:''}
+     ${(c.bills||[]).length?(c.bills.map(b=>`<div class="listitem"><div style="flex:1"><b>${b.ym} · ${eur(b.total)}</b><div class="muted" style="font-size:12px">Pauschale ${eur(b.base)}${b.repairs.length?' + '+b.repairs.length+' Reparatur(en)':''} · <span style="color:${b.status==='bezahlt'?'#0e7a3c':'#b45309'}">${b.status}</span></div></div><button class="btn sm gho" onclick="contractBillPrint('${c.id}','${b.ym}')">Drucken</button>${b.status!=='bezahlt'?`<button class="btn sm" onclick="contractBillPaid('${c.id}','${b.ym}')">Bezahlt</button>`:''}</div>`).join('')):'<div class="empty" style="padding:12px;margin-top:8px">Noch keine Rechnungen.</div>'}
+     <div class="row" style="margin-top:16px;gap:8px;flex-wrap:wrap">${c.status==='aktiv'?`<button class="btn sm gho" onclick="contractStatus('${c.id}','pausiert')">Pausieren</button><button class="btn sm gho" onclick="contractStatus('${c.id}','gekuendigt')">Kündigen</button>`:`<button class="btn sm" onclick="contractStatus('${c.id}','aktiv')">Reaktivieren</button>`}<button class="btn sm gho" onclick="contractDel('${c.id}')">Löschen</button></div>
+   </div>`);
+}
+views.vertraege=function(){
+  ensureContracts();const m=document.getElementById('main');const all=S.contracts;
+  const aktiv=all.filter(c=>c.status==='aktiv');
+  const poolCount=all.reduce((s,c)=>s+(c.pool||[]).length,0);
+  const openBills=all.reduce((s,c)=>s+(c.bills||[]).filter(b=>b.status!=='bezahlt').length,0);
+  const openSum=all.reduce((s,c)=>s+(c.bills||[]).filter(b=>b.status!=='bezahlt').reduce((a,b)=>a+b.total,0),0);
+  m.innerHTML=`<div class="between"><div><h1 class="h1">Verträge (B2B)</h1><p class="sub">Servicverträge mit Firmen: Gerätepools, feste SLA-Reaktionszeiten und monatliche Sammelrechnung – planbarer, wiederkehrender Umsatz.</p></div>
+     <button class="btn pri" onclick="contractNew()">＋ Neuer Vertrag</button></div>
+   <div class="grid g4" style="margin-top:16px">
+     <div class="card kpi"><div class="n">${eur(contractMRR())}</div><div class="l">Wiederkehrend / Monat (MRR)</div></div>
+     <div class="card kpi"><div class="n">${aktiv.length}</div><div class="l">Aktive Verträge</div></div>
+     <div class="card kpi"><div class="n">${poolCount}</div><div class="l">Geräte im Pool</div></div>
+     <div class="card kpi"><div class="n">${eur(openSum)}</div><div class="l">Offen (${openBills} Rechnung${openBills===1?'':'en'})</div></div>
+   </div>
+   <div class="card" style="margin-top:16px;padding:0;overflow:auto"><table>
+     <thead><tr><th>Vertrag</th><th>Firma</th><th>Paket</th><th>Geräte</th><th style="text-align:right">€/Monat</th><th>Status</th></tr></thead>
+     <tbody>${all.map(c=>{const d=slaDef(c.plan);return `<tr onclick="contractOpen('${c.id}')" style="cursor:pointer">
+       <td class="mono muted">${c.nr}</td><td><b>${esc(c.firma)}</b></td><td>${contractPill(c)}</td>
+       <td>${(c.pool||[]).length}</td><td style="text-align:right">${eur(d.rate)}</td>
+       <td>${c.status==='aktiv'?'<span class="pill soft"><span class="d"></span>Aktiv</span>':'<span class="pill dash"><span class="d"></span>'+({pausiert:'Pausiert',gekuendigt:'Gekündigt'})[c.status]+'</span>'}</td>
+     </tr>`;}).join('')||'<tr><td colspan="6"><div class="empty">Noch keine Verträge. Über „Neuer Vertrag" den ersten B2B-Servicevertrag anlegen.</div></td></tr>'}</tbody></table></div>
+   <div class="note" style="margin-top:14px">B2B-Verträge bringen planbaren Umsatz: die Servicepauschale wird jeden Monat fällig, Reparaturen der Pool-Geräte laufen mit Vertragsrabatt über die Sammelrechnung. Ideal für Kanzleien, Autohäuser, Handwerk & Filialbetriebe.</div>`;
+};
 /* ============================ VERSANDREPARATUR (L20) ============================ */
 const SHIP_CARRIERS=['DHL','DPD','GLS','Hermes','UPS'];
 const SHIP_ST={label:{lbl:'Label erstellt',color:'#6b7280'},transit_in:{lbl:'Unterwegs zu uns',color:'#2563eb'},received:{lbl:'Eingegangen',color:'#7c3aed'},repair:{lbl:'In Reparatur',color:'#b45309'},transit_out:{lbl:'Rückversand',color:'#0891b2'},delivered:{lbl:'Zugestellt',color:'#0e7a3c'}};
@@ -3110,7 +3213,7 @@ function demoDone(){ if(_demoStop)return; const el=document.getElementById('demo
 
 /* ============================ BOOT ============================ */
 paintIcons();
-(function(){ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); ensureInv(); ensureProc(); ensureTrade(); ensureShip(); const n=pullBookings(); const nq=pullRequests(); pullFeedback(); pullWarranty(); go('dashboard'); applyNavRole(); if(!curUser())showLogin();
+(function(){ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); ensureInv(); ensureProc(); ensureTrade(); ensureShip(); ensureContracts(); const n=pullBookings(); const nq=pullRequests(); pullFeedback(); pullWarranty(); go('dashboard'); applyNavRole(); if(!curUser())showLogin();
   if(nq) setTimeout(()=>toast(nq+' neue Website-Anfrage'+(nq>1?'n':'')),900);
   if(n) setTimeout(()=>toast(n+' neue Online-Buchung'+(n>1?'en':'')+' übernommen'),500);
 })();
