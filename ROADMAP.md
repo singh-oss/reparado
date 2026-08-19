@@ -75,10 +75,10 @@ Wachstums-Motoren (Versandreparatur, B2B, Forecast) · **Echtes System** (DB, Au
 | ✅ L8 | **🛒 Upsell an der Kasse** (Zubehör bei Reparatur im Warenkorb) · **FERTIG 18.8.** | Leap | S | ★ |
 | ✅ B2 | **Fotos am Auftrag** (Upload+Galerie im Drawer, aus Diagnose übernommen) · **FERTIG 18.8.** | Leap | S–M | ★★ |
 | L18 | **⚖️ Rechtssichere digitale Übergabe** (Datenverlust-Waiver/DSGVO signiert) | Leap | S | ★★ |
-| L4 | **💬 Proaktive Kundenkommunikation** (Empfangskraft treibt aktiv) | Leap | M | ★★ |
+| ✅ L4 | **💬 Proaktive Kundenkommunikation** (Empfangskraft schlägt Kontakte vor: Angebote nachfassen / Termin morgen bestätigen / Warte-auf-Teil-Update, mit Vorschau + Einzel-/Sammelsenden) · **FERTIG 19.8.** | Leap | M | ★★ |
 | ✅ L3 | **🔧 Techniker-Playbook** (KI-Reparaturanleitung je Reparaturart im Auftrag) · **FERTIG 18.8.** | Leap | M | ★★ |
 | ✅ L16 | **🧠 KI-Tagesbriefing** (Chef-Cockpit auf dem Dashboard, GF-only) · **FERTIG 18.8.** | Leap | M | ★★ |
-| P10 | **Repair-Widget-Konfig** — Preise/Styling, iframe-Embed, **WordPress-Plugin**, Standardpreise | Parität 🟠 | M–L | ★★ |
+| ✅ P10 | **Website-Widget-Konfig** — Slug/Akzentfarbe/Module/Höhe/Auto-Höhe, iframe-Embed mit Auto-Resize, generiertes **WordPress-Plugin** zum Download (Shortcode `[reparado]`) · **FERTIG 19.8.** | Parität 🟠 | M–L | ★★ |
 | ✅ P14 | **Kasse-Politur** — editierbarer Artikelkatalog + Kategorien, Meistverkauft, Verwalten · **FERTIG 19.8.** (Scan via Suche) | Parität 🟡 | M | ★ |
 | ✅ P13 | **Kunden-Politur** — Suche, A→Z-Sortierung, Pagination · **FERTIG 18.8.** | Parität 🟡 | S | ★ |
 | ✅ P16 | **Detaillierte Statistik** — Monatsvergleich (Trend) + Ankauf/Verkauf/Handels-Marge · **FERTIG 19.8.** | Parität 🟡 | S–M | ★ |
