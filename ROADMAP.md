@@ -90,7 +90,7 @@ Wachstums-Motoren (Versandreparatur, B2B, Forecast) · **Echtes System** (DB, Au
 | # | Feature | Typ | Effort | Impact |
 |---|---|---|---|---|
 | ✅ L20 | **📮 Versandreparatur end-to-end** — eigener Reiter „Versand": Prepaid-Label mit Tracking, Pipeline Eingang→Im Haus/Reparatur→Rückversand→Zugestellt, Fernannahme legt Kunde+Auftrag automatisch an, Rücksendung mit Rück-Tracking + druckbarem Label · **FERTIG 19.8.** | Leap | M–L | ★★ |
-| L21 | **🏢 B2B-Verträge** (Gerätepools, SLA, Monatsabrechnung — wiederkehrender Umsatz) | Leap | L | ★★ |
+| ✅ L21 | **🏢 B2B-Verträge** — eigener Reiter „Verträge": 3 SLA-Pakete (Basis/Business/Premium: Reaktionszeit, Priorität, Reparaturrabatt), Gerätepool je Firma, monatliche Sammelrechnung (Pauschale + Pool-Reparaturen mit Vertragsrabatt, druckbar), MRR-KPI, Vertragsstatus aktiv/pausiert/gekündigt · **FERTIG 19.8.** | Leap | L | ★★ |
 | L17 | **📈 Forecast + Filial-Benchmark** (Franchise) | Leap | M | ★ |
 | L19 | **🏥 Mehr Versicherer** neben Wertgarantie + Direktabrechnung | Leap | M | ★ |
 | P11 | **Integrationen** — HelloCash, SumUp, Lexware, Google Bewertungen | Parität 🟠 | M | ★ |
