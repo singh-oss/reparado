@@ -2165,10 +2165,10 @@ function reparaturPos(){const p=+prompt('Reparatur-Betrag (€, brutto):')||0;if
 function freePos(){const n=prompt('Bezeichnung der Position:');if(!n)return;const p=+prompt('Preis (€, brutto):')||0;cart.push({name:n,price:p,qty:1,vat:19});refreshCart();}
 function posSearch(v){window.__posq=v;}
 function addToCart(orderId){const o=S.ord.find(x=>x.id===orderId);if(!o)return;
-  const insCovered=o.ins&&o.ins.on&&['freigegeben','abgerechnet'].includes(o.ins.status);
-  if(insCovered){cart.push({name:o.nr+' · Wertgarantie – Selbstbeteiligung',price:+o.ins.selbst||0,qty:1,vat:19});}
+  const insCovered=o.ins&&o.ins.on&&insProvDef(o.ins.provider).direct&&['freigegeben','abgerechnet'].includes(o.ins.status);
+  if(insCovered){cart.push({name:o.nr+' · '+insProvDef(o.ins.provider).lbl+' – Selbstbeteiligung',price:+o.ins.selbst||0,qty:1,vat:19});}
   else{oDevices(o).forEach(d=>cart.push({name:o.nr+' · '+[d.brand,d.model].filter(Boolean).join(' ')+' · '+d.reparatur,price:+d.price||0,qty:1,vat:19}));}
-  toast(insCovered?'Wertgarantie-Fall: Kunde zahlt nur Selbstbeteiligung':'Auftrag in Kasse übernommen');kasseTab='pos';views.kasse();paintIcons();}
+  toast(insCovered?insProvDef(o.ins.provider).lbl+'-Fall: Kunde zahlt nur Selbstbeteiligung':'Auftrag in Kasse übernommen');kasseTab='pos';views.kasse();paintIcons();}
 function checkout(){
   if(!cart.length){toast('Warenkorb leer');return;}
   if(!ensureTse().active){toast('TSE nicht verbunden – Kassieren gesperrt (KassenSichV)');go('einstellungen');return;}
@@ -2437,14 +2437,12 @@ views.einstellungen=function(){
        <button class="btn" onclick="statAdd()">+ Status</button>
        <div class="note" style="margin-top:8px">System-Status steuern den Ablauf (Abholbereit setzt „fertig", Abgeschlossen setzt „abgeholt") und sind nicht löschbar – aber umbenennbar, farbig und mit Auto-Nachricht.</div>
      </div>
-     <div class="card"><b>Wertgarantie (Versicherung)</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Als Fachhandelspartner Reparaturfälle versicherter Kunden einreichen, Freigaben erhalten und direkt mit Wertgarantie abrechnen. Prototyp – Portal-Anbindung simuliert.</p>
-       ${(function(){const w=ensureInsurance();return `
-       <div class="integ" style="justify-content:space-between"><div style="display:flex;gap:12px;align-items:center"><div class="lg">${ic('shield')}</div><div><b>Wertgarantie Fachhandelsportal</b><div class="muted" style="font-size:12px">${w.active&&w.connected?'Verbunden · Partner-Nr. '+esc(w.partnerNr):'Nicht verbunden'}</div></div></div>
-         <button class="switch ${w.active&&w.connected?'on':''}" onclick="S.insurance.active=!S.insurance.active;save();views.einstellungen();paintIcons()"><i></i></button></div>
-       <label class="f" style="margin-top:12px">Fachhandelspartner-Nummer</label>
-       <input class="in" id="wg_partner" value="${esc(w.partnerNr||'')}" placeholder="FH-72336-4471">
-       <div class="row" style="margin-top:12px">${w.connected?`<span class="pill solid"><span class="d"></span>Verbunden</span><button class="btn" onclick="wgDisconnect()">Trennen</button>`:`<button class="btn pri" onclick="wgConnect()">Verbinden</button><span class="muted" style="font-size:13px">Vertragsprüfung &amp; Schadensmeldung im Auftrag.</span>`}
-         <button class="btn" onclick="go('versicherung')">Versicherungsfälle öffnen</button></div>`;})()}
+     <div class="card"><b>Geräteversicherer</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Als Fachhandelspartner Reparaturfälle versicherter Kunden einreichen, Freigaben erhalten und – wo möglich – direkt mit dem Versicherer abrechnen. Prototyp – Portal-Anbindung simuliert.</p>
+       ${(function(){ensureInsurers();return Object.keys(INSURERS).map(p=>{const pd=INSURERS[p];const r=ensureInsurers()[p]||{};const on=!!r.connected;return `
+       <div class="integ" style="justify-content:space-between;margin-bottom:8px"><div style="display:flex;gap:12px;align-items:center"><div class="lg">${ic('shield')}</div><div><b>${esc(pd.lbl)}</b> ${pd.direct?'<span class="tag">Direktabrechnung</span>':'<span class="tag">nur Nachweis</span>'}<div class="muted" style="font-size:12px">${on?'Verbunden'+(r.partnerNr?' · '+esc(r.partnerNr):''):'Nicht verbunden'}</div></div></div>
+         ${on?`<button class="btn sm gho" onclick="insurerDisconnect('${esc(p)}')">Trennen</button>`:`<button class="btn sm pri" onclick="insurerConnect('${esc(p)}')">Verbinden</button>`}</div>
+       ${on&&pd.direct?`<input class="in" style="margin:-2px 0 12px" value="${esc(r.partnerNr||'')}" placeholder="Fachhandelspartner-Nr." onchange="insurerSetPartner('${esc(p)}',this.value)">`:''}`;}).join('');})()}
+       <div class="row" style="margin-top:6px"><button class="btn" onclick="go('versicherung')">Versicherungsfälle öffnen</button></div>
      </div>
      <div class="card" style="grid-column:1/-1"><b>Benachrichtigungen</b><p class="muted" style="font-size:13px;margin:4px 0 12px">E-Mail (SMTP) und SMS für Auto-Nachrichten &amp; Erinnerungen. Prototyp – im echten System werden hiermit die Nachrichten wirklich verschickt.</p>
        ${(function(){const nt=ensureSettings().notify;return `
@@ -2473,60 +2471,82 @@ function connectCash(p){ S.cash.connected=p; save(); toast(p+' verbunden – Kar
 /* ============================ VERSICHERUNG (Wertgarantie) ============================ */
 function defaultInsurance(){return {connected:true,provider:'Wertgarantie',partnerNr:'FH-72336-4471',active:true};}
 function ensureInsurance(){ if(!S.insurance){S.insurance=defaultInsurance();save();} if(!S.wgLeads)S.wgLeads=[]; return S.insurance; }
+/* L19 – mehrere Versicherer + Direktabrechnung */
+const INSURERS={
+  Wertgarantie:{lbl:'Wertgarantie',direct:true,prefix:'WG',note:'Marktführer Geräteschutz · Fachhandelsportal mit Direktabrechnung.'},
+  Assona:{lbl:'Assona',direct:true,prefix:'AS',note:'Handy-/Elektronikversicherung · Fachhändler-Direktabrechnung.'},
+  SchutzKlick:{lbl:'SchutzKlick',direct:true,prefix:'SK',note:'simplesurance · Elektronikschutz mit Partner-Abrechnung.'},
+  hepster:{lbl:'hepster',direct:true,prefix:'HP',note:'Digitaler Versicherer · API-Direktabrechnung.'},
+  'AppleCare+':{lbl:'AppleCare+',direct:false,prefix:'AC',note:'Apple direkt · keine Fachhändler-Direktabrechnung – Kunde zahlt und reicht selbst ein.'}
+};
+function insProvDef(p){return INSURERS[p]||INSURERS.Wertgarantie;}
+function ensureInsurers(){ if(!S.insurers){ S.insurers={Wertgarantie:{connected:true,partnerNr:'FH-72336-4471'},Assona:{connected:true,partnerNr:'AS-4471-72336'},SchutzKlick:{connected:false,partnerNr:''},hepster:{connected:false,partnerNr:''},'AppleCare+':{connected:false,partnerNr:''}}; save(); } return S.insurers; }
+function insProvConnected(p){const r=ensureInsurers()[p];return !!(r&&r.connected);}
+function connectedInsurers(){ensureInsurers();return Object.keys(INSURERS).filter(insProvConnected);}
+function insurerConnect(p){const r=ensureInsurers();r[p]=r[p]||{partnerNr:''};r[p].connected=true;save();toast(insProvDef(p).lbl+' verbunden');views.einstellungen();paintIcons();}
+function insurerDisconnect(p){const r=ensureInsurers();if(r[p])r[p].connected=false;save();toast(insProvDef(p).lbl+' getrennt');views.einstellungen();paintIcons();}
+function insurerSetPartner(p,v){const r=ensureInsurers();r[p]=r[p]||{connected:true};r[p].partnerNr=v;save();}
+function insPartnerNr(p){const r=ensureInsurers()[p];return (r&&r.partnerNr)||ensureInsurance().partnerNr||'—';}
 function wgConnect(){const w=ensureInsurance();const p=document.getElementById('wg_partner');w.partnerNr=(p&&p.value.trim())||w.partnerNr||'FH-72336-4471';w.connected=true;w.active=true;save();toast('Wertgarantie verbunden');views.einstellungen();paintIcons();}
 function wgDisconnect(){const w=ensureInsurance();w.connected=false;save();toast('Wertgarantie getrennt');views.einstellungen();paintIcons();}
 function insErstattung(o){return Math.max(0,(+o.price||0)-(+((o.ins&&o.ins.selbst)||0)));}
-const WG_LBL={geprueft:['Vertrag geprüft','soft'],eingereicht:['Bei Wertgarantie eingereicht','soft'],freigegeben:['Freigegeben','solid'],abgelehnt:['Abgelehnt','soft'],abgerechnet:['Abgerechnet','solid']};
+const WG_LBL={geprueft:['Vertrag geprüft','soft'],eingereicht:['Eingereicht','soft'],freigegeben:['Freigegeben','solid'],abgelehnt:['Abgelehnt','soft'],abgerechnet:['Abgerechnet','solid']};
 function insBadge(st){const x=WG_LBL[st]||['—','soft'];return `<span class="pill ${x[1]}"><span class="d"></span>${x[0]}</span>`;}
 function insPanel(o){
   ensureInsurance();
   if(!o.ins||!o.ins.on){
     return `<div class="divider"></div><label class="f">Versicherung</label>
-     <div class="integ" style="justify-content:space-between"><div style="display:flex;gap:10px;align-items:center"><div class="lg">${ic('shield')}</div><div><b>Wertgarantie</b><div class="muted" style="font-size:12px">Geräteversicherung des Kunden? Fall einreichen.</div></div></div>
-     <button class="btn sm" onclick="insStart('${o.id}')">Als Wertgarantie-Fall</button></div>`;
+     <div class="integ" style="justify-content:space-between"><div style="display:flex;gap:10px;align-items:center"><div class="lg">${ic('shield')}</div><div><b>Geräteversicherung</b><div class="muted" style="font-size:12px">Kunde bei Wertgarantie, Assona, SchutzKlick …? Fall einreichen.</div></div></div>
+     <button class="btn sm" onclick="insStart('${o.id}')">Als Versicherungsfall</button></div>`;
   }
-  const w=o.ins; const gf=curRole()==='inhaber'; let actions='';
-  if(w.status==='geprueft') actions=`<button class="btn pri" onclick="insSubmit('${o.id}')">Schadensmeldung an Wertgarantie senden</button>`;
+  const w=o.ins; const prov=w.provider||'Wertgarantie'; const pd=insProvDef(prov); const gf=curRole()==='inhaber'; let actions='';
+  if(w.status==='geprueft') actions=`<button class="btn pri" onclick="insSubmit('${o.id}')">Schadensmeldung an ${esc(pd.lbl)} senden</button>`;
   else if(w.status==='eingereicht') actions=`<span class="muted" style="font-size:13px;align-self:center">Warten auf Freigabe …</span><button class="btn" onclick="insApprove('${o.id}')">Freigabe erhalten</button><button class="btn gho" onclick="insReject('${o.id}')">Abgelehnt</button>`;
-  else if(w.status==='freigegeben') actions=`<button class="btn pri" onclick="insBill('${o.id}')">Mit Wertgarantie abrechnen</button>`;
-  else if(w.status==='abgerechnet') actions=`<span class="muted" style="font-size:13px;align-self:center">Erstattung ${eur(insErstattung(o))} abgerechnet.</span>`;
+  else if(w.status==='freigegeben') actions=pd.direct?`<button class="btn pri" onclick="insBill('${o.id}')">Mit ${esc(pd.lbl)} abrechnen</button>`:`<button class="btn pri" onclick="insBill('${o.id}')">Nachweis für Kunden erstellen</button><span class="muted" style="font-size:12px;align-self:center">Kunde zahlt, reicht selbst ein</span>`;
+  else if(w.status==='abgerechnet') actions=`<span class="muted" style="font-size:13px;align-self:center">${pd.direct?'Erstattung '+eur(insErstattung(o))+' abgerechnet.':'Nachweis erstellt – Kunde reicht selbst ein.'}</span>`;
   else if(w.status==='abgelehnt') actions=`<span class="muted" style="font-size:13px;align-self:center">Kunde zahlt selbst.</span><button class="btn" onclick="insSubmit('${o.id}')">Erneut einreichen</button>`;
   return `<div class="divider"></div>
-   <div class="between"><label class="f" style="margin:0">Versicherung · Wertgarantie</label>${insBadge(w.status)}</div>
+   <div class="between"><label class="f" style="margin:0">Versicherung · ${esc(pd.lbl)}${pd.direct?'':' <span class="tag">keine Direktabrechnung</span>'}</label>${insBadge(w.status)}</div>
    <div class="card" style="background:var(--soft);border:0;margin-top:8px">
      <div class="grid g2">
        <div><label class="f">Vertragsnummer</label><div style="font-weight:700">${esc(w.vertrag||'—')}</div></div>
        <div><label class="f">Schaden-Nr.</label><div style="font-weight:700">${esc(w.claimNr||'—')}</div></div>
        <div><label class="f">Selbstbeteiligung (Kunde)</label><div style="font-weight:700">${eur(w.selbst)}</div></div>
-       <div><label class="f">${gf?'Erstattung Wertgarantie':'Übernahme'}</label><div style="font-weight:800">${gf?eur(insErstattung(o)):((w.status==='freigegeben'||w.status==='abgerechnet')?'übernommen':'—')}</div></div>
+       <div><label class="f">${gf?'Erstattung '+esc(pd.lbl):'Übernahme'}</label><div style="font-weight:800">${gf?eur(insErstattung(o)):((w.status==='freigegeben'||w.status==='abgerechnet')?(pd.direct?'übernommen':'selbst einreichen'):'—')}</div></div>
      </div>
      <div class="row" style="margin-top:12px;flex-wrap:wrap;gap:8px">${actions}
        <button class="btn" onclick="insDoc('${o.id}')">Schadensmeldung anzeigen</button>
        <button class="btn gho" onclick="insRemove('${o.id}')">Entfernen</button></div>
    </div>`;
 }
-function insStart(id){const o=S.ord.find(x=>x.id===id);if(!o)return;
-  openModal(`<div class="dhead"><b style="flex:1">Wertgarantie-Fall anlegen</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+function insStart(id){const o=S.ord.find(x=>x.id===id);if(!o)return;const provs=connectedInsurers();const list=provs.length?provs:Object.keys(INSURERS);
+  openModal(`<div class="dhead"><b style="flex:1">Versicherungsfall anlegen</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
    <div class="dbody"><p class="muted" style="font-size:13px">Gerät: ${esc(o.brand)} ${esc(o.model)} · ${esc(o.issue)} · voraussichtlich ${eur(o.price)}</p>
-   <label class="f">Vertragsnummer des Kunden</label><input class="in" id="wg_vertrag" placeholder="WG-8842156">
+   <label class="f">Versicherer</label>
+   <select class="in" id="wg_prov" onchange="insStartNote()">${list.map(p=>`<option value="${esc(p)}">${esc(insProvDef(p).lbl)}${insProvDef(p).direct?'':' (keine Direktabrechnung)'}</option>`).join('')}</select>
+   <label class="f" style="margin-top:10px">Vertragsnummer des Kunden</label><input class="in" id="wg_vertrag" placeholder="z. B. WG-8842156">
    <label class="f" style="margin-top:10px">Selbstbeteiligung (€)</label><input class="in" id="wg_selbst" type="number" value="0" placeholder="0">
-   <div class="note" style="margin-top:10px">Reparado prüft den Vertrag im Wertgarantie-Fachhandelsportal und legt den Schadenfall an. Der Kunde zahlt nur die Selbstbeteiligung – den Rest rechnen Sie direkt mit Wertgarantie ab.</div>
+   <div class="note" id="wg_provnote" style="margin-top:10px"></div>
    <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn gho" onclick="closeAll()">Abbrechen</button><button class="btn pri" onclick="insSave('${id}')">Vertrag prüfen &amp; anlegen</button></div></div>`);
+  insStartNote();
 }
-function insSave(id){const o=S.ord.find(x=>x.id===id);const vi=document.getElementById('wg_vertrag');const v=(vi&&vi.value||'').trim();const sb=+((document.getElementById('wg_selbst')||{}).value)||0;
+function insStartNote(){const sel=document.getElementById('wg_prov');const n=document.getElementById('wg_provnote');if(!sel||!n)return;const pd=insProvDef(sel.value);
+  n.innerHTML=pd.note+(pd.direct?' Der Kunde zahlt nur die Selbstbeteiligung – den Rest rechnen Sie direkt ab.':' <b>Achtung:</b> Der Kunde zahlt die Reparatur voll und erhält von Ihnen einen Nachweis zur eigenen Einreichung.');
+}
+function insSave(id){const o=S.ord.find(x=>x.id===id);const vi=document.getElementById('wg_vertrag');const v=(vi&&vi.value||'').trim();const sb=+((document.getElementById('wg_selbst')||{}).value)||0;const prov=(document.getElementById('wg_prov')||{}).value||'Wertgarantie';
   if(!v){toast('Bitte Vertragsnummer eingeben');return;}
-  o.ins={on:true,provider:'Wertgarantie',vertrag:v,selbst:sb,status:'geprueft',claimNr:'',submittedAt:'',approvedAt:'',note:''};
-  save();closeAll();toast('Vertrag gültig – Wertgarantie-Fall angelegt');openOrder(id);refreshBadges();
+  o.ins={on:true,provider:prov,vertrag:v,selbst:sb,status:'geprueft',claimNr:'',submittedAt:'',approvedAt:'',note:''};
+  save();closeAll();toast('Vertrag gültig – '+insProvDef(prov).lbl+'-Fall angelegt');openOrder(id);refreshBadges();
 }
-function insSubmit(id){const o=S.ord.find(x=>x.id===id);if(!o.ins)return;o.ins.status='eingereicht';o.ins.claimNr='WG-CLM-'+(o.nr.replace(/\D/g,'')||'0')+'-'+String(new Date().getFullYear()).slice(2);o.ins.submittedAt=today();save();toast('Schadensmeldung an Wertgarantie gesendet');afterIns(id);}
-function insApprove(id){const o=S.ord.find(x=>x.id===id);if(!o.ins)return;o.ins.status='freigegeben';o.ins.approvedAt=today();save();toast('Wertgarantie hat die Reparatur freigegeben');afterIns(id);}
+function insSubmit(id){const o=S.ord.find(x=>x.id===id);if(!o.ins)return;const pd=insProvDef(o.ins.provider);o.ins.status='eingereicht';o.ins.claimNr=pd.prefix+'-CLM-'+(o.nr.replace(/\D/g,'')||'0')+'-'+String(new Date().getFullYear()).slice(2);o.ins.submittedAt=today();save();toast('Schadensmeldung an '+pd.lbl+' gesendet');afterIns(id);}
+function insApprove(id){const o=S.ord.find(x=>x.id===id);if(!o.ins)return;o.ins.status='freigegeben';o.ins.approvedAt=today();save();toast(insProvDef(o.ins.provider).lbl+' hat die Reparatur freigegeben');afterIns(id);}
 function insReject(id){const o=S.ord.find(x=>x.id===id);if(!o.ins)return;o.ins.status='abgelehnt';save();toast('Fall abgelehnt – Kunde zahlt selbst');afterIns(id);}
-function insBill(id){const o=S.ord.find(x=>x.id===id);if(!o.ins)return;o.ins.status='abgerechnet';save();toast('Mit Wertgarantie abgerechnet: '+eur(insErstattung(o)));afterIns(id);}
-function insRemove(id){const o=S.ord.find(x=>x.id===id);if(!o.ins)return;if(!confirm('Wertgarantie-Fall entfernen?'))return;o.ins=null;save();toast('Versicherungsfall entfernt');afterIns(id);}
+function insBill(id){const o=S.ord.find(x=>x.id===id);if(!o.ins)return;const pd=insProvDef(o.ins.provider);o.ins.status='abgerechnet';save();toast(pd.direct?('Mit '+pd.lbl+' abgerechnet: '+eur(insErstattung(o))):('Nachweis für Kunden erstellt ('+pd.lbl+')'));if(!pd.direct)insDoc(id);afterIns(id);}
+function insRemove(id){const o=S.ord.find(x=>x.id===id);if(!o.ins)return;if(!confirm('Versicherungsfall entfernen?'))return;o.ins=null;save();toast('Versicherungsfall entfernt');afterIns(id);}
 function afterIns(id){refreshBadges();const dr=document.getElementById('drawer');if(dr&&dr.classList.contains('show'))openOrder(id);if(current==='versicherung')views.versicherung();paintIcons();}
-function insDoc(id){const o=S.ord.find(x=>x.id===id);const c=cust(o.cid);const w=o.ins||{};
-  printHTML('Schadensmeldung '+o.nr, shopHead()+`<h2>Schadensmeldung · Wertgarantie</h2>
-    <div class="muted">Fachhandelspartner ${SHOP.name} · Partner-Nr. ${esc(ensureInsurance().partnerNr)} · ${fmtDate(today())}</div>
+function insDoc(id){const o=S.ord.find(x=>x.id===id);const c=cust(o.cid);const w=o.ins||{};const pd=insProvDef(w.provider);
+  printHTML('Schadensmeldung '+o.nr, shopHead()+`<h2>Schadensmeldung · ${esc(pd.lbl)}</h2>
+    <div class="muted">Fachhandelspartner ${SHOP.name} · Partner-Nr. ${esc(insPartnerNr(w.provider))} · ${fmtDate(today())}</div>
     <table><tbody>
      <tr><th>Versicherungsnehmer</th><td>${esc(c.name)}</td></tr>
      <tr><th>Vertragsnummer</th><td class="mono">${esc(w.vertrag||'—')}</td></tr>
@@ -2538,8 +2558,8 @@ function insDoc(id){const o=S.ord.find(x=>x.id===id);const c=cust(o.cid);const w
      <tr><td>Reparatur ${esc(o.issue)} (${esc(o.qual)})</td><td style="text-align:right" class="mono">${eur(o.price)}</td></tr>
      <tr><td>Selbstbeteiligung Kunde</td><td style="text-align:right" class="mono">− ${eur(w.selbst||0)}</td></tr>
     </tbody></table>
-    <div class="tot"><span>Erstattung Wertgarantie</span><span>${eur(insErstattung(o))}</span></div>
-    <div class="foot">Erstellt über das Wertgarantie-Fachhandelsportal (Prototyp). Freigabe ${w.approvedAt?'am '+fmtDate(w.approvedAt):'ausstehend'}.<br>${SHOP.name} · ${SHOP.street} · ${SHOP.zip} ${SHOP.city}</div>`);
+    <div class="tot"><span>${pd.direct?'Erstattung '+esc(pd.lbl):'Vom Kunden einzureichen'}</span><span>${eur(insErstattung(o))}</span></div>
+    <div class="foot">${pd.direct?'Erstellt über das '+esc(pd.lbl)+'-Fachhandelsportal (Prototyp). Freigabe '+(w.approvedAt?'am '+fmtDate(w.approvedAt):'ausstehend')+'.':'Nachweis für die eigene Einreichung des Kunden bei '+esc(pd.lbl)+'.'}<br>${SHOP.name} · ${SHOP.street} · ${SHOP.zip} ${SHOP.city}</div>`);
 }
 function insRowAction(o){const st=o.ins.status;
   if(st==='geprueft')return `<button class="btn sm pri" onclick="event.stopPropagation();insSubmit('${o.id}')">Einreichen</button>`;
@@ -2558,23 +2578,23 @@ function wgAcceptLead(id){const l=(S.wgLeads||[]).find(x=>x.id===id);if(!l)retur
 }
 function wgDismissLead(id){S.wgLeads=(S.wgLeads||[]).filter(x=>x.id!==id);save();views.versicherung();refreshBadges();toast('Vermittlung abgelehnt');}
 views.versicherung=function(){
-  ensureInsurance();
+  ensureInsurance();ensureInsurers();
   const m=document.getElementById('main');
   const gf=curRole()==='inhaber';
-  const wg=S.insurance;
+  const conn=connectedInsurers();
   const cases=S.ord.filter(o=>o.ins&&o.ins.on);
   const offen=cases.filter(o=>['geprueft','eingereicht'].includes(o.ins.status)).length;
   const freig=cases.filter(o=>o.ins.status==='freigegeben').length;
-  const ausstehend=cases.filter(o=>o.ins.status==='freigegeben').reduce((s,o)=>s+insErstattung(o),0);
-  const erstattetM=cases.filter(o=>o.ins.status==='abgerechnet'&&isThisMonth(o.ins.approvedAt||o.readyAt||o.created)).reduce((s,o)=>s+insErstattung(o),0);
+  const ausstehend=cases.filter(o=>o.ins.status==='freigegeben'&&insProvDef(o.ins.provider).direct).reduce((s,o)=>s+insErstattung(o),0);
+  const erstattetM=cases.filter(o=>o.ins.status==='abgerechnet'&&insProvDef(o.ins.provider).direct&&isThisMonth(o.ins.approvedAt||o.readyAt||o.created)).reduce((s,o)=>s+insErstattung(o),0);
   const leads=S.wgLeads||[];
-  m.innerHTML=`<div class="between"><div><h1 class="h1">Versicherung</h1><p class="sub">Wertgarantie-Fälle, Freigaben und Abrechnung</p></div>
-     <span class="pill ${wg.active&&wg.connected?'solid':'soft'}"><span class="d"></span>${wg.active&&wg.connected?'Wertgarantie verbunden':'Nicht verbunden'}</span></div>
+  m.innerHTML=`<div class="between"><div><h1 class="h1">Versicherung</h1><p class="sub">Geräteversicherer: Fälle einreichen, Freigaben, Direktabrechnung</p></div>
+     <span class="pill ${conn.length?'solid':'soft'}"><span class="d"></span>${conn.length?conn.length+' Versicherer verbunden':'Nicht verbunden'}</span></div>
    <div class="grid g4" style="margin-top:16px">
      <div class="card kpi"><div class="n">${offen}</div><div class="l">Offene Fälle</div><div class="t">geprüft &amp; eingereicht</div></div>
      <div class="card kpi"><div class="n">${freig}</div><div class="l">Freigegeben</div><div class="t">abrechenbar</div></div>
-     ${gf?`<div class="card kpi"><div class="n">${eur(ausstehend)}</div><div class="l">Ausstehende Erstattung</div><div class="t">von Wertgarantie</div></div>
-     <div class="card kpi"><div class="n">${eur(erstattetM)}</div><div class="l">Erstattet diesen Monat</div><div class="t">bereits abgerechnet</div></div>`:`<div class="card kpi"><div class="n">${cases.length}</div><div class="l">Fälle gesamt</div><div class="t">Wertgarantie</div></div>
+     ${gf?`<div class="card kpi"><div class="n">${eur(ausstehend)}</div><div class="l">Ausstehende Erstattung</div><div class="t">Direktabrechnung</div></div>
+     <div class="card kpi"><div class="n">${eur(erstattetM)}</div><div class="l">Erstattet diesen Monat</div><div class="t">bereits abgerechnet</div></div>`:`<div class="card kpi"><div class="n">${cases.length}</div><div class="l">Fälle gesamt</div><div class="t">alle Versicherer</div></div>
      <div class="card kpi"><div class="n">${leads.length}</div><div class="l">Neue Vermittlungen</div><div class="t">von Wertgarantie</div></div>`}
    </div>
    ${leads.length?`<div class="card" style="margin-top:16px"><div class="between"><b>Von Wertgarantie zugewiesene Reparaturen</b><span class="pill soft"><span class="d"></span>${leads.length} neu</span></div>
@@ -2583,13 +2603,13 @@ views.versicherung=function(){
        <button class="btn sm pri" onclick="wgAcceptLead('${l.id}')">Annehmen</button><button class="btn sm gho" onclick="wgDismissLead('${l.id}')">Ablehnen</button></div>`).join('')}
    </div>`:''}
    <div class="card" style="margin-top:16px;padding:0;overflow:auto"><table>
-     <thead><tr><th>Auftrag</th><th>Kunde</th><th>Gerät</th><th>Vertrag</th><th style="text-align:right">Reparatur</th><th style="text-align:right">SB</th>${gf?'<th style="text-align:right">Erstattung</th>':''}<th>Status</th><th></th></tr></thead>
-     <tbody>${cases.length?cases.map(o=>`<tr onclick="openOrder('${o.id}')" style="cursor:pointer">
-       <td><b>${o.nr}</b></td><td>${esc(cust(o.cid).name)}</td><td>${esc(o.brand)} ${esc(o.model)}</td><td class="mono">${esc(o.ins.vertrag)}</td>
-       <td style="text-align:right" class="mono">${eur(o.price)}</td><td style="text-align:right" class="mono">${eur(o.ins.selbst)}</td>${gf?`<td style="text-align:right" class="mono">${eur(insErstattung(o))}</td>`:''}
-       <td>${insBadge(o.ins.status)}</td><td style="text-align:right">${insRowAction(o)}</td></tr>`).join(''):`<tr><td colspan="${gf?9:8}"><div class="empty">Noch keine Versicherungsfälle. Markieren Sie einen Auftrag im Reparaturauftrag als „Wertgarantie-Fall".</div></td></tr>`}</tbody>
+     <thead><tr><th>Auftrag</th><th>Kunde</th><th>Gerät</th><th>Versicherer</th><th>Vertrag</th><th style="text-align:right">Reparatur</th><th style="text-align:right">SB</th>${gf?'<th style="text-align:right">Erstattung</th>':''}<th>Status</th><th></th></tr></thead>
+     <tbody>${cases.length?cases.map(o=>{const pd=insProvDef(o.ins.provider);return `<tr onclick="openOrder('${o.id}')" style="cursor:pointer">
+       <td><b>${o.nr}</b></td><td>${esc(cust(o.cid).name)}</td><td>${esc(o.brand)} ${esc(o.model)}</td><td>${esc(pd.lbl)}${pd.direct?'':' <span class="tag">o. Direktabr.</span>'}</td><td class="mono">${esc(o.ins.vertrag)}</td>
+       <td style="text-align:right" class="mono">${eur(o.price)}</td><td style="text-align:right" class="mono">${eur(o.ins.selbst)}</td>${gf?`<td style="text-align:right" class="mono">${pd.direct?eur(insErstattung(o)):'—'}</td>`:''}
+       <td>${insBadge(o.ins.status)}</td><td style="text-align:right">${insRowAction(o)}</td></tr>`;}).join(''):`<tr><td colspan="${gf?10:9}"><div class="empty">Noch keine Versicherungsfälle. Markieren Sie einen Auftrag im Reparaturauftrag als „Versicherungsfall".</div></td></tr>`}</tbody>
    </table></div>
-   <div class="note" style="margin-top:14px">Ablauf: Vertrag prüfen → Schadensmeldung einreichen → Freigabe von Wertgarantie → reparieren → mit Wertgarantie abrechnen. Der Kunde zahlt an der Kasse nur die Selbstbeteiligung.</div>`;
+   <div class="note" style="margin-top:14px">Ablauf: Versicherer wählen → Vertrag prüfen → Schadensmeldung einreichen → Freigabe → reparieren → direkt abrechnen (Kunde zahlt nur SB) bzw. Nachweis für Selbst-Einreichung. Verbundene Versicherer: <b>${connectedInsurers().map(p=>insProvDef(p).lbl).join(', ')||'keine'}</b> – weitere in den Einstellungen.</div>`;
 };
 
 /* ============================ ONLINE-BUCHUNGEN EINLESEN ============================ */
@@ -3248,7 +3268,7 @@ function demoDone(){ if(_demoStop)return; const el=document.getElementById('demo
 
 /* ============================ BOOT ============================ */
 paintIcons();
-(function(){ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); ensureInv(); ensureProc(); ensureTrade(); ensureShip(); ensureContracts(); const n=pullBookings(); const nq=pullRequests(); pullFeedback(); pullWarranty(); go('dashboard'); applyNavRole(); if(!curUser())showLogin();
+(function(){ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); ensureInv(); ensureProc(); ensureTrade(); ensureShip(); ensureContracts(); ensureInsurers(); const n=pullBookings(); const nq=pullRequests(); pullFeedback(); pullWarranty(); go('dashboard'); applyNavRole(); if(!curUser())showLogin();
   if(nq) setTimeout(()=>toast(nq+' neue Website-Anfrage'+(nq>1?'n':'')),900);
   if(n) setTimeout(()=>toast(n+' neue Online-Buchung'+(n>1?'en':'')+' übernommen'),500);
 })();
