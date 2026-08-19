@@ -274,7 +274,7 @@ const SHOP = {name:"Dein Handy Doc", city:"Balingen", street:"Bahnhofstr. 12", z
 const KEY='reparado_v1';
 let S = load();
 
-function load(){ try{const r=JSON.parse(localStorage.getItem(KEY)); if(r&&r.v===10) return r;}catch(e){} const s=seed(); save(s); return s; }
+function load(){ try{const r=JSON.parse(localStorage.getItem(KEY)); if(r&&r.v===11) return r;}catch(e){} const s=seed(); save(s); return s; }
 function save(x){ localStorage.setItem(KEY, JSON.stringify(x||S)); }
 function uid(p){ return p+Math.random().toString(36).slice(2,7); }
 
@@ -323,6 +323,9 @@ function seed(){
   let hn=1060;
   for(let k=0;k<40;k++){const it=HC[k%HC.length];const day=-(1+(k%25));const c=cust[k%cust.length];
     ord.push({id:'o'+hn,nr:'REP-'+hn,cid:c.id,brand:it[0],model:it[1],imei:'',issue:it[2],qual:(k%4===0?'Kopie':'Original'),price:it[3],status:'abgeholt',prio:'Standard',created:d(day-2),due:d(day-1),notes:'',appt:'',readyAt:d(day-1),pickedAt:d(day),warranty:6,sig:'',source:(k%6===0?'online':(k%9===0?'telefon':''))});hn++;}
+  // Historie der letzten Monate (archiviert → zählt für Statistik/Forecast/Benchmark, ohne die aktive Auftragsliste zu füllen)
+  for(let k=0;k<200;k++){const it=HC[(k*7)%HC.length];const day=-(30+(k%111));const c=cust[(k*3)%cust.length];
+    ord.push({id:'oh'+k,nr:'REP-'+(700+k),cid:c.id,brand:it[0],model:it[1],imei:'',issue:it[2],qual:(k%4===0?'Kopie':'Original'),price:it[3],status:'abgeholt',archived:true,prio:'Standard',created:d(day-1),due:d(day),notes:'',appt:'',readyAt:d(day),pickedAt:d(day),warranty:6,sig:'',source:(k%5===0?'online':'')});}
   // Termine heute (damit "Termine heute" > 0)
   [['c5','Apple','iPhone 13','Displaytausch',149,'Express'],['c6','Samsung','Galaxy A14','Akkutausch',59,'Standard'],['c9','Apple','iPhone 12','Kameraglas',49,'Standard']].forEach((t,i)=>ord.unshift({id:'ot'+i,nr:'REP-'+(1116+i),cid:t[0],brand:t[1],model:t[2],imei:'',issue:t[3],qual:'Original',price:t[4],status:'offen',prio:t[5],created:d(0),due:d(0),notes:'Terminkunde heute',appt:d(0),readyAt:'',pickedAt:'',warranty:6,sig:'',source:''}));
   // Verkäufe (Kasse) diesen Monat
@@ -361,7 +364,7 @@ function seed(){
   ord.push({id:'oreact1',nr:'REP-0990',cid:'cakku',brand:'Apple',model:'iPhone 12',imei:'',issue:'Akkutausch',qual:'Original',price:69,status:'abgeholt',prio:'Standard',created:d(-470),due:d(-468),readyAt:d(-467),pickedAt:d(-466),warranty:6,sig:'',source:'',devices:[{typ:'Smartphone',brand:'Apple',model:'iPhone 12',imei:'',fach:'',ref:'',reparatur:'Akkutausch',qual:'Original',price:69,warranty:6}]});
   ord.push({id:'oreact2',nr:'REP-1050',cid:'c4',brand:'Samsung',model:'Galaxy S22',imei:'',issue:'Displaytausch',qual:'Original',price:209,status:'abgeholt',prio:'Standard',created:d(-172),due:d(-170),readyAt:d(-169),pickedAt:d(-168),warranty:6,sig:'',source:'',devices:[{typ:'Smartphone',brand:'Samsung',model:'Galaxy S22',imei:'',fach:'',ref:'',reparatur:'Displaytausch',qual:'Original',price:209,warranty:6}]});
   ord.push({id:'oreact3',nr:'REP-0900',cid:'cinact',brand:'Apple',model:'iPhone 11',imei:'',issue:'Displaytausch',qual:'Kopie',price:99,status:'abgeholt',prio:'Standard',created:d(-370),due:d(-368),readyAt:d(-367),pickedAt:d(-366),warranty:6,sig:'',source:'',devices:[{typ:'Smartphone',brand:'Apple',model:'iPhone 11',imei:'',fach:'',ref:'',reparatur:'Displaytausch',qual:'Kopie',price:99,warranty:6}]});
-  return {v:10, cust, ord, parts, orders, sold:[], counter:1120, rules: defaultRules(), sales, cash:{connected:''}, mailLog:[], calls:seedCalls(), phone:defaultPhone(), users:defaultUsers(), userId:'u1', insurance:defaultInsurance(), wgLeads, drafts:[], quotes, requests, quoteCounter:1002, feedback:[], reactDone:[]};
+  return {v:11, cust, ord, parts, orders, sold:[], counter:1120, rules: defaultRules(), sales, cash:{connected:''}, mailLog:[], calls:seedCalls(), phone:defaultPhone(), users:defaultUsers(), userId:'u1', insurance:defaultInsurance(), wgLeads, drafts:[], quotes, requests, quoteCounter:1002, feedback:[], reactDone:[]};
 }
 function defaultPhone(){return {active:true, mode:'overflow',
   greeting:'Herzlich willkommen bei Dein Handy Doc. Ich bin die digitale Assistentin. Wie kann ich Ihnen helfen?',
@@ -2248,6 +2251,16 @@ function tagesabschluss(){
 }
 
 /* ============================ STATISTIK ============================ */
+function monthRevOffset(k){ const n=new Date(); n.setDate(1); n.setMonth(n.getMonth()-k); const y=n.getFullYear(),mo=n.getMonth();
+  const inM=ds=>{if(!ds)return false;const x=new Date(ds);return x.getFullYear()===y&&x.getMonth()===mo;};
+  const r=S.ord.filter(o=>(o.status==='abgeholt'||o.status==='fertig')&&inM(o.pickedAt||o.readyAt||o.created)).reduce((s,o)=>s+oTotal(o),0);
+  const sa=(S.sales||[]).filter(x=>inM(x.t)).reduce((s,x)=>s+x.total,0);
+  return r+sa; }
+function ensureBranches(){ if(!S.branches){ S.branches=[
+    {id:'br1',name:'Albstadt',rev:8420,orders:96,rating:4.6},
+    {id:'br2',name:'Hechingen',rev:11180,orders:121,rating:4.9},
+    {id:'br3',name:'Reutlingen',rev:7650,orders:88,rating:4.5}
+  ]; } return S.branches; }
 views.statistik=function(){
   const m=document.getElementById('main');
   const rep=S.ord.filter(o=>(o.status==='abgeholt'||o.status==='fertig')&&isThisMonth(o.pickedAt||o.readyAt||o.created)).reduce((s,o)=>s+(+o.price||0),0);
@@ -2289,6 +2302,28 @@ views.statistik=function(){
        <div class="between" style="padding:8px 0;border-bottom:1px solid var(--line)"><span>Angekauft</span><b class="mono">${eur(buyM)}</b></div>
        <div class="between" style="padding:8px 0;border-bottom:1px solid var(--line)"><span>Verkauft</span><b class="mono">${eur(sellM)}</b></div>
        <div class="between" style="padding:8px 0"><span>Handels-Marge</span><b class="mono" style="color:${mg<0?'#c0392b':'#0e7a3c'}">${eur(mg)}</b></div></div>`;})()}
+   </div>
+   <div class="grid g2" style="margin-top:16px">
+     ${(function(){const now=new Date();const dom=now.getDate();const dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+       const proj=dom>0?total/dom*dim:total;const avg3=Math.round((monthRevOffset(1)+monthRevOffset(2)+monthRevOffset(3))/3);
+       const vsAvg=avg3?Math.round((proj-avg3)/avg3*100):(proj?100:0);const good=proj>=avg3;const pct=Math.min(100,Math.round(dom/dim*100));
+       return `<div class="card"><b>📈 Umsatz-Prognose (diesen Monat)</b>
+       <div class="between" style="margin-top:14px"><span>Bis heute (Tag ${dom}/${dim})</span><b>${eur(total)}</b></div><div class="bar"><i style="width:${pct}%"></i></div>
+       <div class="between" style="margin:16px 0 4px"><span>Hochrechnung Monatsende</span><b style="font-size:18px">${eur(proj)}</b></div>
+       <div class="between" style="margin-top:10px"><span class="muted">3-Monats-Schnitt</span><b class="mono">${eur(avg3)}</b></div>
+       <div class="note" style="margin-top:12px;color:${good?'#0e7a3c':'#c0392b'}">${good?'▲':'▼'} Prognose liegt ${Math.abs(vsAvg)}% ${good?'über':'unter'} dem 3-Monats-Schnitt</div>
+       <div class="muted" style="font-size:12px;margin-top:8px">Lineare Hochrechnung aus dem bisherigen Monatsverlauf.</div></div>`;})()}
+     ${(function(){ensureBranches();const now=new Date();const dom=now.getDate();const dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();const proj=dom>0?total/dom*dim:total;
+       const projOrders=dom>0?Math.round(doneM.length/dom*dim):doneM.length;
+       const rows=[{name:'Balingen (diese Filiale)',rev:proj,orders:projOrders,rating:4.8,me:true},...ensureBranches().map(b=>({name:b.name,rev:b.rev,orders:b.orders,rating:b.rating}))];
+       rows.sort((a,b)=>b.rev-a.rev);const maxR=Math.max(1,...rows.map(r=>r.rev));const myRank=rows.findIndex(r=>r.me)+1;
+       return `<div class="card"><div class="between"><b>🏢 Filial-Benchmark</b><span class="pill soft"><span class="d"></span>Platz ${myRank} von ${rows.length}</span></div>
+       <p class="muted" style="font-size:12px;margin:4px 0 12px">Hochgerechneter Monatsumsatz im Franchise-Netz.</p>
+       ${rows.map((r,i)=>`<div style="margin-bottom:12px">
+         <div class="between" style="margin-bottom:4px"><span${r.me?' style="font-weight:800;color:#0e7a3c"':''}>${i+1}. ${esc(r.name)}${r.me?' ◄':''}</span><b class="mono">${eur(r.rev)}</b></div>
+         <div class="bar"><i style="width:${r.rev/maxR*100}%${r.me?'':';background:#bbb'}"></i></div>
+         <div class="muted" style="font-size:11px;margin-top:2px">${r.orders} Reparaturen · ⌀ ${eur(r.rev/Math.max(1,r.orders))}/Auftrag · ★ ${r.rating.toFixed(1)}</div></div>`).join('')}
+       <div class="muted" style="font-size:12px">Filialen verwalten: über die Franchise-Zentrale (Prototyp – Demo-Filialen).</div></div>`;})()}
    </div>`;
 };
 
