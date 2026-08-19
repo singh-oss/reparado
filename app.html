@@ -195,6 +195,7 @@
       <a data-view="bestellungen"><span class="ic" data-ic="box"></span> Bestellungen <span class="badge" id="bg-best">0</span></a>
       <a data-view="lager"><span class="ic" data-ic="arch"></span> Lager &amp; Teile <span class="badge" id="bg-lager">0</span></a>
       <a data-view="ankauf"><span class="ic" data-ic="swap"></span> Ankauf / Verkauf</a>
+      <a data-view="versand"><span class="ic" data-ic="truck"></span> Versand <span class="badge" id="bg-ship">0</span></a>
       <a data-view="preise"><span class="ic" data-ic="tag"></span> Modelle &amp; Preise</a>
       <div class="grouplbl">Verkauf</div>
       <a data-view="kasse"><span class="ic" data-ic="rcpt"></span> Kasse</a>
@@ -261,6 +262,7 @@ const ICONS={
  mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
  phone:'<path d="M6.6 10.8a15 15 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.24 11 11 0 0 0 3.5.56 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.6a1 1 0 0 1 1 1 11 11 0 0 0 .56 3.5 1 1 0 0 1-.24 1z"/>',
  diag:'<path d="M12 3l1.7 4.1L18 8.8l-4.3 1.7L12 15l-1.7-4.5L6 8.8l4.3-1.7L12 3z"/><path d="M18.5 14l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9.9-2.1z"/>',
+ truck:'<rect x="1" y="6" width="13" height="10" rx="1"/><path d="M14 9h4l3 3v4h-7z"/><circle cx="5.5" cy="18" r="1.7"/><circle cx="17.5" cy="18" r="1.7"/>',
 };
 function ic(name,size){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" width="'+(size||18)+'" height="'+(size||18)+'">'+(ICONS[name]||'')+'</svg>';}
 function paintIcons(){document.querySelectorAll('[data-ic]').forEach(e=>{if(!e.__done){e.innerHTML=ic(e.dataset.ic, e.classList.contains('ic')?18:18);e.__done=1;}});}
@@ -581,6 +583,7 @@ function refreshBadges(){
   const ba=document.getElementById('bg-ang'); if(ba){const n=(S.quotes||[]).filter(q=>['entwurf','offen','angenommen'].includes(q.status)).length+((S.requests||[]).length); ba.textContent=n; ba.style.display=n?'':'none';}
   const bl=document.getElementById('bg-lager'); if(bl){const n=(S.parts||[]).filter(p=>p.stock<=p.min).length; bl.textContent=n; bl.style.display=n?'':'none';}
   const bo=document.getElementById('bg-best'); if(bo){const n=(S.orders||[]).filter(b=>b.status!=='geliefert'&&b.status!=='storniert').length; bo.textContent=n; bo.style.display=n?'':'none';}
+  const bs=document.getElementById('bg-ship'); if(bs){const n=(S.shipments||[]).filter(s=>['transit_in','received','repair'].includes(s.status)).length; bs.textContent=n; bs.style.display=n?'':'none';}
   const bn=document.getElementById('bg-notif'); if(bn){const n=((S.requests||[]).length)+((S.feedback||[]).length)+((S.warrantyClaims||[]).length)+(typeof uncollectedOrders==='function'?uncollectedOrders().length:0)+((S.drafts||[]).length); bn.textContent=n; bn.style.display=n?'':'none';}
 }
 
@@ -1683,6 +1686,116 @@ function photoSection(o){const ph=o.photos||[];return `<label class="f" style="m
   ${ph.length?'<div class="muted" style="font-size:12px;margin-top:4px">Diese Fotos sieht der Kunde live auf seiner Status-Seite.</div>':''}`;
 }
 
+/* ============================ VERSANDREPARATUR (L20) ============================ */
+const SHIP_CARRIERS=['DHL','DPD','GLS','Hermes','UPS'];
+const SHIP_ST={label:{lbl:'Label erstellt',color:'#6b7280'},transit_in:{lbl:'Unterwegs zu uns',color:'#2563eb'},received:{lbl:'Eingegangen',color:'#7c3aed'},repair:{lbl:'In Reparatur',color:'#b45309'},transit_out:{lbl:'Rückversand',color:'#0891b2'},delivered:{lbl:'Zugestellt',color:'#0e7a3c'}};
+function ensureShip(){ if(!S.shipments){ S.shipCounter=1003;
+    S.shipments=[
+      {id:'sh_d1',nr:'VS-1001',name:'Tobias Renz',tel:'+49 170 5551234',mail:'t.renz@mail.de',adr:'Lindenweg 8, 72379 Hechingen',brand:'Apple',model:'iPhone 13',issue:'Displaytausch',carrier:'DHL',tracking:'DH472819336104',status:'transit_in',created:dPlus(-1),ref:'',retTracking:'',history:[{s:'transit_in',t:new Date().toISOString()},{s:'label',t:new Date().toISOString()}]},
+      {id:'sh_d2',nr:'VS-1002',name:'Sandra Ott',tel:'+49 151 5559988',mail:'sandra.ott@web.de',adr:'Am Markt 3, 78050 VS',brand:'Samsung',model:'Galaxy S22',issue:'Akkutausch',carrier:'DPD',tracking:'DP930155720481',status:'repair',created:dPlus(-3),ref:'',retTracking:'',history:[{s:'repair',t:new Date().toISOString()},{s:'received',t:new Date().toISOString()}]},
+      {id:'sh_d3',nr:'VS-1003',name:'Kevin Bauer',tel:'+49 160 5552211',mail:'kbauer@gmx.de',adr:'Hauptstr. 44, 72336 Balingen',brand:'Apple',model:'iPhone 12',issue:'Kameraglas',carrier:'GLS',tracking:'GL118372640925',status:'transit_out',created:dPlus(-6),ref:'',retTracking:'GL770281334610',history:[{s:'transit_out',t:new Date().toISOString()}]}
+    ]; }
+  return S.shipments; }
+function shipDef(k){return SHIP_ST[k]||SHIP_ST.label;}
+function shipPill(k){const d=shipDef(k);return `<span class="pill" style="border-color:${d.color};color:${d.color}"><span class="d" style="background:${d.color}"></span>${d.lbl}</span>`;}
+function genTracking(carrier){let n='';for(let i=0;i<12;i++)n+=Math.floor(Math.random()*10);return (carrier||'DHL').slice(0,2).toUpperCase()+n;}
+function shipHist(s,ev){s.history=s.history||[];s.history.unshift({s:ev,t:new Date().toISOString()});}
+function shipMail(s,subj){S.mailLog.unshift({t:new Date().toISOString(),to:s.name,ch:s.mail?'E-Mail':'SMS',rule:'Versand',subj:subj,how:'Versand-Workflow'});}
+function shipNew(){
+  ensureShip();
+  openModal(`<div class="dhead"><b style="flex:1">Neue Versandreparatur · Prepaid-Label</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+   <div class="dbody">
+     <div class="note" style="margin-bottom:12px">Fernannahme: Kunde bekommt ein <b>fertig frankiertes Versandlabel</b> per E-Mail, schickt das Gerät ein – Sie verfolgen jeden Schritt.</div>
+     <div class="grid g2"><div><label class="f">Name</label><input class="in" id="sh_name"></div><div><label class="f">Telefon</label><input class="in" id="sh_tel" value="+49 "></div></div>
+     <label class="f" style="margin-top:10px">E-Mail (für Label &amp; Tracking)</label><input class="in" id="sh_mail" placeholder="kunde@mail.de">
+     <label class="f" style="margin-top:10px">Adresse (für Rücksendung)</label><input class="in" id="sh_adr" placeholder="Straße, PLZ Ort">
+     <div class="grid g2" style="margin-top:10px"><div><label class="f">Marke</label><select class="in" id="sh_brand">${catBrands().map(b=>`<option>${esc(b)}</option>`).join('')}</select></div><div><label class="f">Modell</label><input class="in" id="sh_model" list="sh_models" placeholder="Modell"></div></div>
+     <datalist id="sh_models">${catBrands().flatMap(b=>catModelNames(b)).map(m=>`<option>${esc(m)}</option>`).join('')}</datalist>
+     <label class="f" style="margin-top:10px">Problem</label><textarea class="in" id="sh_issue" rows="2" placeholder="z. B. Display gesprungen"></textarea>
+     <label class="f" style="margin-top:10px">Versanddienstleister</label><select class="in" id="sh_carrier">${SHIP_CARRIERS.map(c=>`<option>${c}</option>`).join('')}</select>
+     <div class="row" style="margin-top:14px"><button class="btn pri" onclick="shipNewDo()">Prepaid-Label erstellen &amp; senden</button><button class="btn gho" onclick="closeAll()">Abbrechen</button></div>
+   </div>`);
+}
+function shipNewDo(){
+  const g=id=>(document.getElementById(id)||{}).value||'';
+  const name=g('sh_name').trim(),tel=g('sh_tel').trim(),model=g('sh_model').trim(),issue=g('sh_issue').trim();
+  if(!name){toast('Bitte Name angeben');return;}
+  if(!model||!issue){toast('Bitte Gerät und Problem angeben');return;}
+  const carrier=g('sh_carrier')||'DHL';const brand=g('sh_brand');
+  const s={id:uid('sh'),nr:'VS-'+(S.shipCounter=(S.shipCounter||1000)+1),name,tel,mail:g('sh_mail').trim(),adr:g('sh_adr').trim(),brand,model,issue,carrier,tracking:genTracking(carrier),status:'label',created:today(),ref:'',retTracking:'',history:[]};
+  shipHist(s,'label');ensureShip().unshift(s);shipMail(s,'Ihr Versandlabel für die Reparatur ('+brand+' '+model+') · '+carrier+' '+s.tracking);save();closeAll();refreshBadges();views.versand();toast('Label erstellt & an Kunden gesendet (Demo)');
+  setTimeout(()=>shipLabel(s.id),200);
+}
+function shipLabel(id){const s=ensureShip().find(x=>x.id===id);if(!s)return;const inbound=['label','transit_in','received','repair'].includes(s.status);
+  const track=inbound?s.tracking:(s.retTracking||s.tracking);
+  const fromA=inbound?`${esc(s.name)}<br>${esc(s.adr||'—')}`:`${SHOP.name}<br>${SHOP.street} · ${SHOP.zip} ${SHOP.city}`;
+  const toA=inbound?`${SHOP.name} · Reparaturannahme<br>${SHOP.street} · ${SHOP.zip} ${SHOP.city}`:`${esc(s.name)}<br>${esc(s.adr||'—')}`;
+  printHTML('Versandlabel '+s.nr, `<div style="border:2px solid #111;border-radius:10px;padding:18px;max-width:520px">
+    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:10px"><b style="font-size:20px">${s.carrier}</b><span style="font-weight:800">${inbound?'EINSENDUNG':'RÜCKSENDUNG'}</span></div>
+    <div style="font-size:12px;color:#555">Absender</div><div style="font-weight:700;margin-bottom:10px">${fromA}</div>
+    <div style="font-size:12px;color:#555">Empfänger</div><div style="font-weight:700;font-size:17px;margin-bottom:12px">${toA}</div>
+    <div style="font-family:monospace;letter-spacing:2px;font-size:15px;border-top:1px dashed #999;padding-top:10px">Tracking: ${track}</div>
+    <div style="height:52px;margin-top:8px;background:repeating-linear-gradient(90deg,#111 0 2px,#fff 2px 4px,#111 4px 5px,#fff 5px 9px)"></div>
+    <div style="text-align:center;font-family:monospace;font-size:13px;margin-top:4px">${track}</div>
+    <div style="font-size:11px;color:#666;margin-top:10px">Sendung ${s.nr} · Reparaturauftrag · ${s.brand} ${s.model}. Prepaid – bereits frankiert. Bitte gut gepolstert verpacken.</div>
+  </div>`);
+}
+function shipMarkSent(id){const s=ensureShip().find(x=>x.id===id);if(!s)return;s.status='transit_in';shipHist(s,'transit_in');shipMail(s,'Sendungsverfolgung aktiv · '+s.carrier+' '+s.tracking);save();refreshBadges();views.versand();toast('Als „unterwegs" markiert');}
+function shipReceive(id){const s=ensureShip().find(x=>x.id===id);if(!s)return;s.status='received';shipHist(s,'received');shipMail(s,'Ihr Gerät ist bei uns eingegangen · '+s.nr);save();refreshBadges();views.versand();toast('Eingang erfasst');}
+function shipToOrder(id){const s=ensureShip().find(x=>x.id===id);if(!s)return;
+  let c=s.tel&&S.cust.find(x=>x.tel&&x.tel.replace(/\D/g,'')===s.tel.replace(/\D/g,'')&&s.tel.replace(/\D/g,'').length>5);
+  if(!c){c={id:uid('c'),name:s.name,tel:s.tel,mail:s.mail,adr:s.adr};S.cust.push(c);}
+  const price=priceFor(s.brand,s.model,s.issue);
+  const devs=[{typ:'Smartphone',brand:s.brand,model:s.model,imei:'',fach:'',ref:'',reparatur:s.issue,qual:'Original',price:+price||0,warranty:6}];
+  const nr=nextOrderNr();const o=Object.assign({id:uid('o'),nr,cid:c.id,devices:devs,lock:'Keine',lockval:'',status:'bearbeitung',prio:'Standard',created:today(),due:dPlus(3),appt:'',notes:'Versandreparatur '+s.nr+' · '+s.issue,readyAt:'',sig:'',source:'versand',technikerId:''},noMirror(devs));
+  S.ord.unshift(o);s.ref=o.id;s.status='repair';shipHist(s,'repair');save();refreshBadges();views.versand();toast('Auftrag '+nr+' angelegt & verknüpft');
+}
+function shipReturn(id){const s=ensureShip().find(x=>x.id===id);if(!s)return;
+  const o=s.ref&&S.ord.find(x=>x.id===s.ref);
+  if(o&&!['fertig','abgeholt'].includes(o.status)){ if(!confirm('Der verknüpfte Auftrag ist noch nicht „fertig". Trotzdem Rücksendung erstellen?'))return; }
+  s.retTracking=genTracking(s.carrier);s.status='transit_out';shipHist(s,'transit_out');if(o)o.status='abgeholt';if(o&&!o.pickedAt)o.pickedAt=today();
+  shipMail(s,'Ihr Gerät ist repariert & auf dem Rückweg · '+s.carrier+' '+s.retTracking);save();refreshBadges();views.versand();toast('Rücksendung erstellt');setTimeout(()=>shipLabel(s.id),200);
+}
+function shipDelivered(id){const s=ensureShip().find(x=>x.id===id);if(!s)return;s.status='delivered';shipHist(s,'delivered');shipMail(s,'Zugestellt · vielen Dank für Ihr Vertrauen');save();refreshBadges();views.versand();toast('Als zugestellt markiert');}
+function shipDel(id){const s=ensureShip().find(x=>x.id===id);if(!s)return;if(!confirm('Versandvorgang '+s.nr+' löschen?'))return;S.shipments=ensureShip().filter(x=>x.id!==id);save();refreshBadges();views.versand();toast('Gelöscht');}
+function shipRow(s){
+  const nextBtn=({
+    label:`<button class="btn sm" onclick="shipLabel('${s.id}')">Label drucken</button><button class="btn sm pri" onclick="shipMarkSent('${s.id}')">Kunde hat verschickt</button>`,
+    transit_in:`<button class="btn sm pri" onclick="shipReceive('${s.id}')">Eingang erfassen</button>`,
+    received:`<button class="btn sm pri" onclick="shipToOrder('${s.id}')">Auftrag anlegen</button>`,
+    repair:`${s.ref?`<button class="btn sm gho" onclick="openOrder('${s.ref}')">Auftrag öffnen</button>`:''}<button class="btn sm pri" onclick="shipReturn('${s.id}')">Rücksendung erstellen</button>`,
+    transit_out:`<button class="btn sm" onclick="shipLabel('${s.id}')">Rücklabel</button><button class="btn sm pri" onclick="shipDelivered('${s.id}')">Zugestellt</button>`,
+    delivered:''
+  })[s.status]||'';
+  const track=s.status==='transit_out'||s.status==='delivered'?(s.retTracking||s.tracking):s.tracking;
+  return `<div class="listitem" style="align-items:flex-start">
+    <div style="flex:1;min-width:0"><div class="row" style="gap:8px;align-items:center"><b>${esc(s.nr)}</b> ${shipPill(s.status)}</div>
+      <div style="margin-top:3px">${esc(s.name)} · ${esc(s.brand)} ${esc(s.model)}</div>
+      <div class="muted" style="font-size:13px">${esc(s.issue)} · ${s.carrier} <span class="mono">${track}</span></div></div>
+    <div class="row" style="gap:6px;flex-wrap:wrap;justify-content:flex-end">${nextBtn}<button class="btn sm gho" onclick="shipDel('${s.id}')">×</button></div>
+  </div>`;
+}
+views.versand=function(){
+  ensureShip();const m=document.getElementById('main');const all=S.shipments;
+  const incoming=all.filter(s=>['label','transit_in'].includes(s.status));
+  const inhouse=all.filter(s=>['received','repair'].includes(s.status));
+  const outgoing=all.filter(s=>s.status==='transit_out');
+  const done=all.filter(s=>s.status==='delivered');
+  const section=(title,arr,empty)=>`<div class="card" style="margin-top:14px"><b>${title} (${arr.length})</b>${arr.length?arr.map(shipRow).join(''):`<div class="empty" style="padding:16px">${empty}</div>`}</div>`;
+  m.innerHTML=`<div class="between"><div><h1 class="h1">Versandreparatur</h1><p class="sub">Fernannahme mit Prepaid-Label, Sendungsverfolgung und automatischer Rücksendung – Reparaturen ohne Ladenbesuch.</p></div>
+     <button class="btn pri" onclick="shipNew()">＋ Neue Einsendung</button></div>
+   <div class="grid g4" style="margin-top:16px">
+     <div class="card kpi"><div class="n">${incoming.length}</div><div class="l">Erwartete Eingänge</div></div>
+     <div class="card kpi"><div class="n">${inhouse.length}</div><div class="l">Im Haus / Reparatur</div></div>
+     <div class="card kpi"><div class="n">${outgoing.length}</div><div class="l">Auf dem Rückweg</div></div>
+     <div class="card kpi"><div class="n">${done.length}</div><div class="l">Abgeschlossen</div></div>
+   </div>
+   ${section('📥 Eingang erwartet',incoming,'Keine offenen Einsendungen. Über „Neue Einsendung" ein Prepaid-Label erstellen.')}
+   ${section('🔧 Im Haus & in Reparatur',inhouse,'Kein Gerät im Haus.')}
+   ${section('📤 Rückversand unterwegs',outgoing,'Keine Rücksendungen unterwegs.')}
+   ${done.length?section('✅ Zugestellt',done,''):''}
+   <div class="note" style="margin-top:14px">Prototyp: Labels und Sendungsverfolgung sind simuliert. Für den Echtbetrieb bindet Reparado die Versand-API (DHL/DPD/GLS) an – Tracking-Updates kommen dann automatisch, der Ablauf bleibt identisch.</div>`;
+};
 /* ============================ ANKAUF/VERKAUF ============================ */
 views.ankauf=function(){
   ensureTrade(); const m=document.getElementById('main');
@@ -2997,7 +3110,7 @@ function demoDone(){ if(_demoStop)return; const el=document.getElementById('demo
 
 /* ============================ BOOT ============================ */
 paintIcons();
-(function(){ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); ensureInv(); ensureProc(); ensureTrade(); const n=pullBookings(); const nq=pullRequests(); pullFeedback(); pullWarranty(); go('dashboard'); applyNavRole(); if(!curUser())showLogin();
+(function(){ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); ensureInv(); ensureProc(); ensureTrade(); ensureShip(); const n=pullBookings(); const nq=pullRequests(); pullFeedback(); pullWarranty(); go('dashboard'); applyNavRole(); if(!curUser())showLogin();
   if(nq) setTimeout(()=>toast(nq+' neue Website-Anfrage'+(nq>1?'n':'')),900);
   if(n) setTimeout(()=>toast(n+' neue Online-Buchung'+(n>1?'en':'')+' übernommen'),500);
 })();
