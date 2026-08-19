@@ -2113,16 +2113,24 @@ views.einstellungen=function(){
        <textarea class="in" rows="2" onchange="S.phone.greetingAfter=this.value;save()">${esc(S.phone.greetingAfter)}</textarea>
        <button class="btn" style="margin-top:14px" onclick="go('anrufe')">Empfang & Simulation öffnen</button>
      </div>
-     <div class="card"><b>Online-Buchung</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Kunden buchen Termine und sehen Preise direkt auf Ihrer Website.</p>
-       <div class="row" style="margin-bottom:10px"><a class="btn pri" href="booking.html" target="_blank">Buchungsseite öffnen</a><span class="muted" style="font-size:13px">Prototyp – Buchungen erscheinen in „Aufträge".</span></div>
-       <label class="f">Buchungslink</label><div class="row"><input class="in" style="flex:1" readonly value="reparado.de/buchen/dein-handy-doc"><button class="btn" onclick="toast('Link kopiert')">Kopieren</button></div>
-       <label class="f" style="margin-top:12px">Einbetten (WordPress-Shortcode)</label><input class="in" readonly value="[reparado shop=&quot;dein-handy-doc&quot;]">
-     </div>
-     <div class="card"><b>Anfrage & Rückruf (Website)</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Kunden fragen ein Angebot an oder bitten um Rückruf – die Anfragen erscheinen unter „Angebote".</p>
-       <div class="row" style="margin-bottom:10px"><a class="btn pri" href="anfrage.html" target="_blank">Anfrageseite öffnen</a><span class="muted" style="font-size:13px">Gerät → Reparatur → Kontakt.</span></div>
-       <label class="f">Anfragelink</label><div class="row"><input class="in" style="flex:1" readonly value="reparado.de/anfrage/dein-handy-doc"><button class="btn" onclick="toast('Link kopiert')">Kopieren</button></div>
-       <label class="f" style="margin-top:12px">Einbetten (WordPress-Shortcode)</label><input class="in" readonly value="[reparado-anfrage shop=&quot;dein-handy-doc&quot;]">
-     </div>
+     ${(function(){const w=ensureWidget();return `<div class="card"><b>Website-Widget</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Buchung, Preise & Anfrage direkt auf Ihrer Website – als Einbett-Code oder WordPress-Plugin. Kunden bleiben auf Ihrer Seite.</p>
+       <div class="row" style="margin-bottom:12px"><a class="btn pri" href="booking.html" target="_blank">Buchung öffnen</a><a class="btn" href="anfrage.html" target="_blank">Anfrage öffnen</a></div>
+       <div class="grid g2">
+         <div><label class="f">Shop-Kennung (Slug)</label><input class="in" value="${esc(w.slug)}" onchange="setWidget('slug',this.value.trim())"></div>
+         <div><label class="f">Akzentfarbe</label><input class="in" type="color" value="${w.accent}" onchange="setWidget('accent',this.value)" style="height:42px;padding:4px"></div>
+       </div>
+       <label class="f" style="margin-top:12px">Anzeigen im Widget</label>
+       <div class="row">${[['buchung','Terminbuchung'],['preise','Preisrechner'],['anfrage','Anfrage/Rückruf']].map(x=>`<button class="chip ${w.show[x[0]]?'on':''}" onclick="setWidget('show',Object.assign({},ensureWidget().show,{${x[0]}:!ensureWidget().show['${x[0]}']}))">${x[1]}</button>`).join('')}</div>
+       <div class="grid g2" style="margin-top:12px">
+         <div><label class="f">Höhe (px)</label><input class="in" type="number" value="${w.height}" onchange="setWidget('height',+this.value||900)"></div>
+         <div><label class="f">Auto-Höhe</label><button class="switch ${w.autoresize?'on':''}" style="margin-top:6px" onclick="setWidget('autoresize',!ensureWidget().autoresize)"><i></i></button></div>
+       </div>
+       <label class="f" style="margin-top:14px">Einbett-Code · Buchung</label>
+       <textarea class="in" rows="3" readonly style="font-family:ui-monospace,monospace;font-size:12px">${esc(widgetEmbed('buchung'))}</textarea>
+       <div class="row" style="margin-top:8px"><button class="btn sm" onclick="copyEmbed('buchung')">Buchungs-Code kopieren</button><button class="btn sm" onclick="copyEmbed('anfrage')">Anfrage-Code kopieren</button><button class="btn sm" onclick="copyStr(widgetUrl('buchung'))">Direktlink kopieren</button></div>
+       <div class="note" style="margin-top:14px"><b>WordPress?</b> Laden Sie das fertige Plugin herunter und laden es unter <i>Plugins → Installieren → Plugin hochladen</i> hoch. Danach überall per Shortcode: <span class="mono">[reparado]</span> (Buchung) oder <span class="mono">[reparado typ="anfrage"]</span>.</div>
+       <div class="row" style="margin-top:10px"><button class="btn pri" onclick="downloadWpPlugin()">WordPress-Plugin herunterladen</button><input class="in" style="flex:1" readonly value='[reparado typ="buchung"]' onclick="this.select();copyStr(this.value)"></div>
+     </div>`;})()}
      <div class="card"><b>Garantie & Belege</b>
        <div class="grid g2" style="margin-top:12px"><div><label class="f">Standard-Garantie (Monate)</label><input class="in" value="${SHOP.warranty}"></div>
        <div><label class="f">Öffnungszeiten</label><input class="in" value="${SHOP.hours}"></div></div>
@@ -2720,9 +2728,91 @@ function randPhone(){const r=()=>Math.floor(1000+Math.random()*9000);return '+49
 function addDaysStr(n){const x=new Date();x.setDate(x.getDate()+n);return x.toISOString().slice(0,10);}
 
 let empfFilter='alle', simChannel='anruf', simAfter=false;
+/* P10 – Website-Widget: Embed-Code, Konfiguration & WordPress-Plugin */
+function ensureWidget(){ if(!S.widget){ S.widget={slug:'dein-handy-doc',accent:'#0e7a3c',show:{preise:true,buchung:true,anfrage:true},height:900,autoresize:true}; save(); } return S.widget; }
+function widgetUrl(typ){ const w=ensureWidget(); const base='https://reparado.de/'+(typ==='anfrage'?'anfrage':'buchen')+'/'+w.slug; return base+'?accent='+encodeURIComponent(w.accent.replace('#','')); }
+function widgetEmbed(typ){ const w=ensureWidget(); const id='reparado-'+typ; const url=widgetUrl(typ);
+  const resize=w.autoresize?`\n<script>window.addEventListener('message',function(e){if(e.data&&e.data.reparadoHeight){var f=document.getElementById('${id}');if(f)f.style.height=e.data.reparadoHeight+'px';}});<\/script>`:'';
+  return `<iframe id="${id}" src="${url}" style="width:100%;height:${w.height}px;border:0;border-radius:16px;box-shadow:0 2px 14px rgba(0,0,0,.08)" loading="lazy" title="${typ==='anfrage'?'Reparatur anfragen':'Termin buchen'}"><\/iframe>`+resize; }
+function copyStr(s){ if(navigator.clipboard)navigator.clipboard.writeText(s); toast('In Zwischenablage kopiert'); }
+function copyEmbed(typ){ copyStr(widgetEmbed(typ)); }
+function setWidget(k,v){ const w=ensureWidget(); w[k]=v; save(); views.einstellungen(); paintIcons(); }
+function downloadWpPlugin(){
+  const w=ensureWidget();
+  const php='<?php\n'
+   +'/*\n'
+   +'Plugin Name: Reparado Buchung & Anfrage\n'
+   +'Description: Bindet das Reparado Buchungs- und Anfrage-Widget per Shortcode ein. Nutzung: [reparado] oder [reparado typ="anfrage"].\n'
+   +'Version: 1.0.0\n'
+   +'Author: '+SHOP.name+'\n'
+   +'*/\n'
+   +"if(!defined('ABSPATH'))exit;\n"
+   +"function reparado_widget($atts){\n"
+   +"  $a=shortcode_atts(array('typ'=>'buchung','slug'=>'"+w.slug+"','accent'=>'"+w.accent.replace('#','')+"','hoehe'=>'"+w.height+"'),$atts,'reparado');\n"
+   +"  $pfad=($a['typ']==='anfrage')?'anfrage':'buchen';\n"
+   +"  $url='https://reparado.de/'.$pfad.'/'.rawurlencode($a['slug']).'?accent='.rawurlencode($a['accent']);\n"
+   +"  $id='reparado-'.esc_attr($a['typ']);\n"
+   +"  $out ='<iframe id=\"'.$id.'\" src=\"'.esc_url($url).'\" style=\"width:100%;height:'.intval($a['hoehe']).'px;border:0;border-radius:16px\" loading=\"lazy\"></iframe>';\n"
+   +"  $out.='<scr'+'ipt>window.addEventListener(\"message\",function(e){if(e.data&&e.data.reparadoHeight){var f=document.getElementById(\"'.$id.'\");if(f)f.style.height=e.data.reparadoHeight+\"px\";}});<\\/scr'+'ipt>';\n"
+   +"  return $out;\n"
+   +"}\n"
+   +"add_shortcode('reparado','reparado_widget');\n";
+  const blob=new Blob([php],{type:'application/x-php'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='reparado-widget.php'; document.body.appendChild(a); a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},100);
+  toast('WordPress-Plugin heruntergeladen');
+}
+/* L4 – Proaktive Kundenkommunikation: die KI-Empfangskraft treibt aktiv */
+function proactiveTasks(){
+  const ops=[]; S.proacDone=S.proacDone||[];
+  const done=k=>S.proacDone.includes(k);
+  // 1) Offene Angebote nachfassen (älter als 1 Tag)
+  (S.quotes||[]).filter(q=>q.status==='offen'&&q.created&&q.created<=dPlus(-1)).forEach(q=>{
+    const k='q:'+q.id; if(done(k))return; const c=cust(q.cid); const first=(c.name||'Kunde').split(' ')[0];
+    ops.push({key:k,type:'angebot',ref:q.id,name:c.name,ch:'E-Mail',
+      txt:'Angebot '+q.nr+' nachfassen · '+oDevLabel(q)+' · '+eur(oTotal(q)),
+      subj:'Ihr Angebot '+q.nr+' – noch Fragen?',
+      msg:'Hallo '+first+', haben Sie unser Angebot ('+oDevLabel(q)+', '+eur(oTotal(q))+') schon ansehen können? Gern beantworten wir offene Fragen und legen direkt los.'});
+  });
+  // 2) Termine morgen bestätigen
+  visibleOrders().filter(o=>o.appt===dPlus(1)).forEach(o=>{
+    const k='t:'+o.id; if(done(k))return; const c=cust(o.cid); const first=(c.name||'Kunde').split(' ')[0];
+    ops.push({key:k,type:'termin',ref:o.id,name:c.name,ch:'SMS',
+      txt:'Termin morgen bestätigen · '+o.nr+' · '+oDevLabel(o),
+      subj:'Terminbestätigung '+o.nr,
+      msg:'Hallo '+first+', wir bestätigen Ihren Termin morgen um '+SHOP.name+' für '+oDevLabel(o)+'. Bis dann!'});
+  });
+  // 3) Warte-auf-Ersatzteil: Zwischenstand geben
+  visibleOrders().filter(o=>o.status==='warten').forEach(o=>{
+    const k='w:'+o.id; if(done(k))return; const c=cust(o.cid); const first=(c.name||'Kunde').split(' ')[0];
+    ops.push({key:k,type:'warten',ref:o.id,name:c.name,ch:'E-Mail',
+      txt:'Zwischenstand „Teil unterwegs" · '+o.nr+' · '+oDevLabel(o),
+      subj:'Kurzer Zwischenstand zu '+o.nr,
+      msg:'Hallo '+first+', kurzer Zwischenstand: Das Ersatzteil für Ihr '+oDevLabel(o)+' ist bestellt und unterwegs. Wir melden uns, sobald wir starten können.'});
+  });
+  return ops.slice(0,8);
+}
+function proacDo(key){
+  const op=proactiveTasks().find(o=>o.key===key); if(!op)return;
+  S.proacDone=S.proacDone||[]; S.proacDone.push(key);
+  S.mailLog.unshift({t:new Date().toISOString(),to:op.name,ch:op.ch,rule:'Proaktiv ('+op.type+')',subj:op.subj,how:'KI-Empfangskraft'});
+  save(); views.anrufe(); paintIcons(); refreshBadges(); toast('Nachricht gesendet (Demo): '+op.name);
+}
+function proacDismiss(key){ S.proacDone=S.proacDone||[]; S.proacDone.push(key); save(); views.anrufe(); paintIcons(); toast('Übersprungen'); }
+function proacAll(){ const ops=proactiveTasks(); if(!ops.length)return; S.proacDone=S.proacDone||[];
+  ops.forEach(op=>{S.proacDone.push(op.key);S.mailLog.unshift({t:new Date().toISOString(),to:op.name,ch:op.ch,rule:'Proaktiv ('+op.type+')',subj:op.subj,how:'KI-Empfangskraft'});});
+  save(); views.anrufe(); paintIcons(); refreshBadges(); toast(ops.length+' Kunden proaktiv angeschrieben (Demo)'); }
+function proacPreview(key){ const op=proactiveTasks().find(o=>o.key===key); if(!op)return;
+  openModal(`<div class="dhead"><b style="flex:1">Vorschau · ${op.ch} an ${esc(op.name)}</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+   <div class="dbody"><label class="f">Betreff</label><input class="in" readonly value="${esc(op.subj)}">
+     <label class="f" style="margin-top:12px">Nachricht (von der KI-Empfangskraft formuliert)</label>
+     <textarea class="in" rows="5" readonly>${esc(op.msg)}</textarea>
+     <div class="row" style="margin-top:14px"><button class="btn pri" onclick="closeAll();proacDo('${op.key}')">Senden</button><button class="btn gho" onclick="closeAll()">Abbrechen</button></div></div>`); }
+
 views.anrufe=function(){
   const m=document.getElementById('main');
   const ph=S.phone; const open=isOpenNow();
+  const proac=proactiveTasks();
   const all=S.calls;
   const calls=all.filter(c=> empfFilter==='alle'?true : empfFilter==='task'?(c.task&&!c.done) : c.channel===empfFilter);
   const handled=all.filter(c=>!c.task).length;
@@ -2741,6 +2831,14 @@ views.anrufe=function(){
      <div class="card kpi"><div class="n">${booked}</div><div class="l">Termine gebucht</div></div>
      <div class="card kpi"><div class="n">~${handled*3}</div><div class="l">Minuten gespart</div></div>
    </div>
+   ${proac.length?`<div class="card" style="margin-top:16px;border:1px solid #0e7a3c">
+     <div class="between"><div><b style="font-size:15px">Proaktiv vorgeschlagen (${proac.length})</b><div class="muted" style="font-size:12px;margin-top:2px">Die KI-Empfangskraft würde jetzt von sich aus auf diese Kunden zugehen.</div></div>
+       <button class="btn sm pri" onclick="proacAll()">Alle senden</button></div>
+     ${proac.map(op=>`<div class="listitem"><div style="flex:1"><b>${esc(op.txt)}</b><div class="muted" style="font-size:13px">${esc(op.name)} · <span class="tag">${op.ch}</span></div></div>
+       <button class="btn sm gho" onclick="proacPreview('${op.key}')">Vorschau</button>
+       <button class="btn sm pri" onclick="proacDo('${op.key}')">Senden</button>
+       <button class="btn sm gho" onclick="proacDismiss('${op.key}')">×</button></div>`).join('')}
+   </div>`:''}
    ${openTasks.length?`<div class="card" style="margin-top:16px;border:1px solid #0e7a3c">
      <b>Für dich zu erledigen (${openTasks.length})</b>
      ${openTasks.map(c=>`<div class="listitem"><div style="flex:1"><b>Rückruf: ${esc(c.name||c.from)}</b><div class="muted" style="font-size:13px">${esc(c.result)} · ${c.time} Uhr</div></div>
