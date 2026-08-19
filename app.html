@@ -1206,7 +1206,7 @@ function pullRequests(){let arr=[];try{arr=JSON.parse(localStorage.getItem('repa
 /* ---- Bewertungs-Booster (L6): Feedback von der Statusseite ---- */
 function pullFeedback(){let arr=[];try{arr=JSON.parse(localStorage.getItem('reparado_feedback')||'[]');}catch(e){}if(!arr.length)return 0;S.feedback=S.feedback||[];arr.forEach(f=>{S.feedback.unshift(Object.assign({id:uid('fb')},f,{ts:f.ts?(typeof f.ts==='number'?new Date(f.ts).toISOString():f.ts):new Date().toISOString()}));});localStorage.removeItem('reparado_feedback');save();return arr.length;}
 function dismissFb(id){S.feedback=(S.feedback||[]).filter(f=>f.id!==id);save();views.dashboard();paintIcons();toast('Erledigt');}
-function askReview(id){const o=S.ord.find(x=>x.id===id);if(!o)return;o.reviewAsked=true;const c=cust(o.cid);S.mailLog.unshift({t:new Date().toISOString(),to:c.name,ch:'E-Mail',rule:'Bewertungsanfrage',subj:'Wie war Ihre Reparatur? '+o.nr,how:'manuell'});save();openOrder(id);toast('Bewertungs-Anfrage an Kunden gesendet (Demo)');}
+function askReview(id){const o=S.ord.find(x=>x.id===id);if(!o)return;o.reviewAsked=true;const c=cust(o.cid);const via=(typeof integConnected==='function'&&integConnected('google'))?' (Google Bewertungen)':'';S.mailLog.unshift({t:new Date().toISOString(),to:c.name,ch:'E-Mail',rule:'Bewertungsanfrage'+via,subj:'Wie war Ihre Reparatur? '+o.nr+' → '+googleReviewLink(),how:'manuell'});save();openOrder(id);toast('Bewertungs-Anfrage an Kunden gesendet (Demo)'+via);}
 /* ---- Garantie-Portal (L15): Kundenmeldungen ---- */
 function pullWarranty(){let arr=[];try{arr=JSON.parse(localStorage.getItem('reparado_warranty')||'[]');}catch(e){}if(!arr.length)return 0;S.warrantyClaims=S.warrantyClaims||[];arr.forEach(w=>{S.warrantyClaims.unshift(Object.assign({id:uid('wc')},w,{ts:w.ts?(typeof w.ts==='number'?new Date(w.ts).toISOString():w.ts):new Date().toISOString()}));});localStorage.removeItem('reparado_warranty');save();return arr.length;}
 function dismissWarranty(id){S.warrantyClaims=(S.warrantyClaims||[]).filter(w=>w.id!==id);save();views.dashboard();paintIcons();toast('Erledigt');}
@@ -1421,7 +1421,7 @@ function renderTemplate(r,o){
   const map={
     '{kunde}':c.name||'Kunde','{werkstatt}':SHOP.name,'{stadt}':SHOP.city,'{telefon}':SHOP.phone,
     '{adresse}':SHOP.street+', '+SHOP.zip+' '+SHOP.city,'{oeffnung}':SHOP.hours,
-    '{google}':SHOP.google,'{geraet}':o?(o.brand+' '+o.model):'Ihr Gerät','{leistung}':o?o.issue:'',
+    '{google}':(typeof googleReviewLink==='function'?googleReviewLink():SHOP.google),'{geraet}':o?(o.brand+' '+o.model):'Ihr Gerät','{leistung}':o?o.issue:'',
     '{auftrag}':o?o.nr:'','{preis}':o?eur(o.price):'','{termin}':o&&o.appt?fmtDate(o.appt):'nach Absprache',
     '{tracking}':o?('reparado.de/status/'+o.nr):'','{teil}':o?o.issue:'','{lieferant}':'Foneday','{eta}':'',
     '{telefon_kunde}':c.tel||'','{stock}':'','{min}':'',
@@ -2348,9 +2348,12 @@ views.einstellungen=function(){
            <div style="flex:1"><b>${p[0]}</b><div class="muted" style="font-size:12px">${p[2]}</div></div>
            ${cashConn===p[0]?'<span class="pill solid"><span class="d"></span>Verbunden</span>':`<button class="btn sm" onclick="connectCash('${p[0]}')">Verbinden</button>`}</div>`).join('')}
      </div>
-     <div class="card"><b>Integrationen</b>
-       ${[['Lexware / lexoffice','LX','Rechnungen & Buchhaltung'],['Google Bewertungen','G','Automatische Bewertungsanfrage'],['E-Mail (SMTP)','@','Versand Ihrer Erinnerungen'],['SMS-Gateway','SMS','Reparatur-SMS an Kunden']].map(p=>`
-         <div class="integ" style="margin-bottom:10px"><div class="lg">${p[1]}</div><div style="flex:1"><b>${p[0]}</b><div class="muted" style="font-size:12px">${p[2]}</div></div><button class="btn sm" onclick="toast('${p[0]} verbunden')">Verbinden</button></div>`).join('')}
+     <div class="card"><b>Integrationen</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Kasse, Buchhaltung und Bewertungen direkt anbinden. Prototyp – Anbindungen simuliert.</p>
+       ${(function(){ensureIntegrations();return Object.keys(INTEGRATIONS).map(k=>{const d=INTEGRATIONS[k];const r=ensureIntegrations()[k]||{};const on=!!r.connected;return `
+         <div class="integ" style="margin-bottom:10px"><div class="lg">${d.ab}</div><div style="flex:1;min-width:0"><b>${esc(d.lbl)}</b> <span class="tag">${esc(d.cat)}</span><div class="muted" style="font-size:12px">${on&&r.val?esc(r.val):esc(d.desc)}</div></div>
+           ${on?`<span class="pill solid"><span class="d"></span>Verbunden</span><button class="btn sm gho" onclick="integDisconnect('${k}')">Trennen</button>`:`<button class="btn sm pri" onclick="integConnect('${k}')">Verbinden</button>`}</div>
+         ${on&&k==='lexware'?`<div class="row" style="margin:-2px 0 10px"><button class="btn sm" onclick="lexExport()">Belege jetzt übertragen</button></div>`:''}
+         ${on&&k==='google'?`<div class="row" style="margin:-2px 0 10px"><button class="btn sm" onclick="window.open('https://'+googleReviewLink(),'_blank')">Bewertungsseite öffnen</button></div>`:''}`;}).join('');})()}
      </div>
      <div class="card"><b>KI-Empfangskraft (Telefon & WhatsApp)</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Nimmt Anrufe und WhatsApp entgegen und beantwortet Routinefragen aus Ihren Daten. Prototyp – Gespräche werden simuliert.</p>
        <div class="integ" style="justify-content:space-between"><div style="display:flex;gap:12px;align-items:center"><div class="lg">${ic('phone')}</div><div><b>KI-Empfangskraft</b><div class="muted" style="font-size:12px">${S.phone.active?'Aktiv':'Deaktiviert'}</div></div></div>
@@ -2467,6 +2470,33 @@ views.einstellungen=function(){
    </div>`;
 };
 function connectCash(p){ S.cash.connected=p; save(); toast(p+' verbunden – Kartenzahlung aktiv'); views.einstellungen();paintIcons(); }
+/* P11 – Integrationen (SumUp, HelloCash, Lexware, Google Bewertungen) */
+const INTEGRATIONS={
+  sumup:{lbl:'SumUp',ab:'SU',cat:'Kartenzahlung',desc:'Kartenterminal & TSE-konforme Belege',field:'Händler-ID (Merchant Code)',ph:'MXXXXXXX'},
+  hellocash:{lbl:'HelloCash',ab:'HC',cat:'Registrierkasse',desc:'Cloud-Registrierkasse mit TSE',field:'Kassen-Token',ph:'hc_live_…'},
+  lexware:{lbl:'Lexware Office',ab:'LX',cat:'Buchhaltung',desc:'Rechnungen & Belege automatisch übertragen',field:'API-Schlüssel',ph:'lxo_…'},
+  google:{lbl:'Google Bewertungen',ab:'G',cat:'Marketing',desc:'Automatische Bewertungsanfrage nach Abholung',field:'Bewertungs-Link',ph:'g.page/dein-shop/review'}
+};
+function ensureIntegrations(){ if(!S.integrations){S.integrations={sumup:{connected:true,val:'M72336DHD'},hellocash:{connected:false,val:''},lexware:{connected:true,val:'lxo_demo_4471'},google:{connected:true,val:SHOP.google}};save();} return S.integrations; }
+function integDef(k){return INTEGRATIONS[k];}
+function integConnected(k){const r=ensureIntegrations()[k];return !!(r&&r.connected);}
+function googleReviewLink(){const r=ensureIntegrations().google;return (r&&r.connected&&r.val)||SHOP.google;}
+function integConnect(k){const d=integDef(k);const r=ensureIntegrations()[k]||{};
+  openModal(`<div class="dhead"><b style="flex:1">${esc(d.lbl)} verbinden</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+   <div class="dbody"><p class="muted" style="font-size:13px">${esc(d.desc)}. Prototyp – die Anbindung wird simuliert.</p>
+     <label class="f">${esc(d.field)}</label><input class="in" id="integ_val" value="${esc(r.val||'')}" placeholder="${esc(d.ph)}">
+     <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn gho" onclick="closeAll()">Abbrechen</button><button class="btn pri" onclick="integSave('${k}')">Verbinden</button></div></div>`);
+}
+function integSave(k){const v=((document.getElementById('integ_val')||{}).value||'').trim();const r=ensureIntegrations();r[k]={connected:true,val:v};
+  if(k==='sumup'||k==='hellocash')S.cash.connected=integDef(k).lbl;
+  save();closeAll();toast(integDef(k).lbl+' verbunden');views.einstellungen();paintIcons();}
+function integDisconnect(k){const r=ensureIntegrations();if(r[k])r[k].connected=false;
+  if((k==='sumup'||k==='hellocash')&&S.cash.connected===integDef(k).lbl)S.cash.connected='';
+  save();toast(integDef(k).lbl+' getrennt');views.einstellungen();paintIcons();}
+function lexExport(){ if(!integConnected('lexware')){toast('Lexware nicht verbunden');return;}
+  const fin=(S.ord||[]).filter(o=>o.status==='abgeholt').length+(S.sales||[]).length;
+  S.mailLog.unshift({t:new Date().toISOString(),to:'Lexware Office',ch:'API',rule:'Beleg-Export',subj:fin+' Belege übertragen',how:'Integration'});
+  save();toast(fin+' Belege an Lexware übertragen (Demo)');}
 
 /* ============================ VERSICHERUNG (Wertgarantie) ============================ */
 function defaultInsurance(){return {connected:true,provider:'Wertgarantie',partnerNr:'FH-72336-4471',active:true};}
@@ -3268,7 +3298,7 @@ function demoDone(){ if(_demoStop)return; const el=document.getElementById('demo
 
 /* ============================ BOOT ============================ */
 paintIcons();
-(function(){ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); ensureInv(); ensureProc(); ensureTrade(); ensureShip(); ensureContracts(); ensureInsurers(); const n=pullBookings(); const nq=pullRequests(); pullFeedback(); pullWarranty(); go('dashboard'); applyNavRole(); if(!curUser())showLogin();
+(function(){ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); ensureInv(); ensureProc(); ensureTrade(); ensureShip(); ensureContracts(); ensureInsurers(); ensureIntegrations(); const n=pullBookings(); const nq=pullRequests(); pullFeedback(); pullWarranty(); go('dashboard'); applyNavRole(); if(!curUser())showLogin();
   if(nq) setTimeout(()=>toast(nq+' neue Website-Anfrage'+(nq>1?'n':'')),900);
   if(n) setTimeout(()=>toast(n+' neue Online-Buchung'+(n>1?'en':'')+' übernommen'),500);
 })();
