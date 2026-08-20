@@ -562,6 +562,11 @@ function ensureWorkshop(){ if(!S.workshop){ S.workshop={id:'ws_'+Math.random().t
   DB.tenant=S.workshop.id; return S.workshop; }
 function wsSet(k,v){const w=ensureWorkshop();w[k]=v;save();}
 const PLAN_LBL={basic:'Basic',plus:'Plus',pro:'Pro'};
+/* Hardware/Drucker (Repender-Punkt) – simuliert. QZ Tray = Browser-Druckbrücke für Etiketten/Bons. */
+function ensureHardware(){ if(!S.hardware){S.hardware={qz:false,scanner:true,labelName:'',labelOn:false,receiptName:'',receiptOn:false};save();} return S.hardware; }
+function hwSet(k,v){const h=ensureHardware();h[k]=v;save();views.einstellungen();paintIcons();}
+function hwTestLabel(){printHTML('Test-Etikett', `<div style="border:1px dashed #999;border-radius:8px;padding:14px;width:280px;font-family:monospace"><div style="font-size:12px;color:#555">${xesc(ensureWorkshop().name)}</div><div style="font-size:20px;font-weight:800">REP-TEST</div><div style="height:44px;margin:8px 0;background:repeating-linear-gradient(90deg,#111 0 2px,#fff 2px 4px)"></div><div style="font-size:12px">Test-Etikett · ${fmtDate(today())}</div></div>`);toast('Test-Etikett an '+((ensureHardware().labelName)||'Etikettendrucker')+' (Demo)');}
+function hwTestReceipt(){printHTML('Test-Bon', `<div style="width:260px;font-family:monospace;font-size:12px"><div style="text-align:center;font-weight:800">${xesc(ensureWorkshop().name)}</div><div style="text-align:center;color:#555">Test-Bon</div><hr><div>Displaytausch .......... € 149,00</div><div>19% USt ................ € 23,79</div><hr><div style="font-weight:800">SUMME ................. € 149,00</div><div style="text-align:center;margin-top:8px">${fmtDate(today())}</div></div>`);toast('Test-Bon an '+((ensureHardware().receiptName)||'Bondrucker')+' (Demo)');}
 function maHidden(){return (S.settings&&S.settings.maHidden)?S.settings.maHidden:MA_HIDDEN;}
 function canView(v){return curRole()==='inhaber'?true:maHidden().indexOf(v)<0;}
 function toggleMaView(v){const s=ensureSettings();s.maHidden=s.maHidden||MA_HIDDEN.slice();const i=s.maHidden.indexOf(v);if(i<0)s.maHidden.push(v);else s.maHidden.splice(i,1);save();views.einstellungen();paintIcons();}
@@ -869,6 +874,7 @@ function openOrder(id){
        <button class="btn" onclick="printKVA('${o.id}')">Kostenvoranschlag</button>
        <button class="btn" onclick="playbook('${o.id}')">Reparatur-Anleitung</button>
        <button class="btn" onclick="printReceipt('${o.id}')">Beleg / Quittung</button>
+       <button class="btn" onclick="downloadEInvoice('${o.id}')">E-Rechnung (XML)</button>
        <button class="btn" onclick="printLabel('${o.id}')">Etikett drucken</button>
        <button class="btn" onclick="printWarranty('${o.id}')">Garantie-Beleg</button>
        <button class="btn" onclick="go('kasse');closeAll();addToCart('${o.id}')">In die Kasse</button>
@@ -1301,6 +1307,55 @@ function printReceipt(id){const o=S.ord.find(x=>x.id===id);const c=cust(o.cid);
     <div class="foot">Preis inkl. gesetzlicher MwSt. · Garantie: ${o.warranty} Monate auf die durchgeführte Reparatur.<br>Vielen Dank für Ihren Auftrag bei ${SHOP.name}.</div>
     ${ensureSettings().agb?`<div style="margin-top:14px;padding-top:10px;border-top:1px solid #ddd;font-size:11px;color:#666;line-height:1.5">${esc(ensureSettings().agb)}</div>`:''}`);
   }
+/* E-Rechnung (Repender-Punkt): EN16931 CII-XML (= XRechnung-Syntax / ZUGFeRD-Kern) aus einem Auftrag */
+function r2(n){return Math.round((+n||0)*100)/100;}
+function xesc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function genEInvoiceXML(o){
+  const w=ensureWorkshop(); const c=cust(o.cid); const RATE=19;
+  const parseAdr=(adr)=>{const m=String(adr||'').match(/(\d{5})\s+(.+)$/);return{plz:m?m[1]:'',city:m?m[2].trim():'',street:(String(adr||'').replace(/,?\s*\d{5}.*$/,'').trim())};};
+  const ba=parseAdr(c.adr);
+  const devs=oDevices(o); const lineNets=devs.map(d=>r2((+d.price||0)/(1+RATE/100)));
+  const net=r2(lineNets.reduce((s,x)=>s+x,0)); const tax=r2(net*RATE/100); const gross=r2(net+tax);
+  const issue=(o.pickedAt||o.readyAt||o.created||today()).replace(/-/g,'');
+  const lines=devs.map((d,i)=>{const ln=lineNets[i]; const nm=[d.brand,d.model].filter(Boolean).join(' ')+(d.reparatur?' · '+d.reparatur:'')||'Reparatur';
+    return `  <ram:IncludedSupplyChainTradeLineItem>
+    <ram:AssociatedDocumentLineDocument><ram:LineID>${i+1}</ram:LineID></ram:AssociatedDocumentLineDocument>
+    <ram:SpecifiedTradeProduct><ram:Name>${xesc(nm)}</ram:Name></ram:SpecifiedTradeProduct>
+    <ram:SpecifiedLineTradeAgreement><ram:NetPriceProductTradePrice><ram:ChargeAmount>${ln.toFixed(2)}</ram:ChargeAmount></ram:NetPriceProductTradePrice></ram:SpecifiedLineTradeAgreement>
+    <ram:SpecifiedLineTradeDelivery><ram:BilledQuantity unitCode="C62">1</ram:BilledQuantity></ram:SpecifiedLineTradeDelivery>
+    <ram:SpecifiedLineTradeSettlement><ram:ApplicableTradeTax><ram:TypeCode>VAT</ram:TypeCode><ram:CategoryCode>S</ram:CategoryCode><ram:RateApplicablePercent>${RATE}</ram:RateApplicablePercent></ram:ApplicableTradeTax>
+      <ram:SpecifiedTradeSettlementLineMonetarySummation><ram:LineTotalAmount>${ln.toFixed(2)}</ram:LineTotalAmount></ram:SpecifiedTradeSettlementLineMonetarySummation></ram:SpecifiedLineTradeSettlement>
+  </ram:IncludedSupplyChainTradeLineItem>`;}).join('\n');
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<rsm:CrossIndustryInvoice xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100" xmlns:ram="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100" xmlns:udt="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100">
+  <rsm:ExchangedDocumentContext><ram:GuidelineSpecifiedDocumentContextParameter><ram:ID>urn:cen.eu:en16931:2017</ram:ID></ram:GuidelineSpecifiedDocumentContextParameter></rsm:ExchangedDocumentContext>
+  <rsm:ExchangedDocument><ram:ID>${xesc(o.nr)}</ram:ID><ram:TypeCode>380</ram:TypeCode><ram:IssueDateTime><udt:DateTimeString format="102">${issue}</udt:DateTimeString></ram:IssueDateTime></rsm:ExchangedDocument>
+  <rsm:SupplyChainTradeTransaction>
+${lines}
+    <ram:ApplicableHeaderTradeAgreement>
+      <ram:SellerTradeParty><ram:Name>${xesc(w.name)}</ram:Name>
+        <ram:PostalTradeAddress><ram:PostcodeCode>${xesc(SHOP.zip)}</ram:PostcodeCode><ram:LineOne>${xesc(SHOP.street)}</ram:LineOne><ram:CityName>${xesc(SHOP.city)}</ram:CityName><ram:CountryID>DE</ram:CountryID></ram:PostalTradeAddress>
+        ${w.ustId?`<ram:SpecifiedTaxRegistration><ram:ID schemeID="VA">${xesc(w.ustId)}</ram:ID></ram:SpecifiedTaxRegistration>`:''}${w.taxNr?`<ram:SpecifiedTaxRegistration><ram:ID schemeID="FC">${xesc(w.taxNr)}</ram:ID></ram:SpecifiedTaxRegistration>`:''}</ram:SellerTradeParty>
+      <ram:BuyerTradeParty><ram:Name>${xesc(c.name)}</ram:Name>
+        <ram:PostalTradeAddress><ram:PostcodeCode>${xesc(ba.plz)}</ram:PostcodeCode><ram:LineOne>${xesc(ba.street)}</ram:LineOne><ram:CityName>${xesc(ba.city)}</ram:CityName><ram:CountryID>DE</ram:CountryID></ram:PostalTradeAddress></ram:BuyerTradeParty>
+    </ram:ApplicableHeaderTradeAgreement>
+    <ram:ApplicableHeaderTradeDelivery/>
+    <ram:ApplicableHeaderTradeSettlement>
+      <ram:InvoiceCurrencyCode>EUR</ram:InvoiceCurrencyCode>
+      <ram:ApplicableTradeTax><ram:CalculatedAmount>${tax.toFixed(2)}</ram:CalculatedAmount><ram:TypeCode>VAT</ram:TypeCode><ram:BasisAmount>${net.toFixed(2)}</ram:BasisAmount><ram:CategoryCode>S</ram:CategoryCode><ram:RateApplicablePercent>${RATE}</ram:RateApplicablePercent></ram:ApplicableTradeTax>
+      <ram:SpecifiedTradeSettlementHeaderMonetarySummation>
+        <ram:LineTotalAmount>${net.toFixed(2)}</ram:LineTotalAmount><ram:TaxBasisTotalAmount>${net.toFixed(2)}</ram:TaxBasisTotalAmount>
+        <ram:TaxTotalAmount currencyID="EUR">${tax.toFixed(2)}</ram:TaxTotalAmount><ram:GrandTotalAmount>${gross.toFixed(2)}</ram:GrandTotalAmount><ram:DuePayableAmount>${gross.toFixed(2)}</ram:DuePayableAmount>
+      </ram:SpecifiedTradeSettlementHeaderMonetarySummation>
+    </ram:ApplicableHeaderTradeSettlement>
+  </rsm:SupplyChainTradeTransaction>
+</rsm:CrossIndustryInvoice>`;
+}
+function downloadEInvoice(id){const o=S.ord.find(x=>x.id===id);if(!o)return;const w=ensureWorkshop();
+  if(!w.ustId&&!w.taxNr){ if(!confirm('Für eine gültige E-Rechnung fehlt USt-IdNr/Steuernummer (Einstellungen → Werkstatt-Account). Trotzdem als Entwurf erzeugen?'))return; }
+  const xml=genEInvoiceXML(o); const blob=new Blob([xml],{type:'application/xml'}); const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob); a.download='E-Rechnung-'+o.nr+'.xml'; document.body.appendChild(a); a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},100); toast('E-Rechnung (EN16931-XML) erzeugt: '+o.nr);}
 function printWarranty(id){const o=S.ord.find(x=>x.id===id);const c=cust(o.cid);
   const start=o.pickedAt||o.readyAt||today();const until=addMonths(start,o.warranty);
   printHTML('Garantie '+o.nr, shopHead()+`<h2>Garantie-Nachweis</h2><div class="muted">Auftrag ${o.nr}</div>
@@ -2410,7 +2465,9 @@ views.einstellungen=function(){
        <div class="muted" style="font-size:12px;margin-top:2px">Werkstatt-ID <span class="mono">${esc(w.id)}</span> · Kürzel <span class="mono">${esc(w.slug)}</span> · ${members} Nutzer · seit ${fmtDate(w.createdAt)}</div></div>
        <span class="pill soft" title="Datenschicht bereit für Server-Anbindung"><span class="d"></span>Läuft lokal · server-bereit</span></div>
      <div class="grid g2" style="margin-top:12px"><div><label class="f">Account-Name (Werkstatt)</label><input class="in" value="${esc(w.name)}" onchange="wsSet('name',this.value)"></div>
-       <div><label class="f">Account-E-Mail (Login)</label><input class="in" value="${esc(w.email||'')}" placeholder="werkstatt@mail.de" onchange="wsSet('email',this.value)"></div></div>
+       <div><label class="f">Account-E-Mail (Login)</label><input class="in" value="${esc(w.email||'')}" placeholder="werkstatt@mail.de" onchange="wsSet('email',this.value)"></div>
+       <div><label class="f">Steuernummer</label><input class="in" value="${esc(w.taxNr||'')}" placeholder="12/345/67890" onchange="wsSet('taxNr',this.value)"></div>
+       <div><label class="f">USt-IdNr (für E-Rechnung)</label><input class="in" value="${esc(w.ustId||'')}" placeholder="DE123456789" onchange="wsSet('ustId',this.value)"></div></div>
      <div class="note" style="margin-top:10px">Dieser Account trennt Ihre Daten von anderen Werkstätten (Mandantentrennung). Aktuell lokal auf diesem Gerät – beim Live-Schalten wird daraus ein echter Online-Login, ohne dass sich für Sie etwas ändert.</div>
    </div>`;})()}
    <div class="grid g2" style="margin-top:16px">
@@ -2546,6 +2603,14 @@ views.einstellungen=function(){
        ${nt.waOn?`<div class="grid g2" style="margin-top:10px"><div><label class="f">WhatsApp-Business-Nummer</label><input class="in" value="${esc(nt.waNumber||'')}" placeholder="+49 …" onchange="ensureSettings().notify.waNumber=this.value;save()"></div><div><label class="f">Business-API-Token</label><input class="in" type="password" placeholder="EAAG… (Meta Cloud API)" onchange="ensureSettings().notify.waToken=this.value;save()"></div></div>`:''}
        <div class="note" style="margin-top:10px">Kanäle je Status (E-Mail/SMS/<b>WhatsApp</b>) schaltest du unter „Status &amp; Automatisierungen"; Vorlagen im Reiter „Erinnerungen".</div>
        <div class="row" style="margin-top:12px"><button class="btn" onclick="toast('Testnachricht gesendet (Demo)')">Testnachricht senden</button></div>`;})()}
+     </div>
+     <div class="card"><b>Hardware & Drucker</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Barcode-Scanner, Etiketten- und Bondrucker anbinden. Prototyp – Druck läuft über den Browser (echte Anbindung via QZ Tray beim Live-Schalten).</p>
+       ${(function(){const h=ensureHardware();return `
+       <div class="integ" style="justify-content:space-between"><div style="display:flex;gap:12px;align-items:center"><div class="lg">QZ</div><div><b>QZ Tray (Druckbrücke)</b><div class="muted" style="font-size:12px">${h.qz?'Verbunden – Direktdruck aktiv':'Nicht verbunden'}</div></div></div><button class="switch ${h.qz?'on':''}" onclick="hwSet('qz',!ensureHardware().qz)"><i></i></button></div>
+       <div class="integ" style="justify-content:space-between;margin-top:10px"><div style="display:flex;gap:12px;align-items:center"><div class="lg">⌗</div><div><b>Barcode-Scanner</b><div class="muted" style="font-size:12px">${h.scanner?'aktiv (Tastatur-Emulation)':'deaktiviert'}</div></div></div><button class="switch ${h.scanner?'on':''}" onclick="hwSet('scanner',!ensureHardware().scanner)"><i></i></button></div>
+       <div class="integ" style="justify-content:space-between;margin-top:10px"><div style="display:flex;gap:12px;align-items:center;flex:1;min-width:0"><div class="lg">🏷️</div><div style="flex:1;min-width:0"><b>Etikettendrucker</b><input class="in" style="margin-top:4px;padding:6px 8px" value="${esc(h.labelName||'')}" placeholder="z. B. Brother QL-820" onchange="hwSet('labelName',this.value)"></div></div><button class="switch ${h.labelOn?'on':''}" onclick="hwSet('labelOn',!ensureHardware().labelOn)"><i></i></button></div>
+       <div class="integ" style="justify-content:space-between;margin-top:10px"><div style="display:flex;gap:12px;align-items:center;flex:1;min-width:0"><div class="lg">🧾</div><div style="flex:1;min-width:0"><b>Bondrucker</b><input class="in" style="margin-top:4px;padding:6px 8px" value="${esc(h.receiptName||'')}" placeholder="z. B. Epson TM-m30" onchange="hwSet('receiptName',this.value)"></div></div><button class="switch ${h.receiptOn?'on':''}" onclick="hwSet('receiptOn',!ensureHardware().receiptOn)"><i></i></button></div>
+       <div class="row" style="margin-top:12px;gap:8px"><button class="btn sm" onclick="hwTestLabel()">Test-Etikett</button><button class="btn sm" onclick="hwTestReceipt()">Test-Bon</button></div>`;})()}
      </div>
      <div class="card"><b>Benutzer & Rollen</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Geschäftsführung hat Vollzugriff. Mitarbeiter-Zugriff ist unten frei einstellbar.</p>
        ${S.users.map(u=>`<div class="listitem"><div class="avatar ${u.role==='inhaber'?'':'out'}">${initials(u.name)}</div><div style="flex:1;min-width:0"><b>${esc(u.name)}${u.id===S.userId?' <span class="tag">Du</span>':''}</b><div class="muted" style="font-size:12px">${ROLE_LABEL[u.role]} · ${u.role==='inhaber'?'Vollzugriff':'operativ (kein Umsatz)'}</div></div>
