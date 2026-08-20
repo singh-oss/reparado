@@ -272,10 +272,25 @@ function paintIcons(){document.querySelectorAll('[data-ic]').forEach(e=>{if(!e._
 /* ============================ STATE ============================ */
 const SHOP = {name:"Dein Handy Doc", city:"Balingen", street:"Bahnhofstr. 12", zip:"72336", phone:"07433 9678444", email:"info@deinhandydoc.de", google:"g.page/deinhandydoc/review", hours:"Mo–Fr 9–18 Uhr, Sa 9–13 Uhr", warranty:6};
 const KEY='reparado_v1';
+/* ===== Datenschicht (Track-F-Fundament) =====
+   EINZIGE Stelle für Persistenz. Heute backend='local' (localStorage).
+   Server-Anbindung (letzter Track-F-Schritt): nur hier backend='server' setzen
+   und _push/hydrate implementieren (z. B. Supabase app_data[tenant]) – der Rest
+   der App bleibt unverändert, weil alles über load()/save() → DB läuft. */
+const DB = {
+  key: KEY,
+  backend: 'local',   // 'local' → 'server' bei echter Anbindung
+  tenant: null,       // Werkstatt-/Mandanten-ID im Multi-Tenant-Betrieb
+  read(){ try{ return JSON.parse(localStorage.getItem(this.key)); }catch(e){ return null; } },
+  write(x){ try{ localStorage.setItem(this.key, JSON.stringify(x)); }catch(e){}
+    if(this.backend==='server'){ try{ this._push(x); }catch(e){} } },
+  _push(x){ /* TODO Track F: State asynchron an echten Server senden (app_data[tenant]) */ },
+  hydrate(cb){ /* TODO Track F: State vom Server laden → Cache ersetzen → cb(); lokal: no-op */ if(cb)cb(); }
+};
 let S = load();
 
-function load(){ try{const r=JSON.parse(localStorage.getItem(KEY)); if(r&&r.v===11) return r;}catch(e){} const s=seed(); save(s); return s; }
-function save(x){ localStorage.setItem(KEY, JSON.stringify(x||S)); }
+function load(){ const r=DB.read(); if(r&&r.v===11) return r; const s=seed(); save(s); return s; }
+function save(x){ DB.write(x||S); }
 function uid(p){ return p+Math.random().toString(36).slice(2,7); }
 
 function seed(){
