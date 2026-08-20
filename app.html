@@ -1378,6 +1378,32 @@ function printKVA(id){const o=S.ord.find(x=>x.id===id);const c=cust(o.cid);
   }
 
 /* ============================ KALENDER ============================ */
+/* Kalender-Sync (Repender-Punkt) – Google/Apple/Outlook 2-Wege simuliert; .ics-Export ist ECHT funktionsfähig. */
+const CAL_PROVIDERS=[['google','Google Kalender','G'],['apple','Apple Kalender','A'],['outlook','Outlook','O']];
+function ensureCalSync(){ if(!S.calSync){S.calSync={google:{connected:false,dir:'both'},apple:{connected:false,dir:'both'},outlook:{connected:false,dir:'both'},lastSync:''};save();} return S.calSync; }
+function calSyncConnect(p){const cs=ensureCalSync();cs[p].connected=true;cs.lastSync=today();save();views.kalender();paintIcons();toast(CAL_PROVIDERS.find(x=>x[0]===p)[1]+' verbunden – Termine werden abgeglichen');}
+function calSyncDisconnect(p){const cs=ensureCalSync();cs[p].connected=false;save();views.kalender();paintIcons();toast(CAL_PROVIDERS.find(x=>x[0]===p)[1]+' getrennt');}
+function calSyncDir(p,d){const cs=ensureCalSync();cs[p].dir=d;save();views.kalender();paintIcons();}
+function calSyncNow(){const cs=ensureCalSync();const conn=CAL_PROVIDERS.filter(x=>cs[x[0]].connected);if(!conn.length){toast('Kein Kalender verbunden');return;}cs.lastSync=today();const n=visibleOrders().filter(o=>o.appt).length;save();views.kalender();paintIcons();toast(n+' Termine synchronisiert ('+conn.map(x=>x[1]).join(', ')+')');}
+function calICS(){ const pad=n=>String(n).padStart(2,'0'); const now=new Date();
+  const stamp=now.getUTCFullYear()+pad(now.getUTCMonth()+1)+pad(now.getUTCDate())+'T'+pad(now.getUTCHours())+pad(now.getUTCMinutes())+pad(now.getUTCSeconds())+'Z';
+  const ev=visibleOrders().filter(o=>o.appt).map(o=>{const c=cust(o.cid);const d=o.appt.replace(/-/g,'');const nx=new Date(o.appt+'T00:00:00');nx.setDate(nx.getDate()+1);const dn=nx.getFullYear()+pad(nx.getMonth()+1)+pad(nx.getDate());
+    return ['BEGIN:VEVENT','UID:'+o.id+'@reparado','DTSTAMP:'+stamp,'DTSTART;VALUE=DATE:'+d,'DTEND;VALUE=DATE:'+dn,'SUMMARY:Termin: '+(c.name||'Kunde')+' · '+oDevLabel(o),'DESCRIPTION:Auftrag '+o.nr+' · '+oIssueLabel(o),'END:VEVENT'].join('\r\n');});
+  return ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Reparado//Werkstatt//DE','CALSCALE:GREGORIAN','X-WR-CALNAME:'+ensureWorkshop().name+' Termine',...ev,'END:VCALENDAR'].join('\r\n');
+}
+function downloadICS(){const ics=calICS();const blob=new Blob([ics],{type:'text/calendar'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='reparado-termine.ics';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},100);toast('Kalender exportiert (.ics) – in jeden Kalender importierbar');}
+function calSubscribeUrl(){return widgetBase()+'/kalender/'+ensureWorkshop().slug+'.ics';}
+function calSyncCard(){const cs=ensureCalSync();const anyConn=CAL_PROVIDERS.some(x=>cs[x[0]].connected);
+  return `<div class="card" style="margin-top:16px"><div class="between"><b>Kalender-Synchronisierung</b>${anyConn?`<span class="pill soft"><span class="d"></span>zuletzt ${fmtDate(cs.lastSync)}</span>`:''}</div>
+     <p class="muted" style="font-size:12px;margin:4px 0 12px">Termine automatisch mit Google, Apple &amp; Outlook abgleichen (2-Wege). Prototyp – die Live-Verbindung wird beim Live-Schalten aktiviert; der <b>.ics-Export unten funktioniert schon jetzt</b>.</p>
+     ${CAL_PROVIDERS.map(([k,lbl,ab])=>{const c=cs[k];return `<div class="integ" style="justify-content:space-between;margin-bottom:8px"><div style="display:flex;gap:12px;align-items:center"><div class="lg">${ab}</div><div><b>${lbl}</b><div class="muted" style="font-size:12px">${c.connected?('Verbunden · '+(c.dir==='both'?'2-Wege':(c.dir==='push'?'nur exportieren':'nur importieren'))):'Nicht verbunden'}</div></div></div>
+       <div class="row" style="gap:6px">${c.connected?`<select class="in" style="width:auto;padding:5px 8px" onchange="calSyncDir('${k}',this.value)"><option value="both" ${c.dir==='both'?'selected':''}>2-Wege</option><option value="push" ${c.dir==='push'?'selected':''}>nur exportieren</option><option value="pull" ${c.dir==='pull'?'selected':''}>nur importieren</option></select><button class="btn sm gho" onclick="calSyncDisconnect('${k}')">Trennen</button>`:`<button class="btn sm pri" onclick="calSyncConnect('${k}')">Verbinden</button>`}</div></div>`;}).join('')}
+     <div class="row" style="margin-top:6px;gap:8px;flex-wrap:wrap">${anyConn?`<button class="btn sm" onclick="calSyncNow()">Jetzt synchronisieren</button>`:''}<button class="btn sm pri" onclick="downloadICS()">Kalender exportieren (.ics)</button></div>
+     <label class="f" style="margin-top:12px">Abo-Link (in Kalender-App abonnieren)</label>
+     <div class="row"><input class="in" style="flex:1" readonly value="${esc(calSubscribeUrl())}" onclick="this.select();copyStr(this.value)"><button class="btn sm" onclick="copyStr(calSubscribeUrl())">Kopieren</button></div>
+     <div class="muted" style="font-size:11px;margin-top:4px">Abo-Link (Live-Aktualisierung) wird mit dem Server scharfgeschaltet; der .ics-Export ist sofort nutzbar.</div>
+   </div>`;
+}
 views.kalender=function(){
   const m=document.getElementById('main');
   const base=new Date(); base.setDate(1);
@@ -1403,7 +1429,8 @@ views.kalender=function(){
    <div class="card" style="margin-top:16px">
      <div class="grid" style="grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:8px">${['Mo','Di','Mi','Do','Fr','Sa','So'].map(d=>`<div class="muted" style="font-size:12px;font-weight:700;text-align:center">${d}</div>`).join('')}</div>
      <div class="grid" style="grid-template-columns:repeat(7,1fr);gap:6px">${cells}</div>
-   </div>`;
+   </div>
+   ${calSyncCard()}`;
 };
 
 /* ============================ KUNDEN ============================ */
