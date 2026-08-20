@@ -55,6 +55,8 @@
   .chk input{margin-top:2px}
   .callnow{display:flex;align-items:center;gap:10px;background:var(--soft);border-radius:12px;padding:12px 14px;margin-bottom:18px;font-size:14px}
   .callnow a{color:#0e7a3c;font-weight:800;text-decoration:none;margin-left:auto}
+  body.embedded{background:transparent}
+  body.embedded .top{position:static}
 </style>
 </head>
 <body>
@@ -139,11 +141,17 @@ function submit(){
   if(!document.getElementById('dsg').checked){alert('Bitte bestätigen Sie die Verarbeitung Ihrer Angaben.');return;}
   if(state.contact==='E-Mail'&&!state.mail){alert('Bitte eine E-Mail-Adresse angeben.');return;}
   let arr=[];try{arr=JSON.parse(localStorage.getItem('reparado_requests')||'[]');}catch(e){}
-  arr.push({name:state.name,tel:state.tel,mail:state.mail,type:state.type,brand:state.brand,model:state.model,issue:state.issue,problem:state.problem,contact:state.contact,besttime:state.besttime,ts:Date.now()});
+  const rq={name:state.name,tel:state.tel,mail:state.mail,type:state.type,brand:state.brand,model:state.model,issue:state.issue,problem:state.problem,contact:state.contact,besttime:state.besttime,ts:Date.now()};
+  arr.push(rq);
   localStorage.setItem('reparado_requests',JSON.stringify(arr));
+  if(window.parent!==window){try{window.parent.postMessage({reparadoRequest:rq},'*');}catch(e){}}
   setStep(4);
 }
 function reset(){Object.assign(state,{step:1,type:'',brand:'',model:'',issue:'',problem:'',contact:'Rückruf',besttime:'',name:'',tel:'',mail:''});[1,2,3].forEach(i=>document.getElementById('s'+i).classList.toggle('on',i===1));render();}
+function postH(){if(window.parent!==window){try{window.parent.postMessage({reparadoHeight:Math.ceil(document.documentElement.getBoundingClientRect().height)+2},'*');}catch(e){}}}
+try{if(window.ResizeObserver)new ResizeObserver(postH).observe(document.body);}catch(e){}
+window.addEventListener('load',postH);window.addEventListener('resize',postH);
+if(new URLSearchParams(location.search).get('embed')==='1')document.body.classList.add('embedded');
 render();
 </script>
 </body>

@@ -2431,10 +2431,15 @@ views.einstellungen=function(){
          <div><label class="f">Höhe (px)</label><input class="in" type="number" value="${w.height}" onchange="setWidget('height',+this.value||900)"></div>
          <div><label class="f">Auto-Höhe</label><button class="switch ${w.autoresize?'on':''}" style="margin-top:6px" onclick="setWidget('autoresize',!ensureWidget().autoresize)"><i></i></button></div>
        </div>
+       <label class="f" style="margin-top:12px">Basis-URL (wo Buchung/Anfrage gehostet sind)</label>
+       <input class="in" value="${esc(w.embedBase||'')}" placeholder="${esc(widgetBase())}" onchange="setWidget('embedBase',this.value.trim())">
+       <div class="muted" style="font-size:12px;margin-top:4px">Leer lassen = automatisch erkannt: <span class="mono">${esc(widgetBase())}</span>. Später eigene Domain eintragen (z. B. https://ihre-werkstatt.de).</div>
+       <label class="f" style="margin-top:14px">Live-Vorschau (so sieht es auf Ihrer Website aus)</label>
+       <div style="border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--soft)"><iframe src="${widgetUrl('buchung')}" style="width:100%;height:${Math.min(w.height,560)}px;border:0" title="Vorschau"></iframe></div>
        <label class="f" style="margin-top:14px">Einbett-Code · Buchung</label>
        <textarea class="in" rows="3" readonly style="font-family:ui-monospace,monospace;font-size:12px">${esc(widgetEmbed('buchung'))}</textarea>
        <div class="row" style="margin-top:8px"><button class="btn sm" onclick="copyEmbed('buchung')">Buchungs-Code kopieren</button><button class="btn sm" onclick="copyEmbed('anfrage')">Anfrage-Code kopieren</button><button class="btn sm" onclick="copyStr(widgetUrl('buchung'))">Direktlink kopieren</button></div>
-       <div class="note" style="margin-top:14px"><b>WordPress?</b> Laden Sie das fertige Plugin herunter und laden es unter <i>Plugins → Installieren → Plugin hochladen</i> hoch. Danach überall per Shortcode: <span class="mono">[reparado]</span> (Buchung) oder <span class="mono">[reparado typ="anfrage"]</span>.</div>
+       <div class="note" style="margin-top:14px"><b>WordPress?</b> Laden Sie das fertige Plugin herunter und laden es unter <i>Plugins → Installieren → Plugin hochladen</i> hoch. Danach überall per Shortcode: <span class="mono">[reparado]</span> (Buchung) oder <span class="mono">[reparado typ="anfrage"]</span>. Der Einbett-Code funktioniert auf jeder Website (auch Wix, Jimdo, HTML) – Auto-Höhe inklusive.</div>
        <div class="row" style="margin-top:10px"><button class="btn pri" onclick="downloadWpPlugin()">WordPress-Plugin herunterladen</button><input class="in" style="flex:1" readonly value='[reparado typ="buchung"]' onclick="this.select();copyStr(this.value)"></div>
      </div>`;})()}
      <div class="card"><b>Garantie & Belege</b>
@@ -3082,8 +3087,9 @@ function addDaysStr(n){const x=new Date();x.setDate(x.getDate()+n);return x.toIS
 
 let empfFilter='alle', simChannel='anruf', simAfter=false;
 /* P10 – Website-Widget: Embed-Code, Konfiguration & WordPress-Plugin */
-function ensureWidget(){ if(!S.widget){ S.widget={slug:'dein-handy-doc',accent:'#0e7a3c',show:{preise:true,buchung:true,anfrage:true},height:900,autoresize:true}; save(); } return S.widget; }
-function widgetUrl(typ){ const w=ensureWidget(); const base='https://reparado.de/'+(typ==='anfrage'?'anfrage':'buchen')+'/'+w.slug; return base+'?accent='+encodeURIComponent(w.accent.replace('#','')); }
+function ensureWidget(){ if(!S.widget){ S.widget={slug:'dein-handy-doc',accent:'#0e7a3c',show:{preise:true,buchung:true,anfrage:true},height:900,autoresize:true,embedBase:''}; save(); } if(S.widget.embedBase===undefined){S.widget.embedBase='';save();} return S.widget; }
+function widgetBase(){ const w=ensureWidget(); if(w.embedBase&&w.embedBase.trim()) return w.embedBase.trim().replace(/\/+$/,''); try{ return new URL('.',location.href).href.replace(/\/+$/,''); }catch(e){ return location.origin; } }
+function widgetUrl(typ){ const w=ensureWidget(); const page=(typ==='anfrage'?'anfrage':'booking')+'.html'; return widgetBase()+'/'+page+'?embed=1&accent='+encodeURIComponent(w.accent.replace('#','')); }
 function widgetEmbed(typ){ const w=ensureWidget(); const id='reparado-'+typ; const url=widgetUrl(typ);
   const resize=w.autoresize?`\n<script>window.addEventListener('message',function(e){if(e.data&&e.data.reparadoHeight){var f=document.getElementById('${id}');if(f)f.style.height=e.data.reparadoHeight+'px';}});<\/script>`:'';
   return `<iframe id="${id}" src="${url}" style="width:100%;height:${w.height}px;border:0;border-radius:16px;box-shadow:0 2px 14px rgba(0,0,0,.08)" loading="lazy" title="${typ==='anfrage'?'Reparatur anfragen':'Termin buchen'}"><\/iframe>`+resize; }
@@ -3101,9 +3107,9 @@ function downloadWpPlugin(){
    +'*/\n'
    +"if(!defined('ABSPATH'))exit;\n"
    +"function reparado_widget($atts){\n"
-   +"  $a=shortcode_atts(array('typ'=>'buchung','slug'=>'"+w.slug+"','accent'=>'"+w.accent.replace('#','')+"','hoehe'=>'"+w.height+"'),$atts,'reparado');\n"
-   +"  $pfad=($a['typ']==='anfrage')?'anfrage':'buchen';\n"
-   +"  $url='https://reparado.de/'.$pfad.'/'.rawurlencode($a['slug']).'?accent='.rawurlencode($a['accent']);\n"
+   +"  $a=shortcode_atts(array('typ'=>'buchung','basis'=>'"+widgetBase()+"','accent'=>'"+w.accent.replace('#','')+"','hoehe'=>'"+w.height+"'),$atts,'reparado');\n"
+   +"  $page=($a['typ']==='anfrage')?'anfrage.html':'booking.html';\n"
+   +"  $url=rtrim($a['basis'],'/').'/'.$page.'?embed=1&accent='.rawurlencode($a['accent']);\n"
    +"  $id='reparado-'.esc_attr($a['typ']);\n"
    +"  $out ='<iframe id=\"'.$id.'\" src=\"'.esc_url($url).'\" style=\"width:100%;height:'.intval($a['hoehe']).'px;border:0;border-radius:16px\" loading=\"lazy\"></iframe>';\n"
    +"  $out.='<scr'+'ipt>window.addEventListener(\"message\",function(e){if(e.data&&e.data.reparadoHeight){var f=document.getElementById(\"'.$id.'\");if(f)f.style.height=e.data.reparadoHeight+\"px\";}});<\\/scr'+'ipt>';\n"

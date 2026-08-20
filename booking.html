@@ -47,6 +47,9 @@
   .done .ck{width:64px;height:64px;border-radius:50%;background:#0e7a3c;color:#fff;display:grid;place-items:center;margin:0 auto 18px}
   .note{background:var(--soft);border-radius:12px;padding:12px 14px;font-size:13px;color:#444;margin-top:16px}
   .foot{text-align:center;color:var(--ink2);font-size:13px;margin-top:26px}
+  body.embedded{background:transparent}
+  body.embedded .top{position:static}
+  body.embedded .wrap{padding-top:16px}
 </style>
 </head>
 <body>
@@ -128,11 +131,19 @@ function submit(){
   if(!state.name||!state.tel){alert('Bitte Name und Telefon angeben.');return;}
   // Prototyp: Buchung in gemeinsamen Speicher legen -> erscheint in der App unter Aufträge
   let arr=[];try{arr=JSON.parse(localStorage.getItem('reparado_bookings')||'[]');}catch(e){}
-  arr.push({name:state.name,tel:state.tel,mail:state.mail,brand:state.brand,model:state.model,issue:state.issue,price:state.price,appt:state.appt,ts:Date.now()});
+  const bk={name:state.name,tel:state.tel,mail:state.mail,brand:state.brand,model:state.model,issue:state.issue,price:state.price,appt:state.appt,ts:Date.now()};
+  arr.push(bk);
   localStorage.setItem('reparado_bookings',JSON.stringify(arr));
+  // Einbettung: Buchung auch an die Host-Website melden (echte Anbindung kann sie serverseitig übernehmen)
+  if(window.parent!==window){try{window.parent.postMessage({reparadoBooking:bk},'*');}catch(e){}}
   setStep(5);
 }
 function reset(){Object.assign(state,{step:1,brand:'',model:'',issue:'',price:0,appt:'',time:'',name:'',tel:'',mail:''});[1,2,3,4].forEach(i=>document.getElementById('s'+i).classList.toggle('on',i===1));render();}
+/* Einbettung: Höhe an die Host-Website melden (Auto-Resize) */
+function postH(){if(window.parent!==window){try{window.parent.postMessage({reparadoHeight:Math.ceil(document.documentElement.getBoundingClientRect().height)+2},'*');}catch(e){}}}
+try{if(window.ResizeObserver)new ResizeObserver(postH).observe(document.body);}catch(e){}
+window.addEventListener('load',postH);window.addEventListener('resize',postH);
+if(new URLSearchParams(location.search).get('embed')==='1')document.body.classList.add('embedded');
 render();
 </script>
 </body>
