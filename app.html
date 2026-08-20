@@ -225,7 +225,7 @@
 
 <div id="loginScreen"><div class="loginbox">
   <div class="loginbrand"><span class="dot">R</span> Reparado</div>
-  <div class="muted" style="margin-bottom:20px">Anmeldung · Dein Handy Doc</div>
+  <div class="muted" style="margin-bottom:20px" id="loginWs">Anmeldung · Dein Handy Doc</div>
   <div id="loginStep"></div>
   <div class="loginhint">Demo-PINs · Geschäftsführung <b>1234</b> · Mitarbeiter <b>0000</b></div>
 </div></div>
@@ -503,7 +503,7 @@ function statusLabel(k){return statusDef(k).label;}
 function statusColor(k){return statusDef(k).color||'#6b7280';}
 function statusFlow(){return ensureStatuses().filter(s=>s.active).map(s=>s.key);}
 function statusPill(s){const d=statusDef(s);return `<span class="pill" style="border-color:${d.color};color:${d.color}"><span class="d" style="background:${d.color}"></span>${esc(d.label)}</span>`;}
-function statusNotify(o,def){const c=cust(o.cid);const tpl=def.tpl||('Guten Tag {kunde}, Ihr {geraet} (Auftrag {auftrag}) hat einen neuen Status: '+def.label+'.');const rendered=renderTemplate({subj:'Statusupdate: '+def.label,body:tpl,who:'kunde'},o);const ch=(def.email&&def.sms)?'E-Mail+SMS':(def.email?'E-Mail':'SMS');S.mailLog.unshift({t:new Date().toISOString(),to:c.name,ch:ch,rule:'Status: '+def.label,subj:rendered.subj,how:'automatisch (Status)'});save();}
+function statusNotify(o,def){const c=cust(o.cid);const tpl=def.tpl||('Guten Tag {kunde}, Ihr {geraet} (Auftrag {auftrag}) hat einen neuen Status: '+def.label+'.');const rendered=renderTemplate({subj:'Statusupdate: '+def.label,body:tpl,who:'kunde'},o);const chans=[];if(def.email)chans.push('E-Mail');if(def.sms)chans.push('SMS');if(def.wa)chans.push('WhatsApp');const ch=chans.join('+')||'SMS';S.mailLog.unshift({t:new Date().toISOString(),to:c.name,ch:ch,rule:'Status: '+def.label,subj:rendered.subj,how:'automatisch (Status)'});save();}
 function statSet(k,f,v){const s=statusDef(k);if(s){s[f]=v;save();}}
 function statToggle(k,f){const s=statusDef(k);if(s){s[f]=!s[f];save();views.einstellungen();paintIcons();}}
 function statMove(k,dir){const l=ensureStatuses();const i=l.findIndex(s=>s.key===k);const j=i+dir;if(i<0||j<0||j>=l.length)return;const t=l[i];l[i]=l[j];l[j]=t;save();views.einstellungen();paintIcons();}
@@ -556,6 +556,12 @@ const ROLE_LABEL={inhaber:'Geschäftsführung',mitarbeiter:'Mitarbeiter'};
 const MA_HIDDEN=['statistik','buchhaltung','einstellungen','ankauf'];
 function curUser(){return (S.users||[]).find(u=>u.id===S.userId)||null;}
 function curRole(){const u=curUser();return u?u.role:'inhaber';}
+/* Werkstatt-Account (Mandant) – Track-F-Fundament. Lokal jetzt, echter Login beim Server-Schritt. */
+function ensureWorkshop(){ if(!S.workshop){ S.workshop={id:'ws_'+Math.random().toString(36).slice(2,8),name:SHOP.name,email:SHOP.email,phone:SHOP.phone,slug:'dein-handy-doc',plan:'pro',status:'active',createdAt:today()}; save(); }
+  if(!S.workshop.id){S.workshop.id='ws_'+Math.random().toString(36).slice(2,8);save();}
+  DB.tenant=S.workshop.id; return S.workshop; }
+function wsSet(k,v){const w=ensureWorkshop();w[k]=v;save();}
+const PLAN_LBL={basic:'Basic',plus:'Plus',pro:'Pro'};
 function maHidden(){return (S.settings&&S.settings.maHidden)?S.settings.maHidden:MA_HIDDEN;}
 function canView(v){return curRole()==='inhaber'?true:maHidden().indexOf(v)<0;}
 function toggleMaView(v){const s=ensureSettings();s.maHidden=s.maHidden||MA_HIDDEN.slice();const i=s.maHidden.indexOf(v);if(i<0)s.maHidden.push(v);else s.maHidden.splice(i,1);save();views.einstellungen();paintIcons();}
@@ -569,7 +575,7 @@ function renderSideUser(){const el=document.getElementById('sideUser');if(!el)re
 }
 function logout(){S.userId=null;save();showLogin();}
 let _loginPin='', _loginUser=null;
-function showLogin(){_loginUser=null;_loginPin='';loginRenderUsers();document.getElementById('loginScreen').classList.add('show');}
+function showLogin(){_loginUser=null;_loginPin='';const w=ensureWorkshop();const el=document.getElementById('loginWs');if(el)el.textContent='Anmeldung · '+(w.name||'Werkstatt');loginRenderUsers();document.getElementById('loginScreen').classList.add('show');}
 function hideLogin(){document.getElementById('loginScreen').classList.remove('show');}
 function loginRenderUsers(){document.getElementById('loginStep').innerHTML=`<div class="muted" style="font-size:13px;margin-bottom:12px">Wer bist du?</div>`+(S.users||[]).map(u=>`<button class="usertile" onclick="loginPick('${u.id}')"><div class="avatar">${initials(u.name)}</div><div style="flex:1"><div style="font-weight:700">${esc(u.name)}</div><div class="muted" style="font-size:12px">${ROLE_LABEL[u.role]}</div></div><span class="ic" data-ic="chevron"></span></button>`).join('');paintIcons();}
 function loginPick(id){_loginUser=(S.users||[]).find(u=>u.id===id);_loginPin='';loginRenderPin();}
@@ -739,7 +745,7 @@ function aufSelCount(){return Object.keys(aufSel).filter(k=>aufSel[k]).length;}
 function aufToggleSel(id){aufSel[id]=!aufSel[id];views.auftraege();paintIcons();}
 function aufSelAll(ids,on){ids.forEach(id=>aufSel[id]=on);views.auftraege();paintIcons();}
 function sortOrders(list){const l=list.slice();if(aufSort==='neu')l.sort((a,b)=>(b.created||'').localeCompare(a.created||'')||String(b.nr).localeCompare(String(a.nr)));else if(aufSort==='alt')l.sort((a,b)=>(a.created||'').localeCompare(b.created||'')||String(a.nr).localeCompare(String(b.nr)));else if(aufSort==='preis')l.sort((a,b)=>oTotal(b)-oTotal(a));else if(aufSort==='faellig')l.sort((a,b)=>(a.due||'zzzz').localeCompare(b.due||'zzzz'));return l;}
-function setStatusRow(id,s){const o=S.ord.find(x=>x.id===id);if(!o)return;o.status=s;if(s==='fertig'&&!o.readyAt)o.readyAt=today();if(s==='abgeholt')o.pickedAt=today();save();const def=statusDef(s);const notified=!!(def&&(def.email||def.sms));if(notified)statusNotify(o,def);toast('Status: '+statusLabel(s)+(notified?' · Kunde benachrichtigt':''));views.auftraege();paintIcons();refreshBadges();}
+function setStatusRow(id,s){const o=S.ord.find(x=>x.id===id);if(!o)return;o.status=s;if(s==='fertig'&&!o.readyAt)o.readyAt=today();if(s==='abgeholt')o.pickedAt=today();save();const def=statusDef(s);const notified=!!(def&&(def.email||def.sms||def.wa));if(notified)statusNotify(o,def);toast('Status: '+statusLabel(s)+(notified?' · Kunde benachrichtigt':''));views.auftraege();paintIcons();refreshBadges();}
 function archiveOrder(id){const o=S.ord.find(x=>x.id===id);if(o){o.archived=true;save();closeAll();toast('Auftrag archiviert');views.auftraege();paintIcons();refreshBadges();}}
 function trashOrder(id){const o=S.ord.find(x=>x.id===id);if(o){o.trashed=true;save();closeAll();toast('In den Papierkorb verschoben');views.auftraege();paintIcons();refreshBadges();}}
 function restoreOrder(id){const o=S.ord.find(x=>x.id===id);if(o){o.trashed=false;o.archived=false;save();toast('Wiederhergestellt');views.auftraege();paintIcons();refreshBadges();}}
@@ -750,7 +756,7 @@ function aufBulk(action){const ids=Object.keys(aufSel).filter(k=>aufSel[k]);if(!
   else if(action==='restore'){ids.forEach(id=>{const o=S.ord.find(x=>x.id===id);if(o){o.trashed=false;o.archived=false;}});toast(ids.length+' wiederhergestellt');}
   else if(action==='delete'){if(!confirm(ids.length+' Aufträge endgültig löschen?'))return;S.ord=S.ord.filter(x=>!aufSel[x.id]);toast(ids.length+' gelöscht');}
   aufSel={};save();views.auftraege();paintIcons();refreshBadges();}
-function aufBulkStatus(s){const ids=Object.keys(aufSel).filter(k=>aufSel[k]);ids.forEach(id=>{const o=S.ord.find(x=>x.id===id);if(o){o.status=s;if(s==='fertig'&&!o.readyAt)o.readyAt=today();if(s==='abgeholt')o.pickedAt=today();const def=statusDef(s);if(def&&(def.email||def.sms))statusNotify(o,def);}});aufSel={};save();toast(ids.length+' auf „'+statusLabel(s)+'" gesetzt');views.auftraege();paintIcons();refreshBadges();}
+function aufBulkStatus(s){const ids=Object.keys(aufSel).filter(k=>aufSel[k]);ids.forEach(id=>{const o=S.ord.find(x=>x.id===id);if(o){o.status=s;if(s==='fertig'&&!o.readyAt)o.readyAt=today();if(s==='abgeholt')o.pickedAt=today();const def=statusDef(s);if(def&&(def.email||def.sms||def.wa))statusNotify(o,def);}});aufSel={};save();toast(ids.length+' auf „'+statusLabel(s)+'" gesetzt');views.auftraege();paintIcons();refreshBadges();}
 function kanCard(o){const c=cust(o.cid);const prioTag=(o.prio&&o.prio!=='Standard')?` <span class="tag">${esc(o.prio)}</span>`:'';const tech=o.technikerId?(S.users.find(u=>u.id===o.technikerId)||{}).name:'';
   return `<div class="kancard" draggable="true" ondragstart="__kanDrag='${o.id}';this.style.opacity=.5" ondragend="this.style.opacity=1" onclick="openOrder('${o.id}')" style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.06)">
     <div class="between"><b style="font-size:13px">${o.nr}</b><span class="mono" style="font-size:12px">${eur(oTotal(o))}</span></div>
@@ -887,7 +893,7 @@ function setStatus(id,s){
   if(s==='fertig'&&!o.readyAt) o.readyAt=today();
   if(s==='abgeholt') o.pickedAt=today();
   save();
-  const def=statusDef(s); const notified=!!(def&&(def.email||def.sms));
+  const def=statusDef(s); const notified=!!(def&&(def.email||def.sms||def.wa));
   if(notified) statusNotify(o,def);
   toast('Status: '+statusLabel(s)+(notified?' · Kunde benachrichtigt':''));
   openOrder(id); (views[current]||views.dashboard)(); paintIcons(); refreshBadges();
@@ -2399,6 +2405,14 @@ views.einstellungen=function(){
   const m=document.getElementById('main');
   const cashConn=S.cash.connected;
   m.innerHTML=`<div class="between"><div><h1 class="h1">Einstellungen</h1><p class="sub">Stammdaten, Kassen und Integrationen</p></div></div>
+   ${(function(){const w=ensureWorkshop();const members=(S.users||[]).length;return `<div class="card" style="margin-top:16px;border:1px solid var(--green,#0e7a3c)">
+     <div class="between" style="flex-wrap:wrap;gap:10px"><div><b>Werkstatt-Account</b> <span class="tag">${esc(PLAN_LBL[w.plan]||w.plan)}</span> <span class="pill ${w.status==='active'?'soft':'dash'}"><span class="d"></span>${w.status==='active'?'Aktiv':(w.status==='trial'?'Testphase':'Gesperrt')}</span>
+       <div class="muted" style="font-size:12px;margin-top:2px">Werkstatt-ID <span class="mono">${esc(w.id)}</span> · Kürzel <span class="mono">${esc(w.slug)}</span> · ${members} Nutzer · seit ${fmtDate(w.createdAt)}</div></div>
+       <span class="pill soft" title="Datenschicht bereit für Server-Anbindung"><span class="d"></span>Läuft lokal · server-bereit</span></div>
+     <div class="grid g2" style="margin-top:12px"><div><label class="f">Account-Name (Werkstatt)</label><input class="in" value="${esc(w.name)}" onchange="wsSet('name',this.value)"></div>
+       <div><label class="f">Account-E-Mail (Login)</label><input class="in" value="${esc(w.email||'')}" placeholder="werkstatt@mail.de" onchange="wsSet('email',this.value)"></div></div>
+     <div class="note" style="margin-top:10px">Dieser Account trennt Ihre Daten von anderen Werkstätten (Mandantentrennung). Aktuell lokal auf diesem Gerät – beim Live-Schalten wird daraus ein echter Online-Login, ohne dass sich für Sie etwas ändert.</div>
+   </div>`;})()}
    <div class="grid g2" style="margin-top:16px">
      <div class="card"><b>Stammdaten</b>
        <div class="grid g2" style="margin-top:12px"><div><label class="f">Firma</label><input class="in" value="${SHOP.name}"></div>
@@ -2502,6 +2516,7 @@ views.einstellungen=function(){
            <input class="in" style="flex:1;min-width:150px" value="${esc(s.label)}" onchange="statSet('${s.key}','label',this.value)">
            <button class="chip ${s.email?'on':''}" onclick="statToggle('${s.key}','email')">E-Mail</button>
            <button class="chip ${s.sms?'on':''}" onclick="statToggle('${s.key}','sms')">SMS</button>
+           <button class="chip ${s.wa?'on':''}" onclick="statToggle('${s.key}','wa')">WhatsApp</button>
            <span class="muted" style="font-size:12px">Aktiv</span><button class="switch ${s.active?'on':''}" onclick="statToggle('${s.key}','active')"><i></i></button>
            <button class="btn sm gho" onclick="statMove('${s.key}',-1)"${i===0?' disabled':''}>↑</button>
            <button class="btn sm gho" onclick="statMove('${s.key}',1)"${i===statusList().length-1?' disabled':''}>↓</button>
@@ -2527,7 +2542,9 @@ views.einstellungen=function(){
        <div><label class="f">SMTP-Passwort</label><input class="in" type="password" placeholder="••••••" onchange="ensureSettings().notify.smtpPass=this.value;save()"></div></div>
        <div class="integ" style="justify-content:space-between;margin-top:12px"><div><b>SMS-Versand</b><div class="muted" style="font-size:12px">${nt.smsOn?'aktiv':'deaktiviert'}</div></div><button class="switch ${nt.smsOn?'on':''}" onclick="ensureSettings().notify.smsOn=!ensureSettings().notify.smsOn;save();views.einstellungen();paintIcons()"><i></i></button></div>
        ${nt.smsOn?`<label class="f" style="margin-top:10px">SMS-Gateway</label><input class="in" value="${esc(nt.smsGateway||'')}" placeholder="z. B. sipgate / Twilio – API-Key" onchange="ensureSettings().notify.smsGateway=this.value;save()">`:''}
-       <div class="note" style="margin-top:10px">Vorlagen bearbeitest du im Reiter „Erinnerungen" und je Status unter „Status &amp; Automatisierungen".</div>
+       <div class="integ" style="justify-content:space-between;margin-top:12px"><div><b>WhatsApp-Status-Updates</b><div class="muted" style="font-size:12px">${nt.waOn?'aktiv · Status-Nachrichten per WhatsApp':'deaktiviert'}</div></div><button class="switch ${nt.waOn?'on':''}" onclick="ensureSettings().notify.waOn=!ensureSettings().notify.waOn;save();views.einstellungen();paintIcons()"><i></i></button></div>
+       ${nt.waOn?`<div class="grid g2" style="margin-top:10px"><div><label class="f">WhatsApp-Business-Nummer</label><input class="in" value="${esc(nt.waNumber||'')}" placeholder="+49 …" onchange="ensureSettings().notify.waNumber=this.value;save()"></div><div><label class="f">Business-API-Token</label><input class="in" type="password" placeholder="EAAG… (Meta Cloud API)" onchange="ensureSettings().notify.waToken=this.value;save()"></div></div>`:''}
+       <div class="note" style="margin-top:10px">Kanäle je Status (E-Mail/SMS/<b>WhatsApp</b>) schaltest du unter „Status &amp; Automatisierungen"; Vorlagen im Reiter „Erinnerungen".</div>
        <div class="row" style="margin-top:12px"><button class="btn" onclick="toast('Testnachricht gesendet (Demo)')">Testnachricht senden</button></div>`;})()}
      </div>
      <div class="card"><b>Benutzer & Rollen</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Geschäftsführung hat Vollzugriff. Mitarbeiter-Zugriff ist unten frei einstellbar.</p>
@@ -3371,7 +3388,7 @@ function demoDone(){ if(_demoStop)return; const el=document.getElementById('demo
 
 /* ============================ BOOT ============================ */
 paintIcons();
-(function(){ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); ensureInv(); ensureProc(); ensureTrade(); ensureShip(); ensureContracts(); ensureInsurers(); ensureIntegrations(); const n=pullBookings(); const nq=pullRequests(); pullFeedback(); pullWarranty(); go('dashboard'); applyNavRole(); if(!curUser())showLogin();
+(function(){ensureWorkshop(); ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); ensureInv(); ensureProc(); ensureTrade(); ensureShip(); ensureContracts(); ensureInsurers(); ensureIntegrations(); const n=pullBookings(); const nq=pullRequests(); pullFeedback(); pullWarranty(); go('dashboard'); applyNavRole(); if(!curUser())showLogin();
   if(nq) setTimeout(()=>toast(nq+' neue Website-Anfrage'+(nq>1?'n':'')),900);
   if(n) setTimeout(()=>toast(n+' neue Online-Buchung'+(n>1?'en':'')+' übernommen'),500);
 })();
