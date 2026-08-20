@@ -1,0 +1,50 @@
+{
+  "DESIGN-PHILOSOPHY.md": {
+    "mtime": 1786962650.6107657,
+    "seen": 1787209859.249677,
+    "ast_hash": "a820c19ffa7811139d0cd654db6ec305",
+    "semantic_hash": "a820c19ffa7811139d0cd654db6ec305"
+  },
+  "ROADMAP.md": {
+    "mtime": 1787173667.9190502,
+    "seen": 1787209859.249679,
+    "ast_hash": "ae522cee35bad45bf0526c47eb3200de",
+    "semantic_hash": "ae522cee35bad45bf0526c47eb3200de"
+  },
+  "anfrage.html": {
+    "mtime": 1787065608.2643692,
+    "seen": 1787209859.249679,
+    "ast_hash": "a385d1479c797c569ef8655e673ff2a5",
+    "semantic_hash": "a385d1479c797c569ef8655e673ff2a5"
+  },
+  "app.html": {
+    "mtime": 1787173617.4635053,
+    "seen": 1787209859.2496798,
+    "ast_hash": "50056f9edb0ba1a1b9a1eac4b55c13d8",
+    "semantic_hash": "50056f9edb0ba1a1b9a1eac4b55c13d8"
+  },
+  "booking.html": {
+    "mtime": 1786962924.2969491,
+    "seen": 1787209859.2496798,
+    "ast_hash": "20ce4730b3fb36769d254b3d60c5ff74",
+    "semantic_hash": "20ce4730b3fb36769d254b3d60c5ff74"
+  },
+  "index.html": {
+    "mtime": 1786962955.5930839,
+    "seen": 1787209859.249681,
+    "ast_hash": "7e0340cce3586147a0f46a49cd251053",
+    "semantic_hash": "7e0340cce3586147a0f46a49cd251053"
+  },
+  "landing.html": {
+    "mtime": 1786962900.4336321,
+    "seen": 1787209859.249681,
+    "ast_hash": "7e0340cce3586147a0f46a49cd251053",
+    "semantic_hash": "7e0340cce3586147a0f46a49cd251053"
+  },
+  "status.html": {
+    "mtime": 1787088613.4291818,
+    "seen": 1787209859.249681,
+    "ast_hash": "dd6cd5dfb9b5a03d5076c6d97912d668",
+    "semantic_hash": "dd6cd5dfb9b5a03d5076c6d97912d668"
+  }
+}

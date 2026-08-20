@@ -718,7 +718,8 @@ views.dashboard=function(){
 };
 
 /* ============================ AUFTRÄGE ============================ */
-let aufFilter='alle', aufSort='neu', aufView='aktiv', aufSel={};
+let aufFilter='alle', aufSort='neu', aufView='aktiv', aufSel={}, aufLayout='list';
+let __kanDrag=null;
 function aufSelCount(){return Object.keys(aufSel).filter(k=>aufSel[k]).length;}
 function aufToggleSel(id){aufSel[id]=!aufSel[id];views.auftraege();paintIcons();}
 function aufSelAll(ids,on){ids.forEach(id=>aufSel[id]=on);views.auftraege();paintIcons();}
@@ -735,6 +736,25 @@ function aufBulk(action){const ids=Object.keys(aufSel).filter(k=>aufSel[k]);if(!
   else if(action==='delete'){if(!confirm(ids.length+' Aufträge endgültig löschen?'))return;S.ord=S.ord.filter(x=>!aufSel[x.id]);toast(ids.length+' gelöscht');}
   aufSel={};save();views.auftraege();paintIcons();refreshBadges();}
 function aufBulkStatus(s){const ids=Object.keys(aufSel).filter(k=>aufSel[k]);ids.forEach(id=>{const o=S.ord.find(x=>x.id===id);if(o){o.status=s;if(s==='fertig'&&!o.readyAt)o.readyAt=today();if(s==='abgeholt')o.pickedAt=today();const def=statusDef(s);if(def&&(def.email||def.sms))statusNotify(o,def);}});aufSel={};save();toast(ids.length+' auf „'+statusLabel(s)+'" gesetzt');views.auftraege();paintIcons();refreshBadges();}
+function kanCard(o){const c=cust(o.cid);const prioTag=(o.prio&&o.prio!=='Standard')?` <span class="tag">${esc(o.prio)}</span>`:'';const tech=o.technikerId?(S.users.find(u=>u.id===o.technikerId)||{}).name:'';
+  return `<div class="kancard" draggable="true" ondragstart="__kanDrag='${o.id}';this.style.opacity=.5" ondragend="this.style.opacity=1" onclick="openOrder('${o.id}')" style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.06)">
+    <div class="between"><b style="font-size:13px">${o.nr}</b><span class="mono" style="font-size:12px">${eur(oTotal(o))}</span></div>
+    <div style="font-size:13px;margin-top:2px">${esc(oDevLabel(o))}${oDevices(o).length>1?` <span class="tag">${oDevices(o).length}</span>`:''}</div>
+    <div class="muted" style="font-size:12px">${esc(c.name)}${prioTag}${o.source==='online'?' <span class="tag">Online</span>':''}${o.source==='versand'?' <span class="tag">Versand</span>':''}</div>
+    <div class="between" style="margin-top:5px"><span class="muted" style="font-size:11px">Fällig ${fmtDate(o.due)}</span>${tech?`<span class="muted" style="font-size:11px">${esc(tech)}</span>`:''}</div>
+  </div>`;}
+function kanBoard(){
+  const src=visibleOrders(); const cols=statusFlow(); const byS={}; cols.forEach(s=>byS[s]=[]);
+  src.forEach(o=>{(byS[o.status]||(byS[o.status]=[])).push(o);});
+  const colHtml=cols.map(s=>{const c=statusColor(s);const items=sortOrders(byS[s]||[]);
+    return `<div class="kancol" ondragover="event.preventDefault();this.style.background='var(--soft2)'" ondragleave="this.style.background='var(--soft)'" ondrop="this.style.background='var(--soft)';kanDrop(event,'${s}')" style="min-width:250px;flex:1;background:var(--soft);border-radius:12px;padding:10px;border-top:3px solid ${c}">
+      <div class="between" style="margin-bottom:8px"><b style="color:${c}">${esc(statusLabel(s))}</b><span class="pill soft"><span class="d"></span>${items.length}</span></div>
+      <div style="display:flex;flex-direction:column;gap:8px;min-height:60px">${items.map(kanCard).join('')||'<div class="muted" style="font-size:12px;text-align:center;padding:12px 0">Keine</div>'}</div>
+    </div>`;}).join('');
+  return `<div class="note" style="margin-bottom:12px">Karten per Drag &amp; Drop zwischen den Spalten ziehen, um den Status zu ändern – der Kunde wird bei hinterlegter Vorlage automatisch benachrichtigt.</div>
+   <div style="display:flex;gap:12px;overflow-x:auto;padding-bottom:8px">${colHtml}</div>`;
+}
+function kanDrop(ev,s){ev.preventDefault();if(__kanDrag){const id=__kanDrag;__kanDrag=null;setStatusRow(id,s);}}
 views.auftraege=function(){
   const m=document.getElementById('main');
   const arch=ordArchived(), trash=ordTrashed(); const mine=curRole()!=='inhaber';
@@ -751,10 +771,11 @@ views.auftraege=function(){
      <button class="btn pri" onclick="newOrder()">Neuer Auftrag</button></div>
    <div class="row" style="margin:14px 0;gap:8px;flex-wrap:wrap;align-items:center">${vBtn('aktiv','Aktiv')}${vBtn('archiv','Archiv',arch.length)}${vBtn('papierkorb','Papierkorb',trash.length)}
      <span style="flex:1"></span>
+     ${aufView==='aktiv'?`<div class="seg" style="width:auto"><button class="${aufLayout==='list'?'on':''}" onclick="aufLayout='list';views.auftraege();paintIcons()">☰ Liste</button><button class="${aufLayout==='board'?'on':''}" onclick="aufLayout='board';views.auftraege();paintIcons()">▦ Board</button></div>`:''}
      <label class="muted" style="font-size:13px">Sortieren</label>
      <select class="in" style="width:auto;padding:6px 10px" onchange="aufSort=this.value;views.auftraege();paintIcons()">${[['neu','Neueste zuerst'],['alt','Älteste zuerst'],['preis','Preis: hoch → niedrig'],['faellig','Fällig zuerst']].map(o=>`<option value="${o[0]}" ${aufSort===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select>
    </div>
-   ${aufView==='aktiv'?`<div class="row" style="margin-bottom:14px;flex-wrap:wrap;gap:8px">${['alle',...statusFlow()].map(s=>`<button class="chip ${aufFilter===s?'on':''}" onclick="aufFilter='${s}';views.auftraege();paintIcons()">${s==='alle'?'Alle':esc(statusLabel(s))} · ${s==='alle'?(counts.__all||0):(counts[s]||0)}</button>`).join('')}</div>`:''}
+   ${(aufView==='aktiv'&&aufLayout==='list')?`<div class="row" style="margin-bottom:14px;flex-wrap:wrap;gap:8px">${['alle',...statusFlow()].map(s=>`<button class="chip ${aufFilter===s?'on':''}" onclick="aufFilter='${s}';views.auftraege();paintIcons()">${s==='alle'?'Alle':esc(statusLabel(s))} · ${s==='alle'?(counts.__all||0):(counts[s]||0)}</button>`).join('')}</div>`:''}
    ${(aufView==='aktiv'&&S.drafts&&S.drafts.length)?`<div class="card" style="margin-bottom:14px;border:1px dashed var(--green);background:var(--green-tint,#eaf4ee)"><div class="between"><b>Entwürfe (${S.drafts.length})</b><span class="muted" style="font-size:12px">Nicht abgeschlossene Aufträge – jederzeit fortsetzen</span></div>
      <div style="margin-top:8px">${S.drafts.map(d=>`<div class="listitem"><div class="lg">${ic('clip')}</div><div style="flex:1;min-width:0"><b>${esc(d.title||'Entwurf')}</b><div class="muted" style="font-size:12px">Zuletzt bearbeitet ${fmtDateTime(d.updatedAt)}</div></div>
        <button class="btn sm pri" onclick="resumeDraft('${d.id}')">Weiter bearbeiten</button><button class="btn sm gho" onclick="discardDraft('${d.id}')">Verwerfen</button></div>`).join('')}</div></div>`:''}
@@ -763,7 +784,7 @@ views.auftraege=function(){
      ${aufView==='archiv'?`<button class="btn sm" onclick="aufBulk('restore')">Wiederherstellen</button><button class="btn sm gho" onclick="aufBulk('trash')">In Papierkorb</button>`:''}
      ${aufView==='papierkorb'?`<button class="btn sm" onclick="aufBulk('restore')">Wiederherstellen</button><button class="btn sm gho" onclick="aufBulk('delete')">Endgültig löschen</button>`:''}
      <button class="btn sm gho" onclick="aufSel={};views.auftraege();paintIcons()">Auswahl aufheben</button></div></div>`:''}
-   <div class="card" style="padding:0;overflow:auto">
+   ${(aufView==='aktiv'&&aufLayout==='board')?kanBoard():`<div class="card" style="padding:0;overflow:auto">
     <table><thead><tr><th style="width:34px"><input type="checkbox" ${allSel?'checked':''} onclick="aufSelAll(${idsArr},this.checked)"></th><th>Nr.</th><th>Kunde</th><th>Gerät</th><th>Fehler</th><th>Preis</th><th>Status</th><th>Fällig</th><th></th></tr></thead>
     <tbody>${list.length?list.map(o=>`<tr>
       <td onclick="event.stopPropagation()"><input type="checkbox" ${aufSel[o.id]?'checked':''} onclick="aufToggleSel('${o.id}')"></td>
@@ -776,7 +797,7 @@ views.auftraege=function(){
       <td class="muted mono" onclick="openOrder('${o.id}')" style="cursor:pointer">${fmtDate(o.due)}</td>
       <td onclick="event.stopPropagation()" style="text-align:right;white-space:nowrap">${aufView==='aktiv'?`<button class="btn sm gho" onclick="archiveOrder('${o.id}')">Archiv</button><button class="btn sm gho" onclick="trashOrder('${o.id}')">Papierkorb</button>`:''}${aufView==='archiv'?`<button class="btn sm gho" onclick="restoreOrder('${o.id}')">Wiederherstellen</button>`:''}${aufView==='papierkorb'?`<button class="btn sm gho" onclick="restoreOrder('${o.id}')">Wiederherstellen</button><button class="btn sm gho" onclick="deleteOrderPerm('${o.id}')">Löschen</button>`:''}</td>
     </tr>`).join(''):`<tr><td colspan="9"><div class="empty">${aufView==='papierkorb'?'Papierkorb ist leer':(aufView==='archiv'?'Kein Archiv':'Keine Aufträge in diesem Filter')}</div></td></tr>`}</tbody></table>
-   </div>`;
+   </div>`}`;
 };
 
 function openOrder(id){
@@ -1517,18 +1538,49 @@ function newCustOrderDo(){const oid=document.getElementById('co_ord').value;cons
 function reorderLow(partId){ensureInv();const p=S.parts.find(x=>x.id===partId);if(!p)return;const qty=Math.max(1,(p.min*2)-p.stock);S.orders.unshift({id:uid('b'),type:'lager',nr:'Lager',partId,part:p.name,qty,supplier:p.supplier||'',status:'bestellt',prio:'normal',eta:dPlus(3),ref:'',created:today()});save();views.lager();paintIcons();refreshBadges();toast('Nachbestellung: '+p.name+' ×'+qty);}
 function orderPartFor(id){const o=S.ord.find(x=>x.id===id);S.orders.unshift({id:uid('b'),type:'kunde',nr:o.nr,part:oDevLabel(o)+' · '+oIssueLabel(o),qty:1,supplier:'',status:'bestellt',prio:'normal',eta:dPlus(3),ref:o.id,created:today()});o.status='warten';save();closeAll();toast('Ersatzteil bestellt · Auftrag wartet');go('bestellungen');}
 function printProcList(){const open=(S.orders||[]).filter(b=>b.status!=='geliefert'&&b.status!=='storniert');printHTML('Bestellliste',shopHead()+`<h2>Bestellliste</h2><div class="muted">${fmtDate(today())} · ${open.length} offene Positionen</div><table><thead><tr><th>Teil</th><th>Menge</th><th>Lieferant</th><th>Für</th></tr></thead><tbody>${open.map(b=>`<tr><td>${esc(b.part)}</td><td class="mono">${b.qty||1}×</td><td>${esc(b.supplier||'—')}</td><td>${b.type==='kunde'?esc(b.nr):'Lager'}</td></tr>`).join('')||'<tr><td colspan="4">Keine offenen Bestellungen</td></tr>'}</tbody></table>`);}
+/* Lieferanten-Anbindung im Foneday-Stil (simuliert): 1-Klick-Bestellung + tägliche Preis-Synchronisierung */
+function ensureSupApi(){ if(!S.supApi){S.supApi={provider:'Foneday',connected:true,oneClick:true,lastSync:today(),partnerNr:'FD-72336-441'};save();} return S.supApi; }
+function lowParts(){ensureInv();return (S.parts||[]).filter(p=>p.stock<=p.min);}
+function supApiConnect(){const a=ensureSupApi();a.connected=true;a.lastSync=today();save();toast(a.provider+' verbunden – Preise werden täglich abgeglichen');views.bestellungen();paintIcons();}
+function supApiDisconnect(){const a=ensureSupApi();a.connected=false;save();toast(a.provider+' getrennt');views.bestellungen();paintIcons();}
+function fonedaySync(){const a=ensureSupApi();if(!a.connected){toast(a.provider+' nicht verbunden');return;}a.lastSync=today();
+  const n=(S.parts||[]).length; const rep=Object.keys((ensureCat().prices)||{}).length;
+  S.mailLog.unshift({t:new Date().toISOString(),to:a.provider,ch:'API',rule:'Preis-Sync',subj:n+' Teilepreise & '+rep+' Reparaturpreise abgeglichen',how:a.provider+'-Integration'});
+  save();views.bestellungen();paintIcons();toast('Preise mit '+a.provider+' synchronisiert · '+n+' Teile aktualisiert');}
+function fonedayOrder(partId){const a=ensureSupApi();if(!a.connected){toast(a.provider+' nicht verbunden – zuerst anbinden');return;}
+  const p=(S.parts||[]).find(x=>x.id===partId);if(!p)return;const qty=Math.max(1,(p.min*2)-p.stock);
+  S.orders.unshift({id:uid('b'),type:'lager',nr:'Lager',partId,part:p.name,qty,supplier:a.provider,status:'bestellt',prio:'normal',eta:dPlus(2),ref:'',created:today(),via:a.provider});
+  S.mailLog.unshift({t:new Date().toISOString(),to:a.provider,ch:'API',rule:'Bestellung',subj:'1-Klick-Bestellung: '+p.name+' ×'+qty,how:a.provider+'-Integration'});
+  save();views.bestellungen();paintIcons();refreshBadges();toast('An '+a.provider+' übermittelt: '+p.name+' ×'+qty);}
+function fonedayOrderAll(){const a=ensureSupApi();if(!a.connected){toast(a.provider+' nicht verbunden');return;}
+  const low=lowParts();if(!low.length){toast('Kein Unterbestand');return;}
+  low.forEach(p=>{const qty=Math.max(1,(p.min*2)-p.stock);S.orders.unshift({id:uid('b'),type:'lager',nr:'Lager',partId:p.id,part:p.name,qty,supplier:a.provider,status:'bestellt',prio:'normal',eta:dPlus(2),ref:'',created:today(),via:a.provider});});
+  S.mailLog.unshift({t:new Date().toISOString(),to:a.provider,ch:'API',rule:'Sammelbestellung',subj:low.length+' Positionen 1-Klick bestellt',how:a.provider+'-Integration'});
+  save();views.bestellungen();paintIcons();refreshBadges();toast(low.length+' Positionen an '+a.provider+' übermittelt');}
+function supApiCard(){const a=ensureSupApi();const low=lowParts();
+  return `<div class="card" style="margin-bottom:14px;border:1px solid ${a.connected?'var(--green,#0e7a3c)':'var(--line)'}">
+     <div class="between" style="flex-wrap:wrap;gap:10px"><div style="display:flex;gap:12px;align-items:center"><div class="lg">FD</div>
+       <div><b>Lieferanten-Anbindung · ${esc(a.provider)}</b> ${a.connected?'<span class="tag">verbunden</span>':'<span class="tag">getrennt</span>'}
+         <div class="muted" style="font-size:12px">${a.connected?('Preise täglich abgeglichen · zuletzt '+fmtDate(a.lastSync)+' · 1-Klick-Bestellung aktiv'):'Nicht verbunden – 1-Klick-Bestellung &amp; Preis-Sync inaktiv'}</div></div></div>
+       <div class="row" style="gap:8px">${a.connected?`<button class="btn sm" onclick="fonedaySync()">Preise synchronisieren</button><button class="btn sm gho" onclick="supApiDisconnect()">Trennen</button>`:`<button class="btn sm pri" onclick="supApiConnect()">Verbinden</button>`}</div></div>
+     ${a.connected&&low.length?`<div class="divider" style="margin:12px 0"></div>
+       <div class="between" style="margin-bottom:8px"><b>Bestellvorschlag · Unterbestand (${low.length})</b><button class="btn sm pri" onclick="fonedayOrderAll()">Alle mit 1 Klick bei ${esc(a.provider)} bestellen</button></div>
+       ${low.map(p=>`<div class="listitem"><div style="flex:1;min-width:0"><b>${esc(p.name)}</b><div class="muted" style="font-size:12px">Bestand ${p.stock} / Min ${p.min}${p.vk?' · EK '+eur(p.vk):''}</div></div><button class="btn sm" onclick="fonedayOrder('${p.id}')">Bei ${esc(a.provider)} bestellen</button></div>`).join('')}`:(a.connected?`<div class="note" style="margin-top:10px">Kein Unterbestand – alle Teile ausreichend auf Lager.</div>`:'')}
+   </div>`;
+}
 views.bestellungen=function(){
-  ensureProc(); const m=document.getElementById('main'); const all=S.orders||[];
+  ensureProc(); ensureSupApi(); const m=document.getElementById('main'); const all=S.orders||[];
   const filt=procTab==='offen'?all.filter(b=>b.status!=='geliefert'&&b.status!=='storniert'):procTab==='kunde'?all.filter(b=>b.type==='kunde'):procTab==='lager'?all.filter(b=>b.type==='lager'):procTab==='geliefert'?all.filter(b=>b.status==='geliefert'):all;
   const cnt=f=>all.filter(f).length; const tab=(k,l,n)=>`<button class="chip ${procTab===k?'on':''}" onclick="procTab='${k}';views.bestellungen();paintIcons()">${l} · ${n}</button>`;
   m.innerHTML=`<div class="between"><div><h1 class="h1">Bestellungen</h1><p class="sub">Ersatzteile bestellen – Lager &amp; pro Auftrag</p></div>
      <div class="row"><button class="btn" onclick="printProcList()">Bestellliste drucken</button><button class="btn" onclick="newCustOrder()">+ Kundenbestellung</button><button class="btn pri" onclick="newStockOrder()">+ Lagerbestellung</button></div></div>
+   ${supApiCard()}
    <div class="row" style="margin:14px 0;flex-wrap:wrap;gap:8px">${tab('alle','Alle',all.length)}${tab('offen','Offen',cnt(b=>b.status!=='geliefert'&&b.status!=='storniert'))}${tab('kunde','Kundenbestellungen',cnt(b=>b.type==='kunde'))}${tab('lager','Lagerbestellungen',cnt(b=>b.type==='lager'))}${tab('geliefert','Eingetroffen',cnt(b=>b.status==='geliefert'))}</div>
    <div class="card" style="padding:0;overflow:auto"><table><thead><tr><th>Typ</th><th>Für</th><th>Teil</th><th>Menge</th><th>Lieferant</th><th>Status</th><th>Priorität</th><th>Erwartet</th><th></th></tr></thead>
      <tbody>${filt.length?filt.map(b=>`<tr>
        <td>${b.type==='kunde'?'<span class="tag">Kunde</span>':'<span class="tag">Lager</span>'}</td>
        <td>${b.type==='kunde'?`<b>${esc(b.nr)}</b>`:'<span class="muted">Lager</span>'}</td>
-       <td>${esc(b.part)}</td><td class="mono">${b.qty||1}×</td><td>${esc(b.supplier||'—')}</td>
+       <td>${esc(b.part)}</td><td class="mono">${b.qty||1}×</td><td>${esc(b.supplier||'—')}${b.via?' <span class="tag">1-Klick</span>':''}</td>
        <td><select class="in" style="padding:5px 8px;width:auto" onchange="procSetStatus('${b.id}',this.value)">${PROC_FLOW.map(s=>`<option value="${s}" ${b.status===s?'selected':''}>${PROC_ST[s]}</option>`).join('')}</select></td>
        <td><select class="in" style="padding:5px 8px;width:auto;${b.prio==='dringend'?'color:#c0392b;font-weight:700':''}" onchange="procSetPrio('${b.id}',this.value)"><option value="normal" ${b.prio!=='dringend'?'selected':''}>Normal</option><option value="dringend" ${b.prio==='dringend'?'selected':''}>Dringend</option></select></td>
        <td class="muted mono" style="font-size:12px">${fmtDate(b.eta)}${b.eta<today()&&b.status!=='geliefert'&&b.status!=='storniert'?' <span class="tag">überfällig</span>':''}</td>

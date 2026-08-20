@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>graphify - graphify-out/graph.html</title>
+<script src="https://unpkg.com/vis-network@9.1.6/standalone/umd/vis-network.min.js"
+        integrity="sha384-Ux6phic9PEHJ38YtrijhkzyJ8yQlH8i/+buBR8s3mAZOJrP1gwyvAcIYl3GWtpX1"
+        crossorigin="anonymous"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0f0f1a; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; display: flex; height: 100vh; overflow: hidden; }
+  #graph { flex: 1; }
+  #sidebar { width: 280px; background: #1a1a2e; border-left: 1px solid #2a2a4e; display: flex; flex-direction: column; overflow: hidden; }
+  #search-wrap { padding: 12px; border-bottom: 1px solid #2a2a4e; }
+  #search { width: 100%; background: #0f0f1a; border: 1px solid #3a3a5e; color: #e0e0e0; padding: 7px 10px; border-radius: 6px; font-size: 13px; outline: none; }
+  #search:focus { border-color: #4E79A7; }
+  #search-results { max-height: 140px; overflow-y: auto; padding: 4px 12px; border-bottom: 1px solid #2a2a4e; display: none; }
+  .search-item { padding: 4px 6px; cursor: pointer; border-radius: 4px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .search-item:hover { background: #2a2a4e; }
+  #info-panel { padding: 14px; border-bottom: 1px solid #2a2a4e; min-height: 140px; }
+  #info-panel h3 { font-size: 13px; color: #aaa; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+  #info-content { font-size: 13px; color: #ccc; line-height: 1.6; }
+  #info-content .field { margin-bottom: 5px; }
+  #info-content .field b { color: #e0e0e0; }
+  #info-content .empty { color: #555; font-style: italic; }
+  .neighbor-link { display: block; padding: 2px 6px; margin: 2px 0; border-radius: 3px; cursor: pointer; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 3px solid #333; }
+  .neighbor-link:hover { background: #2a2a4e; }
+  #neighbors-list { max-height: 160px; overflow-y: auto; margin-top: 4px; }
+  #legend-wrap { flex: 1; overflow-y: auto; padding: 12px; }
+  #legend-wrap h3 { font-size: 13px; color: #aaa; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .legend-item { display: flex; align-items: center; gap: 8px; padding: 4px 0; cursor: pointer; border-radius: 4px; font-size: 12px; }
+  .legend-item:hover { background: #2a2a4e; padding-left: 4px; }
+  .legend-item.dimmed { opacity: 0.35; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+  .legend-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .legend-count { color: #666; font-size: 11px; }
+  #stats { padding: 10px 14px; border-top: 1px solid #2a2a4e; font-size: 11px; color: #555; }
+  #legend-controls { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 4px 0; }
+  #legend-controls label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; color: #aaa; user-select: none; }
+  #legend-controls label:hover { color: #e0e0e0; }
+  .legend-cb, #select-all-cb { appearance: none; -webkit-appearance: none; width: 14px; height: 14px; border: 1.5px solid #3a3a5e; border-radius: 3px; background: #0f0f1a; cursor: pointer; position: relative; flex-shrink: 0; }
+  .legend-cb:checked, #select-all-cb:checked { background: #4E79A7; border-color: #4E79A7; }
+  .legend-cb:checked::after, #select-all-cb:checked::after { content: ''; position: absolute; left: 3.5px; top: 1px; width: 4px; height: 7px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+  #select-all-cb:indeterminate { background: #4E79A7; border-color: #4E79A7; }
+  #select-all-cb:indeterminate::after { content: ''; position: absolute; left: 2px; top: 5px; width: 8px; height: 2px; background: #fff; border: none; transform: none; }
+</style>
+</head>
+<body>
+<div id="graph"></div>
+<div id="sidebar">
+  <div id="search-wrap">
+    <input id="search" type="text" placeholder="Search nodes..." autocomplete="off">
+    <div id="search-results"></div>
+  </div>
+  <div id="info-panel">
+    <h3>Node Info</h3>
+    <div id="info-content"><span class="empty">Click a node to inspect it</span></div>
+  </div>
+  <div id="legend-wrap">
+    <h3>Communities</h3>
+    <div id="legend-controls">
+      <label><input type="checkbox" id="select-all-cb" checked onchange="toggleAllCommunities(!this.checked)">Select All</label>
+    </div>
+    <div id="legend"></div>
+  </div>
+  <div id="stats">67 nodes &middot; 81 edges &middot; 12 communities</div>
+</div>
+<script>
+const RAW_NODES = [{"id": "app_ankauf", "label": "Ankauf / Verkauf (used-device trade)", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 16.7, "font": {"size": 12, "color": "#ffffff"}, "title": "Ankauf / Verkauf (used-device trade)", "community": 0, "community_name": "Werkstatt-Backend & Datenmodell", "source_file": "app.html", "file_type": "code", "degree": 2}, {"id": "app_bestellungen", "label": "Bestellungen / Parts orders (bestellungen)", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 20.0, "font": {"size": 12, "color": "#ffffff"}, "title": "Bestellungen / Parts orders (bestellungen)", "community": 0, "community_name": "Werkstatt-Backend & Datenmodell", "source_file": "app.html", "file_type": "code", "degree": 3}, {"id": "app_dashboard", "label": "Dashboard (\u00dcbersicht)", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 20.0, "font": {"size": 12, "color": "#ffffff"}, "title": "Dashboard (\u00dcbersicht)", "community": 0, "community_name": "Werkstatt-Backend & Datenmodell", "source_file": "app.html", "file_type": "code", "degree": 3}, {"id": "app_erinnerungen", "label": "Erinnerungen / Reminders (erinnerungen)", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 16.7, "font": {"size": 12, "color": "#ffffff"}, "title": "Erinnerungen / Reminders (erinnerungen)", "community": 0, "community_name": "Werkstatt-Backend & Datenmodell", "source_file": "app.html", "file_type": "code", "degree": 2}, {"id": "app_kalender", "label": "Kalender (kalender)", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 13.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Kalender (kalender)", "community": 0, "community_name": "Werkstatt-Backend & Datenmodell", "source_file": "app.html", "file_type": "code", "degree": 1}, {"id": "app_kunden", "label": "Kunden / CRM (kunden)", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 20.0, "font": {"size": 12, "color": "#ffffff"}, "title": "Kunden / CRM (kunden)", "community": 0, "community_name": "Werkstatt-Backend & Datenmodell", "source_file": "app.html", "file_type": "code", "degree": 3}, {"id": "app_lager", "label": "Lager & Teile / Inventory (lager)", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 13.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Lager &amp; Teile / Inventory (lager)", "community": 0, "community_name": "Werkstatt-Backend & Datenmodell", "source_file": "app.html", "file_type": "code", "degree": 1}, {"id": "app_localstorage_key", "label": "localStorage persistence (KEY / load / save)", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 13.3, "font": {"size": 0, "color": "#ffffff"}, "title": "localStorage persistence (KEY / load / save)", "community": 0, "community_name": "Werkstatt-Backend & Datenmodell", "source_file": "app.html", "file_type": "code", "degree": 1}, {"id": "app_mail_log", "label": "Mail/notification log (S.mailLog)", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 23.3, "font": {"size": 12, "color": "#ffffff"}, "title": "Mail/notification log (S.mailLog)", "community": 0, "community_name": "Werkstatt-Backend & Datenmodell", "source_file": "app.html", "file_type": "code", "degree": 4}, {"id": "app_order_model", "label": "Repair order data model (S.ord / oDevices / devices)", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 30.0, "font": {"size": 12, "color": "#ffffff"}, "title": "Repair order data model (S.ord / oDevices / devices)", "community": 0, "community_name": "Werkstatt-Backend & Datenmodell", "source_file": "app.html", "file_type": "code", "degree": 6}, {"id": "app_state_s", "label": "S (global state object)", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 16.7, "font": {"size": 12, "color": "#ffffff"}, "title": "S (global state object)", "community": 0, "community_name": "Werkstatt-Backend & Datenmodell", "source_file": "app.html", "file_type": "code", "degree": 2}, {"id": "app_statistik", "label": "Statistik / Forecast (statistik)", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 20.0, "font": {"size": 12, "color": "#ffffff"}, "title": "Statistik / Forecast (statistik)", "community": 0, "community_name": "Werkstatt-Backend & Datenmodell", "source_file": "app.html", "file_type": "code", "degree": 3}, {"id": "roadmap_auto_angebot", "label": "Auto-Angebot aus Diagnose (L2)", "color": {"background": "#F28E2B", "border": "#F28E2B", "highlight": {"background": "#ffffff", "border": "#F28E2B"}}, "size": 20.0, "font": {"size": 12, "color": "#ffffff"}, "title": "Auto-Angebot aus Diagnose (L2)", "community": 1, "community_name": "Roadmap: Wettbewerb & Killer-Wedges", "source_file": "ROADMAP.md", "file_type": "concept", "degree": 3}, {"id": "roadmap_katalog", "label": "Selbst-pflegbarer Katalog (P1)", "color": {"background": "#F28E2B", "border": "#F28E2B", "highlight": {"background": "#ffffff", "border": "#F28E2B"}}, "size": 16.7, "font": {"size": 12, "color": "#ffffff"}, "title": "Selbst-pflegbarer Katalog (P1)", "community": 1, "community_name": "Roadmap: Wettbewerb & Killer-Wedges", "source_file": "ROADMAP.md", "file_type": "concept", "degree": 2}, {"id": "roadmap_ki_diagnose", "label": "KI-Diagnose / Foto-Diagnose (L1)", "color": {"background": "#F28E2B", "border": "#F28E2B", "highlight": {"background": "#ffffff", "border": "#F28E2B"}}, "size": 16.7, "font": {"size": 12, "color": "#ffffff"}, "title": "KI-Diagnose / Foto-Diagnose (L1)", "community": 1, "community_name": "Roadmap: Wettbewerb & Killer-Wedges", "source_file": "ROADMAP.md", "file_type": "concept", "degree": 2}, {"id": "roadmap_marge", "label": "Echte Marge pro Auftrag (L9)", "color": {"background": "#F28E2B", "border": "#F28E2B", "highlight": {"background": "#ffffff", "border": "#F28E2B"}}, "size": 16.7, "font": {"size": 12, "color": "#ffffff"}, "title": "Echte Marge pro Auftrag (L9)", "community": 1, "community_name": "Roadmap: Wettbewerb & Killer-Wedges", "source_file": "ROADMAP.md", "file_type": "concept", "degree": 2}, {"id": "roadmap_phase1", "label": "Phase 1 \u2014 Fundament des Produkts", "color": {"background": "#F28E2B", "border": "#F28E2B", "highlight": {"background": "#ffffff", "border": "#F28E2B"}}, "size": 20.0, "font": {"size": 12, "color": "#ffffff"}, "title": "Phase 1 \u2014 Fundament des Produkts", "community": 1, "community_name": "Roadmap: Wettbewerb & Killer-Wedges", "source_file": "ROADMAP.md", "file_type": "concept", "degree": 3}, {"id": "roadmap_phase2", "label": "Phase 2 \u2014 Die 3 Killer-Wedges", "color": {"background": "#F28E2B", "border": "#F28E2B", "highlight": {"background": "#ffffff", "border": "#F28E2B"}}, "size": 30.0, "font": {"size": 12, "color": "#ffffff"}, "title": "Phase 2 \u2014 Die 3 Killer-Wedges", "community": 1, "community_name": "Roadmap: Wettbewerb & Killer-Wedges", "source_file": "ROADMAP.md", "file_type": "concept", "degree": 6}, {"id": "roadmap_reaktivierung", "label": "Reaktivierung (L5)", "color": {"background": "#F28E2B", "border": "#F28E2B", "highlight": {"background": "#ffffff", "border": "#F28E2B"}}, "size": 13.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Reaktivierung (L5)", "community": 1, "community_name": "Roadmap: Wettbewerb & Killer-Wedges", "source_file": "ROADMAP.md", "file_type": "concept", "degree": 1}, {"id": "roadmap_repairdash", "label": "RepairDash (Wettbewerber)", "color": {"background": "#F28E2B", "border": "#F28E2B", "highlight": {"background": "#ffffff", "border": "#F28E2B"}}, "size": 13.3, "font": {"size": 0, "color": "#ffffff"}, "title": "RepairDash (Wettbewerber)", "community": 1, "community_name": "Roadmap: Wettbewerb & Killer-Wedges", "source_file": "ROADMAP.md", "file_type": "concept", "degree": 1}, {"id": "roadmap_status_automatik", "label": "Konfigurierbare Status + Automatisierungen (P3)", "color": {"background": "#F28E2B", "border": "#F28E2B", "highlight": {"background": "#ffffff", "border": "#F28E2B"}}, "size": 13.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Konfigurierbare Status + Automatisierungen (P3)", "community": 1, "community_name": "Roadmap: Wettbewerb & Killer-Wedges", "source_file": "ROADMAP.md", "file_type": "concept", "degree": 1}, {"id": "roadmap_warenwirtschaft", "label": "Warenwirtschaft & Teile-Intelligenz (P2)", "color": {"background": "#F28E2B", "border": "#F28E2B", "highlight": {"background": "#ffffff", "border": "#F28E2B"}}, "size": 13.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Warenwirtschaft &amp; Teile-Intelligenz (P2)", "community": 1, "community_name": "Roadmap: Wettbewerb & Killer-Wedges", "source_file": "ROADMAP.md", "file_type": "concept", "degree": 1}, {"id": "roadmap_reparado", "label": "Reparado Produkt-Roadmap", "color": {"background": "#F28E2B", "border": "#F28E2B", "highlight": {"background": "#ffffff", "border": "#F28E2B"}}, "size": 20.0, "font": {"size": 12, "color": "#ffffff"}, "title": "Reparado Produkt-Roadmap", "community": 1, "community_name": "Roadmap: Wettbewerb & Killer-Wedges", "source_file": "ROADMAP.md", "file_type": "document", "degree": 3}, {"id": "roadmap_track_f_echtes_system", "label": "Track F \u2014 Echtes System (Supabase/Auth/TSE/Hosting)", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 10.0, "font": {"size": 0, "color": "#ffffff"}, "title": "Track F \u2014 Echtes System (Supabase/Auth/TSE/Hosting)", "community": 10, "community_name": "Track F: Echtes System", "source_file": "ROADMAP.md", "file_type": "concept", "degree": 0}, {"id": "roadmap_versand", "label": "Versandreparatur end-to-end (L20)", "color": {"background": "#F28E2B", "border": "#F28E2B", "highlight": {"background": "#ffffff", "border": "#F28E2B"}}, "size": 10.0, "font": {"size": 0, "color": "#ffffff"}, "title": "Versandreparatur end-to-end (L20)", "community": 11, "community_name": "Versand (Roadmap)", "source_file": "ROADMAP.md", "file_type": "concept", "degree": 0}, {"id": "app_belege_model", "label": "Belege / receipts inbox (S.belege)", "color": {"background": "#E15759", "border": "#E15759", "highlight": {"background": "#ffffff", "border": "#E15759"}}, "size": 13.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Belege / receipts inbox (S.belege)", "community": 2, "community_name": "Kasse, Buchhaltung & Umsatz", "source_file": "app.html", "file_type": "code", "degree": 1}, {"id": "app_buchhaltung", "label": "Buchhaltung / Accounting (buchhaltung)", "color": {"background": "#E15759", "border": "#E15759", "highlight": {"background": "#ffffff", "border": "#E15759"}}, "size": 23.3, "font": {"size": 12, "color": "#ffffff"}, "title": "Buchhaltung / Accounting (buchhaltung)", "community": 2, "community_name": "Kasse, Buchhaltung & Umsatz", "source_file": "app.html", "file_type": "code", "degree": 4}, {"id": "app_cart", "label": "POS cart & checkout (cart / checkout / TSE tx)", "color": {"background": "#E15759", "border": "#E15759", "highlight": {"background": "#ffffff", "border": "#E15759"}}, "size": 16.7, "font": {"size": 12, "color": "#ffffff"}, "title": "POS cart &amp; checkout (cart / checkout / TSE tx)", "community": 2, "community_name": "Kasse, Buchhaltung & Umsatz", "source_file": "app.html", "file_type": "code", "degree": 2}, {"id": "app_einstellungen", "label": "Einstellungen / Settings & Integrations (einstellungen)", "color": {"background": "#E15759", "border": "#E15759", "highlight": {"background": "#ffffff", "border": "#E15759"}}, "size": 20.0, "font": {"size": 12, "color": "#ffffff"}, "title": "Einstellungen / Settings &amp; Integrations (einstellungen)", "community": 2, "community_name": "Kasse, Buchhaltung & Umsatz", "source_file": "app.html", "file_type": "code", "degree": 3}, {"id": "app_kasse", "label": "Kasse / POS (kasse)", "color": {"background": "#E15759", "border": "#E15759", "highlight": {"background": "#ffffff", "border": "#E15759"}}, "size": 23.3, "font": {"size": 12, "color": "#ffffff"}, "title": "Kasse / POS (kasse)", "community": 2, "community_name": "Kasse, Buchhaltung & Umsatz", "source_file": "app.html", "file_type": "code", "degree": 4}, {"id": "app_nav_router", "label": "Nav router (go / views map / canView)", "color": {"background": "#E15759", "border": "#E15759", "highlight": {"background": "#ffffff", "border": "#E15759"}}, "size": 13.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Nav router (go / views map / canView)", "community": 2, "community_name": "Kasse, Buchhaltung & Umsatz", "source_file": "app.html", "file_type": "code", "degree": 1}, {"id": "app_sales_model", "label": "Sales / TSE receipts (S.sales)", "color": {"background": "#E15759", "border": "#E15759", "highlight": {"background": "#ffffff", "border": "#E15759"}}, "size": 23.3, "font": {"size": 12, "color": "#ffffff"}, "title": "Sales / TSE receipts (S.sales)", "community": 2, "community_name": "Kasse, Buchhaltung & Umsatz", "source_file": "app.html", "file_type": "code", "degree": 4}, {"id": "app_versicherung", "label": "Versicherung / Insurance claims (versicherung)", "color": {"background": "#E15759", "border": "#E15759", "highlight": {"background": "#ffffff", "border": "#E15759"}}, "size": 23.3, "font": {"size": 12, "color": "#ffffff"}, "title": "Versicherung / Insurance claims (versicherung)", "community": 2, "community_name": "Kasse, Buchhaltung & Umsatz", "source_file": "app.html", "file_type": "code", "degree": 4}, {"id": "app_vertraege", "label": "Vertr\u00e4ge B2B / Service contracts (vertraege)", "color": {"background": "#E15759", "border": "#E15759", "highlight": {"background": "#ffffff", "border": "#E15759"}}, "size": 23.3, "font": {"size": 12, "color": "#ffffff"}, "title": "Vertr\u00e4ge B2B / Service contracts (vertraege)", "community": 2, "community_name": "Kasse, Buchhaltung & Umsatz", "source_file": "app.html", "file_type": "code", "degree": 4}, {"id": "app_role_access", "label": "Role-based view access (canView / applyNavRole)", "color": {"background": "#E15759", "border": "#E15759", "highlight": {"background": "#ffffff", "border": "#E15759"}}, "size": 16.7, "font": {"size": 12, "color": "#ffffff"}, "title": "Role-based view access (canView / applyNavRole)", "community": 2, "community_name": "Kasse, Buchhaltung & Umsatz", "source_file": "app.html", "file_type": "concept", "degree": 2}, {"id": "anfrage_wizard", "label": "anfrage.html \u2014 Anfrage-/R\u00fcckruf-Wizard", "color": {"background": "#76B7B2", "border": "#76B7B2", "highlight": {"background": "#ffffff", "border": "#76B7B2"}}, "size": 20.0, "font": {"size": 12, "color": "#ffffff"}, "title": "anfrage.html \u2014 Anfrage-/R\u00fcckruf-Wizard", "community": 3, "community_name": "\u00d6ffentliche Web-Widgets", "source_file": "anfrage.html", "file_type": "code", "degree": 3}, {"id": "booking_page", "label": "booking.html \u2014 Online-Terminbuchung", "color": {"background": "#76B7B2", "border": "#76B7B2", "highlight": {"background": "#ffffff", "border": "#76B7B2"}}, "size": 23.3, "font": {"size": 12, "color": "#ffffff"}, "title": "booking.html \u2014 Online-Terminbuchung", "community": 3, "community_name": "\u00d6ffentliche Web-Widgets", "source_file": "booking.html", "file_type": "code", "degree": 4}, {"id": "anfrage_reparado_requests", "label": "localStorage reparado_requests", "color": {"background": "#76B7B2", "border": "#76B7B2", "highlight": {"background": "#ffffff", "border": "#76B7B2"}}, "size": 16.7, "font": {"size": 12, "color": "#ffffff"}, "title": "localStorage reparado_requests", "community": 3, "community_name": "\u00d6ffentliche Web-Widgets", "source_file": "anfrage.html", "file_type": "concept", "degree": 2}, {"id": "booking_reparado_bookings", "label": "localStorage reparado_bookings", "color": {"background": "#76B7B2", "border": "#76B7B2", "highlight": {"background": "#ffffff", "border": "#76B7B2"}}, "size": 16.7, "font": {"size": 12, "color": "#ffffff"}, "title": "localStorage reparado_bookings", "community": 3, "community_name": "\u00d6ffentliche Web-Widgets", "source_file": "booking.html", "file_type": "concept", "degree": 2}, {"id": "design_philosophy_farbe_und_material", "label": "Farbe und Material (disziplinierte Palette, \u00d6ko-Gr\u00fcn Signal)", "color": {"background": "#76B7B2", "border": "#76B7B2", "highlight": {"background": "#ffffff", "border": "#76B7B2"}}, "size": 16.7, "font": {"size": 12, "color": "#ffffff"}, "title": "Farbe und Material (disziplinierte Palette, \u00d6ko-Gr\u00fcn Signal)", "community": 3, "community_name": "\u00d6ffentliche Web-Widgets", "source_file": "DESIGN-PHILOSOPHY.md", "file_type": "concept", "degree": 2}, {"id": "design_philosophy_oeko_gruen", "label": "\u00d6ko-Gr\u00fcn Signalfarbe (#0e7a3c)", "color": {"background": "#76B7B2", "border": "#76B7B2", "highlight": {"background": "#ffffff", "border": "#76B7B2"}}, "size": 23.3, "font": {"size": 12, "color": "#ffffff"}, "title": "\u00d6ko-Gr\u00fcn Signalfarbe (#0e7a3c)", "community": 3, "community_name": "\u00d6ffentliche Web-Widgets", "source_file": "DESIGN-PHILOSOPHY.md", "file_type": "concept", "degree": 4}, {"id": "roadmap_widget_konfig", "label": "Website-Widget-Konfig / WordPress-Plugin (P10)", "color": {"background": "#76B7B2", "border": "#76B7B2", "highlight": {"background": "#ffffff", "border": "#76B7B2"}}, "size": 13.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Website-Widget-Konfig / WordPress-Plugin (P10)", "community": 3, "community_name": "\u00d6ffentliche Web-Widgets", "source_file": "ROADMAP.md", "file_type": "concept", "degree": 1}, {"id": "status_reparado_v1_store", "label": "localStorage reparado_v1 (Haupt-Store)", "color": {"background": "#76B7B2", "border": "#76B7B2", "highlight": {"background": "#ffffff", "border": "#76B7B2"}}, "size": 20.0, "font": {"size": 12, "color": "#ffffff"}, "title": "localStorage reparado_v1 (Haupt-Store)", "community": 3, "community_name": "\u00d6ffentliche Web-Widgets", "source_file": "status.html", "file_type": "concept", "degree": 3}, {"id": "status_page", "label": "status.html \u2014 Kunden-Reparaturstatus", "color": {"background": "#59A14F", "border": "#59A14F", "highlight": {"background": "#ffffff", "border": "#59A14F"}}, "size": 36.7, "font": {"size": 12, "color": "#ffffff"}, "title": "status.html \u2014 Kunden-Reparaturstatus", "community": 4, "community_name": "Kunden-Statusseite & Bewertungen", "source_file": "status.html", "file_type": "code", "degree": 8}, {"id": "roadmap_bewertungs_booster", "label": "Bewertungs-Booster (L6)", "color": {"background": "#59A14F", "border": "#59A14F", "highlight": {"background": "#ffffff", "border": "#59A14F"}}, "size": 16.7, "font": {"size": 12, "color": "#ffffff"}, "title": "Bewertungs-Booster (L6)", "community": 4, "community_name": "Kunden-Statusseite & Bewertungen", "source_file": "ROADMAP.md", "file_type": "concept", "degree": 2}, {"id": "roadmap_garantie_portal", "label": "Garantie-Portal (L15)", "color": {"background": "#59A14F", "border": "#59A14F", "highlight": {"background": "#ffffff", "border": "#59A14F"}}, "size": 13.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Garantie-Portal (L15)", "community": 4, "community_name": "Kunden-Statusseite & Bewertungen", "source_file": "ROADMAP.md", "file_type": "concept", "degree": 1}, {"id": "roadmap_live_status_fotos", "label": "Live-Status mit Foto-Updates (L12)", "color": {"background": "#59A14F", "border": "#59A14F", "highlight": {"background": "#ffffff", "border": "#59A14F"}}, "size": 13.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Live-Status mit Foto-Updates (L12)", "community": 4, "community_name": "Kunden-Statusseite & Bewertungen", "source_file": "ROADMAP.md", "file_type": "concept", "degree": 1}, {"id": "roadmap_qr_akte", "label": "Digitale Ger\u00e4te-Akte per QR (L13)", "color": {"background": "#59A14F", "border": "#59A14F", "highlight": {"background": "#ffffff", "border": "#59A14F"}}, "size": 13.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Digitale Ger\u00e4te-Akte per QR (L13)", "community": 4, "community_name": "Kunden-Statusseite & Bewertungen", "source_file": "ROADMAP.md", "file_type": "concept", "degree": 1}, {"id": "status_reparado_feedback", "label": "localStorage reparado_feedback", "color": {"background": "#59A14F", "border": "#59A14F", "highlight": {"background": "#ffffff", "border": "#59A14F"}}, "size": 13.3, "font": {"size": 0, "color": "#ffffff"}, "title": "localStorage reparado_feedback", "community": 4, "community_name": "Kunden-Statusseite & Bewertungen", "source_file": "status.html", "file_type": "concept", "degree": 1}, {"id": "status_reparado_warranty", "label": "localStorage reparado_warranty", "color": {"background": "#59A14F", "border": "#59A14F", "highlight": {"background": "#ffffff", "border": "#59A14F"}}, "size": 13.3, "font": {"size": 0, "color": "#ffffff"}, "title": "localStorage reparado_warranty", "community": 4, "community_name": "Kunden-Statusseite & Bewertungen", "source_file": "status.html", "file_type": "concept", "degree": 1}, {"id": "status_sentiment_gate", "label": "Sentiment-Gate (zufrieden\u2192Google / kritisch\u2192intern)", "color": {"background": "#59A14F", "border": "#59A14F", "highlight": {"background": "#ffffff", "border": "#59A14F"}}, "size": 16.7, "font": {"size": 12, "color": "#ffffff"}, "title": "Sentiment-Gate (zufrieden\u2192Google / kritisch\u2192intern)", "community": 4, "community_name": "Kunden-Statusseite & Bewertungen", "source_file": "status.html", "file_type": "concept", "degree": 2}, {"id": "app_angebote", "label": "Angebote / Quotes (angebote)", "color": {"background": "#EDC948", "border": "#EDC948", "highlight": {"background": "#ffffff", "border": "#EDC948"}}, "size": 23.3, "font": {"size": 12, "color": "#ffffff"}, "title": "Angebote / Quotes (angebote)", "community": 5, "community_name": "Auftrags- & Angebots-Flow", "source_file": "app.html", "file_type": "code", "degree": 4}, {"id": "app_anrufe", "label": "Empfang / Reception AI (anrufe)", "color": {"background": "#EDC948", "border": "#EDC948", "highlight": {"background": "#ffffff", "border": "#EDC948"}}, "size": 23.3, "font": {"size": 12, "color": "#ffffff"}, "title": "Empfang / Reception AI (anrufe)", "community": 5, "community_name": "Auftrags- & Angebots-Flow", "source_file": "app.html", "file_type": "code", "degree": 4}, {"id": "app_auftraege", "label": "Auftr\u00e4ge / Orders (auftraege)", "color": {"background": "#EDC948", "border": "#EDC948", "highlight": {"background": "#ffffff", "border": "#EDC948"}}, "size": 40.0, "font": {"size": 12, "color": "#ffffff"}, "title": "Auftr\u00e4ge / Orders (auftraege)", "community": 5, "community_name": "Auftrags- & Angebots-Flow", "source_file": "app.html", "file_type": "code", "degree": 9}, {"id": "app_diagnose", "label": "KI-Diagnose (diagnose)", "color": {"background": "#EDC948", "border": "#EDC948", "highlight": {"background": "#ffffff", "border": "#EDC948"}}, "size": 23.3, "font": {"size": 12, "color": "#ffffff"}, "title": "KI-Diagnose (diagnose)", "community": 5, "community_name": "Auftrags- & Angebots-Flow", "source_file": "app.html", "file_type": "code", "degree": 4}, {"id": "app_neworder", "label": "Neuer Auftrag/Angebot Formular (neworder)", "color": {"background": "#EDC948", "border": "#EDC948", "highlight": {"background": "#ffffff", "border": "#EDC948"}}, "size": 23.3, "font": {"size": 12, "color": "#ffffff"}, "title": "Neuer Auftrag/Angebot Formular (neworder)", "community": 5, "community_name": "Auftrags- & Angebots-Flow", "source_file": "app.html", "file_type": "code", "degree": 4}, {"id": "app_preise", "label": "Modelle & Preise (preise)", "color": {"background": "#EDC948", "border": "#EDC948", "highlight": {"background": "#ffffff", "border": "#EDC948"}}, "size": 16.7, "font": {"size": 12, "color": "#ffffff"}, "title": "Modelle &amp; Preise (preise)", "community": 5, "community_name": "Auftrags- & Angebots-Flow", "source_file": "app.html", "file_type": "code", "degree": 2}, {"id": "app_versand", "label": "Versand / Shipping (versand)", "color": {"background": "#EDC948", "border": "#EDC948", "highlight": {"background": "#ffffff", "border": "#EDC948"}}, "size": 13.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Versand / Shipping (versand)", "community": 5, "community_name": "Auftrags- & Angebots-Flow", "source_file": "app.html", "file_type": "code", "degree": 1}, {"id": "index_landing", "label": "index.html \u2014 Reparado Landingpage", "color": {"background": "#B07AA1", "border": "#B07AA1", "highlight": {"background": "#ffffff", "border": "#B07AA1"}}, "size": 16.7, "font": {"size": 12, "color": "#ffffff"}, "title": "index.html \u2014 Reparado Landingpage", "community": 6, "community_name": "Design-System & Landingpage", "source_file": "index.html", "file_type": "code", "degree": 2}, {"id": "landing_landing", "label": "landing.html \u2014 Reparado Landingpage (Variante)", "color": {"background": "#B07AA1", "border": "#B07AA1", "highlight": {"background": "#ffffff", "border": "#B07AA1"}}, "size": 13.3, "font": {"size": 0, "color": "#ffffff"}, "title": "landing.html \u2014 Reparado Landingpage (Variante)", "community": 6, "community_name": "Design-System & Landingpage", "source_file": "landing.html", "file_type": "code", "degree": 1}, {"id": "design_philosophy_komposition_und_balance", "label": "Komposition und Balance (ruhige \u00dcberg\u00e4nge, zarte Interaktion)", "color": {"background": "#B07AA1", "border": "#B07AA1", "highlight": {"background": "#ffffff", "border": "#B07AA1"}}, "size": 13.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Komposition und Balance (ruhige \u00dcberg\u00e4nge, zarte Interaktion)", "community": 6, "community_name": "Design-System & Landingpage", "source_file": "DESIGN-PHILOSOPHY.md", "file_type": "concept", "degree": 1}, {"id": "design_philosophy_raum_und_form", "label": "Raum und Form (Wei\u00dfraum als Material, 4/8-Punkt-Raster)", "color": {"background": "#B07AA1", "border": "#B07AA1", "highlight": {"background": "#ffffff", "border": "#B07AA1"}}, "size": 13.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Raum und Form (Wei\u00dfraum als Material, 4/8-Punkt-Raster)", "community": 6, "community_name": "Design-System & Landingpage", "source_file": "DESIGN-PHILOSOPHY.md", "file_type": "concept", "degree": 1}, {"id": "design_philosophy_skala_und_rhythmus", "label": "Skala und Rhythmus (Typografie, tabellarische Ziffern)", "color": {"background": "#B07AA1", "border": "#B07AA1", "highlight": {"background": "#ffffff", "border": "#B07AA1"}}, "size": 13.3, "font": {"size": 0, "color": "#ffffff"}, "title": "Skala und Rhythmus (Typografie, tabellarische Ziffern)", "community": 6, "community_name": "Design-System & Landingpage", "source_file": "DESIGN-PHILOSOPHY.md", "file_type": "concept", "degree": 1}, {"id": "design_philosophy_quiet_precision", "label": "Quiet Precision (Design-Philosophie)", "color": {"background": "#B07AA1", "border": "#B07AA1", "highlight": {"background": "#ffffff", "border": "#B07AA1"}}, "size": 26.7, "font": {"size": 12, "color": "#ffffff"}, "title": "Quiet Precision (Design-Philosophie)", "community": 6, "community_name": "Design-System & Landingpage", "source_file": "DESIGN-PHILOSOPHY.md", "file_type": "rationale", "degree": 5}, {"id": "roadmap_b2b_vertraege", "label": "B2B-Vertr\u00e4ge / SLA-Pakete (L21)", "color": {"background": "#FF9DA7", "border": "#FF9DA7", "highlight": {"background": "#ffffff", "border": "#FF9DA7"}}, "size": 10.0, "font": {"size": 0, "color": "#ffffff"}, "title": "B2B-Vertr\u00e4ge / SLA-Pakete (L21)", "community": 7, "community_name": "B2B-Vertr\u00e4ge (Roadmap)", "source_file": "ROADMAP.md", "file_type": "concept", "degree": 0}, {"id": "roadmap_forecast", "label": "Forecast + Filial-Benchmark (L17)", "color": {"background": "#9C755F", "border": "#9C755F", "highlight": {"background": "#ffffff", "border": "#9C755F"}}, "size": 10.0, "font": {"size": 0, "color": "#ffffff"}, "title": "Forecast + Filial-Benchmark (L17)", "community": 8, "community_name": "Forecast (Roadmap)", "source_file": "ROADMAP.md", "file_type": "concept", "degree": 0}, {"id": "roadmap_integrationen", "label": "Integrationen (SumUp/Lexware/Google) (P11)", "color": {"background": "#BAB0AC", "border": "#BAB0AC", "highlight": {"background": "#ffffff", "border": "#BAB0AC"}}, "size": 10.0, "font": {"size": 0, "color": "#ffffff"}, "title": "Integrationen (SumUp/Lexware/Google) (P11)", "community": 9, "community_name": "Integrationen (Roadmap)", "source_file": "ROADMAP.md", "file_type": "concept", "degree": 0}];
+const RAW_EDGES = [{"from": "app_ankauf", "to": "app_statistik", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "app_ankauf", "to": "app_kunden", "label": "references", "title": "references [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "app_bestellungen", "to": "app_lager", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "app_bestellungen", "to": "app_auftraege", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "app_bestellungen", "to": "app_erinnerungen", "label": "references", "title": "references [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "app_dashboard", "to": "app_anrufe", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "app_dashboard", "to": "app_order_model", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "app_dashboard", "to": "app_mail_log", "label": "references", "title": "references [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "app_erinnerungen", "to": "app_order_model", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "app_kalender", "to": "app_order_model", "label": "references", "title": "references [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "app_kunden", "to": "app_order_model", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "app_kunden", "to": "app_mail_log", "label": "shares_data_with", "title": "shares_data_with [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "app_localstorage_key", "to": "app_state_s", "label": "shares_data_with", "title": "shares_data_with [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "app_mail_log", "to": "app_auftraege", "label": "shares_data_with", "title": "shares_data_with [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "app_mail_log", "to": "app_vertraege", "label": "shares_data_with", "title": "shares_data_with [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "app_order_model", "to": "app_state_s", "label": "shares_data_with", "title": "shares_data_with [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "app_order_model", "to": "app_statistik", "label": "references", "title": "references [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "app_statistik", "to": "app_sales_model", "label": "references", "title": "references [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "roadmap_auto_angebot", "to": "roadmap_katalog", "label": "conceptually_related_to", "title": "conceptually_related_to [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "roadmap_auto_angebot", "to": "roadmap_ki_diagnose", "label": "conceptually_related_to", "title": "conceptually_related_to [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "roadmap_auto_angebot", "to": "roadmap_phase2", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "roadmap_katalog", "to": "roadmap_phase1", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "roadmap_ki_diagnose", "to": "roadmap_phase2", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "roadmap_marge", "to": "roadmap_warenwirtschaft", "label": "conceptually_related_to", "title": "conceptually_related_to [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "roadmap_marge", "to": "roadmap_phase2", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "roadmap_phase1", "to": "roadmap_status_automatik", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "roadmap_phase1", "to": "roadmap_reparado", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "roadmap_phase2", "to": "roadmap_bewertungs_booster", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "roadmap_phase2", "to": "roadmap_reaktivierung", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "roadmap_phase2", "to": "roadmap_reparado", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "roadmap_repairdash", "to": "roadmap_reparado", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "app_belege_model", "to": "app_buchhaltung", "label": "shares_data_with", "title": "shares_data_with [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "app_buchhaltung", "to": "app_einstellungen", "label": "shares_data_with", "title": "shares_data_with [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "app_buchhaltung", "to": "app_sales_model", "label": "conceptually_related_to", "title": "conceptually_related_to [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "app_buchhaltung", "to": "app_vertraege", "label": "conceptually_related_to", "title": "conceptually_related_to [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "app_cart", "to": "app_kasse", "label": "implements", "title": "implements [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "app_cart", "to": "app_sales_model", "label": "shares_data_with", "title": "shares_data_with [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "app_einstellungen", "to": "app_role_access", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "app_einstellungen", "to": "app_versicherung", "label": "shares_data_with", "title": "shares_data_with [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "app_kasse", "to": "app_auftraege", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "app_kasse", "to": "app_versicherung", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "app_kasse", "to": "app_sales_model", "label": "shares_data_with", "title": "shares_data_with [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "app_nav_router", "to": "app_role_access", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "app_versicherung", "to": "app_auftraege", "label": "shares_data_with", "title": "shares_data_with [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "app_versicherung", "to": "app_vertraege", "label": "semantically_similar_to", "title": "semantically_similar_to [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "app_vertraege", "to": "app_auftraege", "label": "references", "title": "references [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "anfrage_wizard", "to": "anfrage_reparado_requests", "label": "shares_data_with", "title": "shares_data_with [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "anfrage_wizard", "to": "design_philosophy_oeko_gruen", "label": "implements", "title": "implements [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "anfrage_wizard", "to": "booking_page", "label": "semantically_similar_to", "title": "semantically_similar_to [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "booking_page", "to": "booking_reparado_bookings", "label": "shares_data_with", "title": "shares_data_with [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "booking_page", "to": "roadmap_widget_konfig", "label": "conceptually_related_to", "title": "conceptually_related_to [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "booking_page", "to": "design_philosophy_oeko_gruen", "label": "implements", "title": "implements [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "anfrage_reparado_requests", "to": "status_reparado_v1_store", "label": "shares_data_with", "title": "shares_data_with [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "booking_reparado_bookings", "to": "status_reparado_v1_store", "label": "shares_data_with", "title": "shares_data_with [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "design_philosophy_farbe_und_material", "to": "design_philosophy_quiet_precision", "label": "conceptually_related_to", "title": "conceptually_related_to [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "design_philosophy_farbe_und_material", "to": "design_philosophy_oeko_gruen", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "design_philosophy_oeko_gruen", "to": "status_page", "label": "implements", "title": "implements [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "status_reparado_v1_store", "to": "status_page", "label": "shares_data_with", "title": "shares_data_with [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "status_page", "to": "status_sentiment_gate", "label": "implements", "title": "implements [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "status_page", "to": "status_reparado_feedback", "label": "shares_data_with", "title": "shares_data_with [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "status_page", "to": "status_reparado_warranty", "label": "shares_data_with", "title": "shares_data_with [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "status_page", "to": "roadmap_qr_akte", "label": "implements", "title": "implements [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "status_page", "to": "roadmap_live_status_fotos", "label": "implements", "title": "implements [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "status_page", "to": "roadmap_garantie_portal", "label": "implements", "title": "implements [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "roadmap_bewertungs_booster", "to": "status_sentiment_gate", "label": "implements", "title": "implements [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "app_angebote", "to": "app_auftraege", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "app_angebote", "to": "app_diagnose", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "app_angebote", "to": "app_neworder", "label": "shares_data_with", "title": "shares_data_with [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "app_angebote", "to": "app_anrufe", "label": "references", "title": "references [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "app_anrufe", "to": "app_auftraege", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "app_anrufe", "to": "app_diagnose", "label": "semantically_similar_to", "title": "semantically_similar_to [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "app_auftraege", "to": "app_versand", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "app_auftraege", "to": "app_neworder", "label": "shares_data_with", "title": "shares_data_with [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "app_diagnose", "to": "app_neworder", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "app_diagnose", "to": "app_preise", "label": "references", "title": "references [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "app_neworder", "to": "app_preise", "label": "shares_data_with", "title": "shares_data_with [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "index_landing", "to": "design_philosophy_quiet_precision", "label": "implements", "title": "implements [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "index_landing", "to": "landing_landing", "label": "semantically_similar_to", "title": "semantically_similar_to [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "design_philosophy_komposition_und_balance", "to": "design_philosophy_quiet_precision", "label": "conceptually_related_to", "title": "conceptually_related_to [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "design_philosophy_raum_und_form", "to": "design_philosophy_quiet_precision", "label": "conceptually_related_to", "title": "conceptually_related_to [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "design_philosophy_skala_und_rhythmus", "to": "design_philosophy_quiet_precision", "label": "conceptually_related_to", "title": "conceptually_related_to [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}];
+const LEGEND = [{"cid": 0, "color": "#4E79A7", "label": "Werkstatt-Backend &amp; Datenmodell", "count": 12}, {"cid": 1, "color": "#F28E2B", "label": "Roadmap: Wettbewerb &amp; Killer-Wedges", "count": 11}, {"cid": 2, "color": "#E15759", "label": "Kasse, Buchhaltung &amp; Umsatz", "count": 10}, {"cid": 3, "color": "#76B7B2", "label": "\u00d6ffentliche Web-Widgets", "count": 8}, {"cid": 4, "color": "#59A14F", "label": "Kunden-Statusseite &amp; Bewertungen", "count": 8}, {"cid": 5, "color": "#EDC948", "label": "Auftrags- &amp; Angebots-Flow", "count": 7}, {"cid": 6, "color": "#B07AA1", "label": "Design-System &amp; Landingpage", "count": 6}, {"cid": 7, "color": "#FF9DA7", "label": "B2B-Vertr\u00e4ge (Roadmap)", "count": 1}, {"cid": 8, "color": "#9C755F", "label": "Forecast (Roadmap)", "count": 1}, {"cid": 9, "color": "#BAB0AC", "label": "Integrationen (Roadmap)", "count": 1}, {"cid": 10, "color": "#4E79A7", "label": "Track F: Echtes System", "count": 1}, {"cid": 11, "color": "#F28E2B", "label": "Versand (Roadmap)", "count": 1}];
+
+// HTML-escape helper — prevents XSS when injecting graph data into innerHTML
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// Build vis datasets
+const nodesDS = new vis.DataSet(RAW_NODES.map(n => ({
+  id: n.id, label: n.label, color: n.color, size: n.size,
+  font: n.font, title: n.title,
+  _community: n.community, _community_name: n.community_name,
+  _source_file: n.source_file, _file_type: n.file_type, _degree: n.degree,
+})));
+
+const edgesDS = new vis.DataSet(RAW_EDGES.map((e, i) => ({
+  id: i, from: e.from, to: e.to,
+  label: '',
+  title: e.title,
+  dashes: e.dashes,
+  width: e.width,
+  color: e.color,
+  arrows: { to: { enabled: true, scaleFactor: 0.5 } },
+})));
+
+const container = document.getElementById('graph');
+const network = new vis.Network(container, { nodes: nodesDS, edges: edgesDS }, {
+  physics: {
+    enabled: true,
+    solver: 'forceAtlas2Based',
+    forceAtlas2Based: {
+      gravitationalConstant: -60,
+      centralGravity: 0.005,
+      springLength: 120,
+      springConstant: 0.08,
+      damping: 0.4,
+      avoidOverlap: 0.8,
+    },
+    stabilization: { iterations: 200, fit: true },
+  },
+  interaction: {
+    hover: true,
+    tooltipDelay: 100,
+    hideEdgesOnDrag: true,
+    navigationButtons: false,
+    keyboard: false,
+  },
+  nodes: { shape: 'dot', borderWidth: 1.5 },
+  edges: { smooth: { type: 'continuous', roundness: 0.2 }, selectionWidth: 3 },
+});
+
+network.once('stabilizationIterationsDone', () => {
+  network.setOptions({ physics: { enabled: false } });
+});
+
+function showInfo(nodeId) {
+  const n = nodesDS.get(nodeId);
+  if (!n) return;
+  const neighborIds = network.getConnectedNodes(nodeId);
+  const neighborItems = neighborIds.map(nid => {
+    const nb = nodesDS.get(nid);
+    const color = nb ? nb.color.background : '#555';
+    return `<span class="neighbor-link" style="border-left-color:${esc(color)}" data-nid="${esc(nid)}">${esc(nb ? nb.label : nid)}</span>`;
+  }).join('');
+  document.getElementById('info-content').innerHTML = `
+    <div class="field"><b>${esc(n.label)}</b></div>
+    <div class="field">Type: ${esc(n._file_type || 'unknown')}</div>
+    <div class="field">Community: ${esc(n._community_name)}</div>
+    <div class="field">Source: ${esc(n._source_file || '-')}</div>
+    <div class="field">Degree: ${n._degree}</div>
+    ${neighborIds.length ? `<div class="field" style="margin-top:8px;color:#aaa;font-size:11px">Neighbors (${neighborIds.length})</div><div id="neighbors-list">${neighborItems}</div>` : ''}
+  `;
+}
+
+function focusNode(nodeId) {
+  network.focus(nodeId, { scale: 1.4, animation: true });
+  network.selectNodes([nodeId]);
+  showInfo(nodeId);
+}
+
+// Neighbor links use a data attribute + one delegated listener rather than an
+// inline onclick. A node id/label sourced from a document or a scraped URL
+// (graphify add) can contain a double-quote; dropping the stringified id
+// unescaped into a quoted onclick both broke every link and allowed a hostile
+// source to inject an event handler into the local report (stored XSS, #1838).
+// esc() on data-nid keeps the value inside the attribute; the listener reads it
+// back verbatim. Bound to document so it survives the innerHTML rebuild that
+// recreates #neighbors-list on each showInfo().
+document.addEventListener('click', e => {
+  const el = e.target.closest('.neighbor-link');
+  if (el && el.dataset.nid !== undefined) focusNode(el.dataset.nid);
+});
+
+// Track hovered node — hover detection is more reliable than click params
+let hoveredNodeId = null;
+network.on('hoverNode', params => {
+  hoveredNodeId = params.node;
+  container.style.cursor = 'pointer';
+});
+network.on('blurNode', () => {
+  hoveredNodeId = null;
+  container.style.cursor = 'default';
+});
+container.addEventListener('click', () => {
+  if (hoveredNodeId !== null) {
+    showInfo(hoveredNodeId);
+    network.selectNodes([hoveredNodeId]);
+  }
+});
+network.on('click', params => {
+  if (params.nodes.length > 0) {
+    showInfo(params.nodes[0]);
+  } else if (hoveredNodeId === null) {
+    document.getElementById('info-content').innerHTML = '<span class="empty">Click a node to inspect it</span>';
+  }
+});
+
+const searchInput = document.getElementById('search');
+const searchResults = document.getElementById('search-results');
+searchInput.addEventListener('input', () => {
+  const q = searchInput.value.toLowerCase().trim();
+  searchResults.innerHTML = '';
+  if (!q) { searchResults.style.display = 'none'; return; }
+  const matches = RAW_NODES.filter(n => n.label.toLowerCase().includes(q)).slice(0, 20);
+  if (!matches.length) { searchResults.style.display = 'none'; return; }
+  searchResults.style.display = 'block';
+  matches.forEach(n => {
+    const el = document.createElement('div');
+    el.className = 'search-item';
+    el.textContent = n.label;
+    el.style.borderLeft = `3px solid ${n.color.background}`;
+    el.style.paddingLeft = '8px';
+    el.onclick = () => {
+      network.focus(n.id, { scale: 1.5, animation: true });
+      network.selectNodes([n.id]);
+      showInfo(n.id);
+      searchResults.style.display = 'none';
+      searchInput.value = '';
+    };
+    searchResults.appendChild(el);
+  });
+});
+document.addEventListener('click', e => {
+  if (!searchResults.contains(e.target) && e.target !== searchInput)
+    searchResults.style.display = 'none';
+});
+
+const hiddenCommunities = new Set();
+
+const selectAllCb = document.getElementById('select-all-cb');
+
+function updateSelectAllState() {
+  const total = LEGEND.length;
+  const hidden = hiddenCommunities.size;
+  selectAllCb.checked = hidden === 0;
+  selectAllCb.indeterminate = hidden > 0 && hidden < total;
+}
+
+function toggleAllCommunities(hide) {
+  document.querySelectorAll('.legend-item').forEach(item => {
+    hide ? item.classList.add('dimmed') : item.classList.remove('dimmed');
+  });
+  document.querySelectorAll('.legend-cb').forEach(cb => {
+    cb.checked = !hide;
+  });
+  LEGEND.forEach(c => {
+    if (hide) hiddenCommunities.add(c.cid); else hiddenCommunities.delete(c.cid);
+  });
+  const updates = RAW_NODES.map(n => ({ id: n.id, hidden: hide }));
+  nodesDS.update(updates);
+  updateSelectAllState();
+}
+
+const legendEl = document.getElementById('legend');
+LEGEND.forEach(c => {
+  const item = document.createElement('div');
+  item.className = 'legend-item';
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.className = 'legend-cb';
+  cb.checked = true;
+  cb.addEventListener('change', (e) => {
+    e.stopPropagation();
+    if (cb.checked) {
+      hiddenCommunities.delete(c.cid);
+      item.classList.remove('dimmed');
+    } else {
+      hiddenCommunities.add(c.cid);
+      item.classList.add('dimmed');
+    }
+    const updates = RAW_NODES
+      .filter(n => n.community === c.cid)
+      .map(n => ({ id: n.id, hidden: !cb.checked }));
+    nodesDS.update(updates);
+    updateSelectAllState();
+  });
+  item.innerHTML = `<div class="legend-dot" style="background:${c.color}"></div>
+    <span class="legend-label">${c.label}</span>
+    <span class="legend-count">${c.count}</span>`;
+  item.prepend(cb);
+  item.onclick = (e) => {
+    if (e.target === cb) return;
+    cb.checked = !cb.checked;
+    cb.dispatchEvent(new Event('change'));
+  };
+  legendEl.appendChild(item);
+});
+</script>
+<script>
+// Render hyperedges as shaded regions
+const hyperedges = [{"id": "phase2_killer_wedges", "label": "Phase 2 \u2014 Die 3 Killer-Wedges", "nodes": ["roadmap_ki_diagnose", "roadmap_auto_angebot", "roadmap_bewertungs_booster", "roadmap_reaktivierung", "roadmap_marge"], "relation": "participate_in", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "ROADMAP.md"}, {"id": "quiet_precision_pillars", "label": "Quiet Precision \u2014 Design-S\u00e4ulen", "nodes": ["design_philosophy_raum_und_form", "design_philosophy_farbe_und_material", "design_philosophy_skala_und_rhythmus", "design_philosophy_komposition_und_balance"], "relation": "form", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "DESIGN-PHILOSOPHY.md"}, {"id": "revenue_reporting_flow", "label": "Revenue and accounting reporting flow", "nodes": ["app_kasse", "app_sales_model", "app_buchhaltung", "app_statistik", "app_vertraege"], "relation": "participate_in", "confidence": "INFERRED", "confidence_score": 0.75, "source_file": "app.html"}, {"id": "shared_s_state_writers", "label": "Modules reading/writing the shared S state", "nodes": ["app_state_s", "app_localstorage_key", "app_auftraege", "app_kasse", "app_lager", "app_buchhaltung", "app_versicherung"], "relation": "participate_in", "confidence": "INFERRED", "confidence_score": 0.75, "source_file": "app.html"}, {"id": "public_customer_facing_pages", "label": "\u00d6ffentliche kundenseitige Seiten speisen den Haupt-App-Store", "nodes": ["anfrage_wizard", "booking_page", "status_page", "status_reparado_v1_store"], "relation": "participate_in", "confidence": "INFERRED", "confidence_score": 0.8, "source_file": "status.html"}, {"id": "repair_order_lifecycle", "label": "Repair order lifecycle", "nodes": ["app_anrufe", "app_diagnose", "app_angebote", "app_neworder", "app_auftraege", "app_bestellungen", "app_kasse"], "relation": "participate_in", "confidence": "INFERRED", "confidence_score": 0.85, "source_file": "app.html"}];
+// afterDrawing passes ctx already transformed to network coordinate space.
+// Draw node positions raw — no manual pan/zoom/DPR math needed.
+
+// Andrew's monotone chain. Returns the hull in counter-clockwise order, which
+// is what the perimeter must be traced in. Collinear and duplicate points
+// collapse to the extremes, so degenerate member sets render as a segment
+// rather than a zero-area crossed path.
+function convexHull(pts) {
+    const p = pts.slice().sort((a, b) => (a.x - b.x) || (a.y - b.y));
+    if (p.length < 3) return p;
+    const cross = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+    const build = seq => {
+        const out = [];
+        for (const q of seq) {
+            while (out.length >= 2 && cross(out[out.length - 2], out[out.length - 1], q) <= 0) out.pop();
+            out.push(q);
+        }
+        out.pop();
+        return out;
+    };
+    const hull = build(p).concat(build(p.slice().reverse()));
+    return hull.length >= 3 ? hull : p;
+}
+network.on('afterDrawing', function(ctx) {
+    hyperedges.forEach(h => {
+        const positions = h.nodes
+            .map(nid => network.getPositions([nid])[nid])
+            .filter(p => p !== undefined);
+        if (positions.length < 2) return;
+        ctx.save();
+        ctx.globalAlpha = 0.12;
+        ctx.fillStyle = '#6366f1';
+        ctx.strokeStyle = '#6366f1';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        // Centroid and expanded hull in network coordinates.
+        // The perimeter must follow hull order, not h.nodes order: tracing the
+        // raw member order self-intersects whenever the layout does not happen
+        // to place members in angular order, filling as crossed wedges.
+        const cx = positions.reduce((s, p) => s + p.x, 0) / positions.length;
+        const cy = positions.reduce((s, p) => s + p.y, 0) / positions.length;
+        const hull = convexHull(positions);
+        const expanded = hull.map(p => ({
+            x: cx + (p.x - cx) * 1.15,
+            y: cy + (p.y - cy) * 1.15
+        }));
+        ctx.moveTo(expanded[0].x, expanded[0].y);
+        expanded.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
+        ctx.closePath();
+        ctx.fill();
+        ctx.globalAlpha = 0.4;
+        ctx.stroke();
+        // Label
+        ctx.globalAlpha = 0.8;
+        ctx.fillStyle = '#4f46e5';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(h.label, cx, cy - 5);
+        ctx.restore();
+    });
+});
+</script>
+</body>
+</html>
