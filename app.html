@@ -328,7 +328,7 @@ function seed(){
   const orders=[
     {id:'b1',nr:'REP-1113',supplier:'Foneday',part:'Galaxy A14 Display',status:'offen',eta:d(2),ref:'o1113'},
     {id:'b2',nr:'REP-1109',supplier:'Foneday',part:'Redmi Note 14 Pro 5G Display',status:'unterwegs',eta:d(1),ref:'o1109'},
-    {id:'b3',nr:'Lager',supplier:'GSMparts',part:'iPhone 13 Akku ×5',status:'offen',eta:d(3),ref:''},
+    {id:'b3',nr:'Lager',supplier:'Mobileparts',part:'iPhone 13 Akku ×5',status:'offen',eta:d(3),ref:''},
   ];
   // --- Demo-Anreicherung: gut laufender Betrieb (für die Vorführung) ---
   const moreNames=['Sabine Vogt','Ali Demir','Marta Nowak','Jens Krause','Yusuf Kaya','Christina Bauer','Paolo Ricci','Lena Hofmann','Dennis Braun','Aylin Şahin','Robert Fischer','Nadia Haddad'];
@@ -1617,6 +1617,7 @@ function printProcList(){const open=(S.orders||[]).filter(b=>b.status!=='geliefe
 /* Lieferanten-Anbindung im Foneday-Stil (simuliert): 1-Klick-Bestellung + tägliche Preis-Synchronisierung */
 function ensureSupApi(){ if(!S.supApi){S.supApi={provider:'Foneday',connected:true,oneClick:true,lastSync:today(),partnerNr:'FD-72336-441'};save();} return S.supApi; }
 function lowParts(){ensureInv();return (S.parts||[]).filter(p=>p.stock<=p.min);}
+function supApiSetProvider(name){const a=ensureSupApi();a.provider=name;save();views.bestellungen();paintIcons();toast('Bestell-Lieferant: '+name);}
 function supApiConnect(){const a=ensureSupApi();a.connected=true;a.lastSync=today();save();toast(a.provider+' verbunden – Preise werden täglich abgeglichen');views.bestellungen();paintIcons();}
 function supApiDisconnect(){const a=ensureSupApi();a.connected=false;save();toast(a.provider+' getrennt');views.bestellungen();paintIcons();}
 function fonedaySync(){const a=ensureSupApi();if(!a.connected){toast(a.provider+' nicht verbunden');return;}a.lastSync=today();
@@ -1634,10 +1635,12 @@ function fonedayOrderAll(){const a=ensureSupApi();if(!a.connected){toast(a.provi
   S.mailLog.unshift({t:new Date().toISOString(),to:a.provider,ch:'API',rule:'Sammelbestellung',subj:low.length+' Positionen 1-Klick bestellt',how:a.provider+'-Integration'});
   save();views.bestellungen();paintIcons();refreshBadges();toast(low.length+' Positionen an '+a.provider+' übermittelt');}
 function supApiCard(){const a=ensureSupApi();const low=lowParts();
+  const sups=(S.suppliers||[]).map(s=>s.name);
   return `<div class="card" style="margin-bottom:14px;border:1px solid ${a.connected?'var(--green,#0e7a3c)':'var(--line)'}">
-     <div class="between" style="flex-wrap:wrap;gap:10px"><div style="display:flex;gap:12px;align-items:center"><div class="lg">FD</div>
-       <div><b>Lieferanten-Anbindung · ${esc(a.provider)}</b> ${a.connected?'<span class="tag">verbunden</span>':'<span class="tag">getrennt</span>'}
-         <div class="muted" style="font-size:12px">${a.connected?('Preise täglich abgeglichen · zuletzt '+fmtDate(a.lastSync)+' · 1-Klick-Bestellung aktiv'):'Nicht verbunden – 1-Klick-Bestellung &amp; Preis-Sync inaktiv'}</div></div></div>
+     <div class="between" style="flex-wrap:wrap;gap:10px"><div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><div class="lg">${esc((a.provider||'?').slice(0,2).toUpperCase())}</div>
+       <div><b>Lieferanten-Anbindung</b> ${a.connected?'<span class="tag">verbunden</span>':'<span class="tag">getrennt</span>'}
+         <div class="muted" style="font-size:12px">${a.connected?('Preise täglich abgeglichen · zuletzt '+fmtDate(a.lastSync)+' · 1-Klick-Bestellung aktiv'):'Nicht verbunden – 1-Klick-Bestellung &amp; Preis-Sync inaktiv'}</div></div>
+       <select class="in" style="width:auto;padding:6px 10px" onchange="supApiSetProvider(this.value)">${sups.map(n=>`<option ${a.provider===n?'selected':''}>${esc(n)}</option>`).join('')}</select></div>
        <div class="row" style="gap:8px">${a.connected?`<button class="btn sm" onclick="fonedaySync()">Preise synchronisieren</button><button class="btn sm gho" onclick="supApiDisconnect()">Trennen</button>`:`<button class="btn sm pri" onclick="supApiConnect()">Verbinden</button>`}</div></div>
      ${a.connected&&low.length?`<div class="divider" style="margin:12px 0"></div>
        <div class="between" style="margin-bottom:8px"><b>Bestellvorschlag · Unterbestand (${low.length})</b><button class="btn sm pri" onclick="fonedayOrderAll()">Alle mit 1 Klick bei ${esc(a.provider)} bestellen</button></div>
@@ -1672,9 +1675,9 @@ function ensureInv(){ let ch=false;
     {id:'mv1',ts:new Date(Date.now()-86400000*2).toISOString(),partId:'p2',name:'iPhone 13 Display (OLED)',type:'zugang',qty:5,before:0,after:5,reason:'Wareneingang · Foneday'},
     {id:'mv2',ts:new Date(Date.now()-86400000).toISOString(),partId:'p2',name:'iPhone 13 Display (OLED)',type:'abgang',qty:-1,before:5,after:4,reason:'Verbraucht · Reparatur'},
     {id:'mv3',ts:new Date(Date.now()-3600000*5).toISOString(),partId:'p3',name:'iPhone 13 Akku',type:'inventur',qty:-1,before:2,after:1,reason:'Inventur-Korrektur'}];ch=true;}
-  if(!S.suppliers){S.suppliers=[{id:'sup1',name:'Foneday',contact:'service@foneday.de',note:'Displays & Akkus'},{id:'sup2',name:'GSMparts',contact:'',note:''},{id:'sup3',name:'ASWO',contact:'',note:'Ersatzteile'}];ch=true;}
+  if(!S.suppliers){S.suppliers=[{id:'sup1',name:'Faro line',contact:'info@faro-line.de',note:'Ersatzteile & Displays'},{id:'sup2',name:'Foneday',contact:'service@foneday.com',note:'Displays & Akkus · 1-Klick-Bestellung'},{id:'sup3',name:'ASWO',contact:'',note:'Ersatzteile'},{id:'sup4',name:'Mobileparts',contact:'',note:'Ersatzteile'}];ch=true;}
   if(!S.partCats){S.partCats=Array.from(new Set(['Display','Akku','Ladebuchse','Kamera','Backcover','Kleinteile','Zubehör','Sonstige'].concat((S.parts||[]).map(p=>p.cat).filter(Boolean))));ch=true;}
-  (S.parts||[]).forEach((p,i)=>{if(p.vk===undefined){p.vk=Math.round((p.price||0)*2.2);ch=true;}if(p.supplier===undefined){p.supplier=['Foneday','GSMparts','ASWO'][i%3];ch=true;}});
+  (S.parts||[]).forEach((p,i)=>{if(p.vk===undefined){p.vk=Math.round((p.price||0)*2.2);ch=true;}if(p.supplier===undefined){p.supplier=['Faro line','Foneday','ASWO','Mobileparts'][i%4];ch=true;}});
   if(ch)save();
 }
 function invLagerwert(){return (S.parts||[]).reduce((s,p)=>s+(p.stock||0)*(p.price||0),0);}
@@ -2848,7 +2851,7 @@ function seedAcct(){
    {id:'bl1',from:'Foneday B.V.',email:'billing@foneday.com',subject:'Ihre Rechnung RE-24188 – Ersatzteile',date:dm(-2),invNo:'RE-24188',gross:342.00,vatRate:19,catKey:'wareneinkauf',due:dm(12),confidence:97,status:'neu',source:'email'},
    {id:'bl2',from:'Deutsche Telekom',email:'rechnung@telekom.de',subject:'Ihre Telekom Rechnung August 2026',date:dm(-1),invNo:'2026-8801921',gross:79.90,vatRate:19,catKey:'telefon',due:dm(9),confidence:99,status:'neu',source:'email'},
    {id:'bl3',from:'Hausverwaltung Balingen',email:'buchhaltung@hv-balingen.de',subject:'Miete Gewerbe',date:dm(-3),invNo:'M-2026-08',gross:950.00,vatRate:0,catKey:'miete',due:dm(2),confidence:96,status:'neu',source:'email'},
-   {id:'bl4',from:'GSMparts GmbH',email:'invoice@gsmparts.de',subject:'Rechnung 2026-5567 – Display-Lieferung',date:dm(-5),invNo:'2026-5567',gross:588.00,vatRate:19,catKey:'wareneinkauf',due:dm(8),confidence:96,status:'neu',source:'email'},
+   {id:'bl4',from:'Faro line',email:'billing@faro-line.de',subject:'Rechnung 2026-5567 – Display-Lieferung',date:dm(-5),invNo:'2026-5567',gross:588.00,vatRate:19,catKey:'wareneinkauf',due:dm(8),confidence:96,status:'neu',source:'email'},
    {id:'bl5',from:'Allianz Versicherung',email:'post@allianz.de',subject:'Betriebshaftpflicht Beitrag',date:dm(-6),invNo:'AZ-2026-4471',gross:48.50,vatRate:19,catKey:'versicherung',due:dm(4),confidence:98,status:'neu',source:'email'},
    {id:'bl6',from:'Handyzubehör24',email:'noreply@handyzubehoer24.de',subject:'Rechnung (Scan) – teils unleserlich',date:dm(-1),invNo:'unklar',gross:64.90,vatRate:19,catKey:'buero',due:dm(9),confidence:71,status:'neu',source:'email'}
   ];
@@ -2856,7 +2859,7 @@ function seedAcct(){
   if(a.autoBook) S.belege.filter(b=>b.status==='neu'&&b.confidence>=a.autoThreshold).forEach(b=>autoBookBeleg(b));
   a.seeded=true; save();
 }
-const SUPPLIERS=[['Foneday B.V.','wareneinkauf',19,['Ersatzteil-Lieferung','Display-Charge','Akku-Set']],['GSMparts GmbH','wareneinkauf',19,['Display-Lieferung','Ersatzteile']],['Amazon Business','buero',19,['Büromaterial','Verpackung']],['Vodafone GmbH','telefon',19,['Mobilfunkrechnung']],['ARAL','kfz',19,['Tankbeleg']],['Meta Ads','werbung',19,['Werbeanzeigen']]];
+const SUPPLIERS=[['Foneday','wareneinkauf',19,['Ersatzteil-Lieferung','Display-Charge','Akku-Set']],['Faro line','wareneinkauf',19,['Display-Lieferung','Ersatzteile']],['Mobileparts','wareneinkauf',19,['Ersatzteile','Akku-Set']],['ASWO','wareneinkauf',19,['Ersatzteile']],['Amazon Business','buero',19,['Büromaterial','Verpackung']],['Vodafone GmbH','telefon',19,['Mobilfunkrechnung']]];
 function autoBookBeleg(b){
   b.net=b.vatRate?b.gross/(1+b.vatRate/100):b.gross;b.vat=b.gross-b.net;
   S.bookings.unshift({id:uid('bk'),date:b.date,text:b.from+' · '+b.invNo,gross:b.gross,net:b.net,vat:b.vat,vatRate:b.vatRate,dir:'aus',catKey:b.catKey,src:'email-auto',belegRef:b.invNo,status:'gebucht'});
