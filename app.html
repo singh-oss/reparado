@@ -772,10 +772,11 @@ function kanCard(o){const c=cust(o.cid);const prioTag=(o.prio&&o.prio!=='Standar
 function kanBoard(){
   const src=visibleOrders(); const cols=statusFlow(); const byS={}; cols.forEach(s=>byS[s]=[]);
   src.forEach(o=>{(byS[o.status]||(byS[o.status]=[])).push(o);});
-  const colHtml=cols.map(s=>{const c=statusColor(s);const items=sortOrders(byS[s]||[]);
+  const CAP=15;
+  const colHtml=cols.map(s=>{const c=statusColor(s);const all=sortOrders(byS[s]||[]);const sum=all.reduce((a,o)=>a+oTotal(o),0);const items=all.slice(0,CAP);const rest=all.length-items.length;
     return `<div class="kancol" ondragover="event.preventDefault();this.style.background='var(--soft2)'" ondragleave="this.style.background='var(--soft)'" ondrop="this.style.background='var(--soft)';kanDrop(event,'${s}')" style="min-width:250px;flex:1;background:var(--soft);border-radius:12px;padding:10px;border-top:3px solid ${c}">
-      <div class="between" style="margin-bottom:8px"><b style="color:${c}">${esc(statusLabel(s))}</b><span class="pill soft"><span class="d"></span>${items.length}</span></div>
-      <div style="display:flex;flex-direction:column;gap:8px;min-height:60px">${items.map(kanCard).join('')||'<div class="muted" style="font-size:12px;text-align:center;padding:12px 0">Keine</div>'}</div>
+      <div class="between" style="margin-bottom:8px"><b style="color:${c}">${esc(statusLabel(s))}</b><span class="pill soft"><span class="d"></span>${all.length}${sum?' · '+eur(sum):''}</span></div>
+      <div style="display:flex;flex-direction:column;gap:8px;min-height:60px">${items.map(kanCard).join('')||'<div class="muted" style="font-size:12px;text-align:center;padding:12px 0">Keine</div>'}${rest>0?`<div class="muted" style="font-size:12px;text-align:center;padding:6px 0">+${rest} weitere</div>`:''}</div>
     </div>`;}).join('');
   return `<div class="note" style="margin-bottom:12px">Karten per Drag &amp; Drop zwischen den Spalten ziehen, um den Status zu ändern – der Kunde wird bei hinterlegter Vorlage automatisch benachrichtigt.</div>
    <div style="display:flex;gap:12px;overflow-x:auto;padding-bottom:8px">${colHtml}</div>`;
