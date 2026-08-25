@@ -276,42 +276,39 @@ const SHOP = {name:"Dein Handy Doc", city:"Balingen", street:"Bahnhofstr. 12", z
 const KEY='reparado_v1';
 /* ===== Datenschicht =====
    EINZIGE Stelle für Persistenz. localStorage ist immer der lokale Live-Cache
-   (offline-fähig, schnell). Ist eine Supabase-Config vorhanden (window.REPARADO_CONFIG,
-   siehe config.js), läuft zusätzlich der Server-Modus: beim Start wird der geteilte
-   Stand vom Server geladen (hydrate), jede Änderung wird zurückgeschrieben (_push).
-   Ohne Config = reiner Lokal-Modus, App verhält sich exakt wie bisher.
-   ⚠️ Server-Pfad ist noch NICHT live-verifiziert – wird mit dem echten Projekt getestet. */
-const CFG = (typeof window!=='undefined' && window.REPARADO_CONFIG && window.REPARADO_CONFIG.supabaseUrl && window.REPARADO_CONFIG.supabaseKey) ? window.REPARADO_CONFIG : null;
+   (offline-fähig, schnell). Ist eine Server-Config vorhanden (window.REPARADO_CONFIG
+   mit apiUrl, siehe config.js), läuft der Server-Modus gegen das Reparado-Backend:
+   beim Start wird der geteilte Stand geladen (hydrate), jede Änderung zurückgeschrieben
+   (_push, gebündelt). Der Server leitet die Werkstatt aus dem Login-Token ab.
+   Ohne Config = reiner Lokal-Modus, App verhält sich exakt wie bisher. */
+const CFG = (typeof window!=='undefined' && window.REPARADO_CONFIG && window.REPARADO_CONFIG.apiUrl) ? window.REPARADO_CONFIG : null;
+const API = CFG ? String(CFG.apiUrl).replace(/\/+$/,'') : '';
 const DB = {
   key: KEY,
   backend: CFG ? 'server' : 'local',
-  tenant: CFG ? (CFG.workshopId||null) : null,   // Werkstatt-/Mandanten-ID
-  token: null,                                    // Supabase-Auth-JWT (Server-Modus)
-  _user: null, _pt: null,
+  tenant: null,          // Werkstatt-ID (aus Login), nur zur Anzeige
+  token: null,           // Login-Token (Server-Modus)
+  name: null, role: null, _pt: null,
   read(){ try{ return JSON.parse(localStorage.getItem(this.key)); }catch(e){ return null; } },
   write(x){ try{ localStorage.setItem(this.key, JSON.stringify(x)); }catch(e){}
-    if(this.backend==='server'){ this._pushDebounced(x); } },
-  _hdr(){ return {'apikey':CFG.supabaseKey,'Authorization':'Bearer '+(this.token||CFG.supabaseKey),'Content-Type':'application/json'}; },
+    if(this.backend==='server' && this.token){ this._pushDebounced(x); } },
+  _hdr(){ return {'Authorization':'Bearer '+this.token,'Content-Type':'application/json'}; },
   _pushDebounced(x){ clearTimeout(this._pt); const self=this; this._pt=setTimeout(function(){ self._push(x); }, 800); },
-  _push(x){ if(!this.tenant||!CFG) return; const self=this;
-    fetch(CFG.supabaseUrl+'/rest/v1/app_data', {method:'POST', headers:Object.assign({'Prefer':'resolution=merge-duplicates'}, this._hdr()),
-      body:JSON.stringify({workshop_id:this.tenant, key:this.key, value:x, updated_at:new Date().toISOString()})})
+  _push(x){ if(!this.token) return;
+    fetch(API+'/api/state', {method:'POST', headers:this._hdr(), body:JSON.stringify({value:x})})
       .then(function(r){ if(!r.ok) console.warn('DB push', r.status); }).catch(function(e){ console.warn('DB push offline', e); }); },
-  hydrate(){ const self=this; if(!this.tenant||!CFG) return Promise.resolve(false);
-    return fetch(CFG.supabaseUrl+'/rest/v1/app_data?workshop_id=eq.'+encodeURIComponent(this.tenant)+'&key=eq.'+encodeURIComponent(this.key)+'&select=value', {headers:this._hdr()})
-      .then(function(r){ return r.ok? r.json() : []; })
-      .then(function(rows){ if(rows && rows[0] && rows[0].value){ localStorage.setItem(self.key, JSON.stringify(rows[0].value)); return true; } return false; })
-      .catch(function(){ return false; }); },
+  hydrate(){ const self=this; if(!this.token) return Promise.resolve(false);
+    return fetch(API+'/api/state', {headers:this._hdr()})
+      .then(function(r){ if(r.status===401){ self.logoutServer(); throw new Error('Sitzung abgelaufen'); } return r.ok? r.json() : {}; })
+      .then(function(d){ if(d && d.value){ localStorage.setItem(self.key, JSON.stringify(d.value)); return true; } return false; }); },
   login(email,pw){ const self=this; if(!CFG) return Promise.reject(new Error('Keine Server-Config'));
-    return fetch(CFG.supabaseUrl+'/auth/v1/token?grant_type=password', {method:'POST', headers:{'apikey':CFG.supabaseKey,'Content-Type':'application/json'}, body:JSON.stringify({email:email,password:pw})})
-      .then(function(r){ return r.json(); })
-      .then(function(d){ if(d.access_token){ self.token=d.access_token; self._user=d.user; try{localStorage.setItem('reparado_sb_token', d.access_token);}catch(e){} return d; } throw new Error(d.error_description||d.msg||'Anmeldung fehlgeschlagen'); }); },
-  resolveTenant(){ const self=this; if(this.tenant||!CFG) return Promise.resolve(this.tenant);
-    const uid=self._user&&self._user.id; if(!uid) return Promise.resolve(null);
-    return fetch(CFG.supabaseUrl+'/rest/v1/memberships?user_id=eq.'+encodeURIComponent(uid)+'&select=workshop_id&limit=1', {headers:this._hdr()})
-      .then(function(r){ return r.ok?r.json():[]; }).then(function(rows){ if(rows&&rows[0]){ self.tenant=rows[0].workshop_id; } return self.tenant; }); },
-  restoreSession(){ try{ const t=localStorage.getItem('reparado_sb_token'); if(t){ this.token=t; return true; } }catch(e){} return false; },
-  logoutServer(){ this.token=null; this._user=null; try{localStorage.removeItem('reparado_sb_token');}catch(e){} }
+    return fetch(API+'/api/auth/login', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email:email,password:pw})})
+      .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, d:d}; }); })
+      .then(function(res){ if(res.ok && res.d.token){ self.token=res.d.token; self.tenant=res.d.workshopId; self.name=res.d.name; self.role=res.d.role;
+          try{localStorage.setItem('reparado_token', res.d.token);}catch(e){} return res.d; }
+        throw new Error((res.d && res.d.error) || 'Anmeldung fehlgeschlagen'); }); },
+  restoreSession(){ try{ const t=localStorage.getItem('reparado_token'); if(t){ this.token=t; return true; } }catch(e){} return false; },
+  logoutServer(){ this.token=null; try{localStorage.removeItem('reparado_token');}catch(e){} }
 };
 let S = load();
 
@@ -3530,13 +3527,13 @@ function serverLoginOverlay(err){
 }
 function sbDoLogin(){const em=(document.getElementById('sbEmail')||{}).value||'';const pw=(document.getElementById('sbPw')||{}).value||'';
   if(!em||!pw){serverLoginOverlay('Bitte E-Mail und Passwort eingeben.');return;}
-  DB.login(em.trim(),pw).then(()=>DB.resolveTenant()).then(()=>DB.hydrate()).then(()=>{
+  DB.login(em.trim(),pw).then(()=>DB.hydrate()).then(()=>{
     const ov=document.getElementById('sbLogin'); if(ov)ov.remove(); S=load(); bootApp();
   }).catch(e=>serverLoginOverlay(e.message||'Anmeldung fehlgeschlagen.'));
 }
 function startApp(){
   if(DB.backend==='server'){
-    if(DB.restoreSession()){ DB.resolveTenant().then(()=>DB.hydrate()).then(()=>{ S=load(); bootApp(); }).catch(()=>serverLoginOverlay()); }
+    if(DB.restoreSession()){ DB.hydrate().then(()=>{ S=load(); bootApp(); }).catch(()=>serverLoginOverlay('Bitte erneut anmelden.')); }
     else { serverLoginOverlay(); }
   } else { bootApp(); }
 }

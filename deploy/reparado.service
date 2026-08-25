@@ -1,0 +1,15 @@
+[Unit]
+Description=Reparado Backend
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/reparado
+ExecStart=/usr/bin/python3 /opt/reparado/server.py
+Restart=always
+RestartSec=3
+User=reparado
+Group=reparado
+
+[Install]
+WantedBy=multi-user.target

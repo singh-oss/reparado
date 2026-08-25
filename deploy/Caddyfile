@@ -1,0 +1,7 @@
+# Reparado-Backend hinter Caddy (automatisches HTTPS)
+# Subdomain z. B. werkstatt.margency.de -> DNS A-Record auf die Server-IP.
+
+werkstatt.margency.de {
+    reverse_proxy 127.0.0.1:8790
+    encode gzip
+}
