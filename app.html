@@ -227,7 +227,7 @@
 
 <div id="loginScreen"><div class="loginbox">
   <div class="loginbrand"><span class="dot">R</span> Reparado</div>
-  <div class="muted" style="margin-bottom:20px" id="loginWs">Anmeldung · Dein Handy Doc</div>
+  <div class="muted" style="margin-bottom:20px" id="loginWs">Anmeldung</div>
   <div id="loginStep"></div>
   <div class="loginhint">Demo-PINs · Geschäftsführung <b>1234</b> · Mitarbeiter <b>0000</b></div>
 </div></div>
@@ -272,7 +272,7 @@ function ic(name,size){return '<svg viewBox="0 0 24 24" fill="none" stroke="curr
 function paintIcons(){document.querySelectorAll('[data-ic]').forEach(e=>{if(!e.__done){e.innerHTML=ic(e.dataset.ic, e.classList.contains('ic')?18:18);e.__done=1;}});}
 
 /* ============================ STATE ============================ */
-const SHOP = {name:"Dein Handy Doc", city:"Balingen", street:"Bahnhofstr. 12", zip:"72336", phone:"07433 9678444", email:"info@deinhandydoc.de", google:"g.page/deinhandydoc/review", hours:"Mo–Fr 9–18 Uhr, Sa 9–13 Uhr", warranty:6};
+const SHOP = {name:"Meine Werkstatt", city:"", street:"", zip:"", phone:"", email:"", google:"", hours:"Mo–Fr 9–18 Uhr, Sa 9–13 Uhr", warranty:6};
 const KEY='reparado_v1';
 /* ===== Datenschicht =====
    EINZIGE Stelle für Persistenz. localStorage ist immer der lokale Live-Cache
@@ -301,12 +301,17 @@ const DB = {
     return fetch(API+'/api/state', {headers:this._hdr()})
       .then(function(r){ if(r.status===401){ self.logoutServer(); throw new Error('Sitzung abgelaufen'); } return r.ok? r.json() : {}; })
       .then(function(d){ if(d && d.value){ localStorage.setItem(self.key, JSON.stringify(d.value)); return true; } return false; }); },
+  _setSession(d){ this.token=d.token; this.tenant=d.workshopId; this.name=d.name; this.role=d.role; try{localStorage.setItem('reparado_token', d.token);}catch(e){} },
   login(email,pw){ const self=this; if(!CFG) return Promise.reject(new Error('Keine Server-Config'));
     return fetch(API+'/api/auth/login', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email:email,password:pw})})
       .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, d:d}; }); })
-      .then(function(res){ if(res.ok && res.d.token){ self.token=res.d.token; self.tenant=res.d.workshopId; self.name=res.d.name; self.role=res.d.role;
-          try{localStorage.setItem('reparado_token', res.d.token);}catch(e){} return res.d; }
+      .then(function(res){ if(res.ok && res.d.token){ self._setSession(res.d); return res.d; }
         throw new Error((res.d && res.d.error) || 'Anmeldung fehlgeschlagen'); }); },
+  signup(workshopName,email,pw){ const self=this; if(!CFG) return Promise.reject(new Error('Keine Server-Config'));
+    return fetch(API+'/api/auth/signup', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({workshopName:workshopName,email:email,password:pw})})
+      .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, d:d}; }); })
+      .then(function(res){ if(res.ok && res.d.token){ self._setSession(res.d); return res.d; }
+        throw new Error((res.d && res.d.error) || 'Registrierung fehlgeschlagen'); }); },
   restoreSession(){ try{ const t=localStorage.getItem('reparado_token'); if(t){ this.token=t; return true; } }catch(e){} return false; },
   logoutServer(){ this.token=null; try{localStorage.removeItem('reparado_token');}catch(e){} }
 };
@@ -574,7 +579,7 @@ function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>'
 const views={};
 let current='dashboard';
 /* ---- Benutzer & Rollen ---- */
-function defaultUsers(){return [{id:'u1',name:'Murat Öz',role:'inhaber',pin:'1234'},{id:'u2',name:'Lena Weber',role:'mitarbeiter',pin:'0000'},{id:'u3',name:'Tom Fischer',role:'mitarbeiter',pin:'0000'}];}
+function defaultUsers(){return [{id:'u1',name:'Inhaber',role:'inhaber',pin:'1234'},{id:'u2',name:'Mitarbeiter 1',role:'mitarbeiter',pin:'0000'},{id:'u3',name:'Mitarbeiter 2',role:'mitarbeiter',pin:'0000'}];}
 const ROLE_LABEL={inhaber:'Geschäftsführung',mitarbeiter:'Mitarbeiter'};
 const MA_HIDDEN=['statistik','buchhaltung','einstellungen','ankauf'];
 function curUser(){return (S.users||[]).find(u=>u.id===S.userId)||null;}
@@ -913,7 +918,7 @@ function openOrder(id){
 
      <div class="divider"></div>
      <label class="f">Status-Link für den Kunden</label>
-     <div class="row"><input class="in" style="flex:1" readonly value="${track}"><button class="btn" onclick="navigator.clipboard&&navigator.clipboard.writeText('${track}');toast('Link kopiert')">Kopieren</button><button class="btn" onclick="window.open('status.html?nr=${o.nr}','_blank')">Ansehen</button></div>
+     <div class="row"><input class="in" style="flex:1" readonly value="${track}"><button class="btn" onclick="navigator.clipboard&&navigator.clipboard.writeText('${track}');toast('Link kopiert')">Kopieren</button><button class="btn" onclick="window.open('status.html?nr=${o.nr}&ws='+encodeURIComponent(SHOP.name),'_blank')">Ansehen</button></div>
      ${o.status==='abgeholt'?`<div class="row" style="margin-top:10px;align-items:center;gap:10px"><button class="btn" onclick="askReview('${o.id}')">${o.reviewAsked?'Bewertung erneut anfragen':'Bewertung anfragen'}</button><span class="muted" style="font-size:12px">${o.reviewAsked?'bereits angefragt':'Zufriedene Kunden werden zu Google geleitet, kritische bleiben intern.'}</span></div>`:''}
      <div class="row" style="margin-top:12px;align-items:center;gap:12px"><div>${qrSVG(track,110)}</div><div><label class="f">Geräte-Akte (QR)</label><div class="muted" style="font-size:13px">Auf Etikett/Gerät kleben. Kunde &amp; Werkstatt scannen für Status, Fotos, Garantie und Reparatur-Historie.</div></div></div>
 
@@ -1671,7 +1676,7 @@ function reorderLow(partId){ensureInv();const p=S.parts.find(x=>x.id===partId);i
 function orderPartFor(id){const o=S.ord.find(x=>x.id===id);S.orders.unshift({id:uid('b'),type:'kunde',nr:o.nr,part:oDevLabel(o)+' · '+oIssueLabel(o),qty:1,supplier:'',status:'bestellt',prio:'normal',eta:dPlus(3),ref:o.id,created:today()});o.status='warten';save();closeAll();toast('Ersatzteil bestellt · Auftrag wartet');go('bestellungen');}
 function printProcList(){const open=(S.orders||[]).filter(b=>b.status!=='geliefert'&&b.status!=='storniert');printHTML('Bestellliste',shopHead()+`<h2>Bestellliste</h2><div class="muted">${fmtDate(today())} · ${open.length} offene Positionen</div><table><thead><tr><th>Teil</th><th>Menge</th><th>Lieferant</th><th>Für</th></tr></thead><tbody>${open.map(b=>`<tr><td>${esc(b.part)}</td><td class="mono">${b.qty||1}×</td><td>${esc(b.supplier||'—')}</td><td>${b.type==='kunde'?esc(b.nr):'Lager'}</td></tr>`).join('')||'<tr><td colspan="4">Keine offenen Bestellungen</td></tr>'}</tbody></table>`);}
 /* Lieferanten-Anbindung im Foneday-Stil (simuliert): 1-Klick-Bestellung + tägliche Preis-Synchronisierung */
-function ensureSupApi(){ if(!S.supApi){S.supApi={provider:'Foneday',connected:true,oneClick:true,lastSync:today(),partnerNr:'FD-72336-441'};save();} return S.supApi; }
+function ensureSupApi(){ if(!S.supApi){S.supApi=S.__clean?{provider:'Foneday',connected:false,oneClick:true,lastSync:'',partnerNr:''}:{provider:'Foneday',connected:true,oneClick:true,lastSync:today(),partnerNr:'FD-72336-441'};save();} return S.supApi; }
 function lowParts(){ensureInv();return (S.parts||[]).filter(p=>p.stock<=p.min);}
 function supApiSetProvider(name){const a=ensureSupApi();a.provider=name;save();views.bestellungen();paintIcons();toast('Bestell-Lieferant: '+name);}
 function supApiConnect(){const a=ensureSupApi();a.connected=true;a.lastSync=today();save();toast(a.provider+' verbunden – Preise werden täglich abgeglichen');views.bestellungen();paintIcons();}
@@ -1727,7 +1732,7 @@ views.bestellungen=function(){
 /* ============================ WARENWIRTSCHAFT (P2) ============================ */
 let lagerTab='lager', lagerCat='alle';
 function ensureInv(){ let ch=false;
-  if(!S.stockMoves){S.stockMoves=[
+  if(!S.stockMoves){S.stockMoves=S.__clean?[]:[
     {id:'mv1',ts:new Date(Date.now()-86400000*2).toISOString(),partId:'p2',name:'iPhone 13 Display (OLED)',type:'zugang',qty:5,before:0,after:5,reason:'Wareneingang · Foneday'},
     {id:'mv2',ts:new Date(Date.now()-86400000).toISOString(),partId:'p2',name:'iPhone 13 Display (OLED)',type:'abgang',qty:-1,before:5,after:4,reason:'Verbraucht · Reparatur'},
     {id:'mv3',ts:new Date(Date.now()-3600000*5).toISOString(),partId:'p3',name:'iPhone 13 Akku',type:'inventur',qty:-1,before:2,after:1,reason:'Inventur-Korrektur'}];ch=true;}
@@ -1886,7 +1891,7 @@ const SLA_PLANS={
   premium:{lbl:'Premium',rate:349,discount:20,responseH:4,priority:'Höchste',color:'#7c3aed',perks:['4h Reaktionszeit','Höchste Priorität','20% Rabatt','Leihgerätepool','Abholung & Rückbringung']}
 };
 function ensureContracts(){ if(!S.contracts){ S.contractCounter=2001;
-    S.contracts=[
+    S.contracts=S.__clean?[]:[
       {id:'ct_d1',nr:'BV-2001',firma:'Kanzlei Vogt & Partner',contact:'Frau Vogt',tel:'+49 7433 112233',mail:'office@kanzlei-vogt.de',plan:'business',started:dPlus(-95),status:'aktiv',
         pool:[{model:'iPhone 14 Pro',imei:'356789101234567',note:'Geschäftsführung'},{model:'iPhone 13',imei:'356789101299887',note:'Empfang'},{model:'iPad Air',imei:'—',note:'Konferenz'}],
         bills:[{ym:dPlus(-35).slice(0,7),base:149,repairs:[{ordNr:'REP-1090',label:'iPhone 13 Displaytausch',amount:127.5}],total:276.5,status:'bezahlt'},{ym:dPlus(-5).slice(0,7),base:149,repairs:[],total:149,status:'offen'}]},
@@ -1983,7 +1988,7 @@ views.vertraege=function(){
 const SHIP_CARRIERS=['DHL','DPD','GLS','Hermes','UPS'];
 const SHIP_ST={label:{lbl:'Label erstellt',color:'#6b7280'},transit_in:{lbl:'Unterwegs zu uns',color:'#2563eb'},received:{lbl:'Eingegangen',color:'#7c3aed'},repair:{lbl:'In Reparatur',color:'#b45309'},transit_out:{lbl:'Rückversand',color:'#0891b2'},delivered:{lbl:'Zugestellt',color:'#0e7a3c'}};
 function ensureShip(){ if(!S.shipments){ S.shipCounter=1003;
-    S.shipments=[
+    S.shipments=S.__clean?[]:[
       {id:'sh_d1',nr:'VS-1001',name:'Tobias Renz',tel:'+49 170 5551234',mail:'t.renz@mail.de',adr:'Lindenweg 8, 72379 Hechingen',brand:'Apple',model:'iPhone 13',issue:'Displaytausch',carrier:'DHL',tracking:'DH472819336104',status:'transit_in',created:dPlus(-1),ref:'',retTracking:'',history:[{s:'transit_in',t:new Date().toISOString()},{s:'label',t:new Date().toISOString()}]},
       {id:'sh_d2',nr:'VS-1002',name:'Sandra Ott',tel:'+49 151 5559988',mail:'sandra.ott@web.de',adr:'Am Markt 3, 78050 VS',brand:'Samsung',model:'Galaxy S22',issue:'Akkutausch',carrier:'DPD',tracking:'DP930155720481',status:'repair',created:dPlus(-3),ref:'',retTracking:'',history:[{s:'repair',t:new Date().toISOString()},{s:'received',t:new Date().toISOString()}]},
       {id:'sh_d3',nr:'VS-1003',name:'Kevin Bauer',tel:'+49 160 5552211',mail:'kbauer@gmx.de',adr:'Hauptstr. 44, 72336 Balingen',brand:'Apple',model:'iPhone 12',issue:'Kameraglas',carrier:'GLS',tracking:'GL118372640925',status:'transit_out',created:dPlus(-6),ref:'',retTracking:'GL770281334610',history:[{s:'transit_out',t:new Date().toISOString()}]}
@@ -2140,7 +2145,7 @@ function wishCard(){ensureWishes();const ws=S.wishes||[];const waiting=ws.filter
 let ankaufTab='alle';
 const TRADE_ST={verfuegbar:['Verfügbar','#0e7a3c'],reserviert:['Reserviert','#8b5cf6'],verkauft:['Verkauft','#6b7280']};
 function ensureTrade(){ let ch=false; if(!S.sold)S.sold=[];
-  if(!S.tradeInit){ S.tradeInit=true; ch=true; if(!S.sold.length){S.sold=[
+  if(!S.tradeInit){ S.tradeInit=true; ch=true; if(!S.sold.length&&!S.__clean){S.sold=[
     {id:'sd1',model:'iPhone 11 128GB',imei:'356789112233',cond:'Gut',buy:120,buyDate:today(),from:'Laufkundschaft',sellPrice:0,sellDate:'',to:'',status:'verfuegbar'},
     {id:'sd2',model:'Galaxy S21 128GB',imei:'',cond:'Sehr gut',buy:150,buyDate:today(),from:'',sellPrice:239,sellDate:today(),to:'',status:'verkauft'},
     {id:'sd3',model:'iPhone 12 64GB',imei:'',cond:'Gut',buy:180,buyDate:today(),from:'',sellPrice:0,sellDate:'',to:'Vorgemerkt',status:'reserviert'}];}}
@@ -2339,7 +2344,7 @@ function renderCart(){
 }
 function refreshCart(){const el=document.getElementById('cartlist');if(el)el.innerHTML=renderCart();}
 function cartQty(x,d){cart[x].qty=Math.max(1,cart[x].qty+d);refreshCart();}
-function ensurePos(){ if(!S.posItems){S.posItems=POS_ITEMS.map(x=>({name:x[0],price:x[1],cat:'Zubehör',sold:0}));save();} return S.posItems; }
+function ensurePos(){ if(!S.posItems){S.posItems=S.__clean?[]:POS_ITEMS.map(x=>({name:x[0],price:x[1],cat:'Zubehör',sold:0}));save();} return S.posItems; }
 let posCat='alle';
 function posCats(){const c=['alle'];ensurePos().forEach(p=>{if(c.indexOf(p.cat||'Sonstige')<0)c.push(p.cat||'Sonstige');});return c;}
 function posManage(){ensurePos();openModal(`<div class="dhead"><b style="flex:1">Artikel verwalten</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
@@ -2443,7 +2448,7 @@ function monthRevOffset(k){ const n=new Date(); n.setDate(1); n.setMonth(n.getMo
   const r=S.ord.filter(o=>(o.status==='abgeholt'||o.status==='fertig')&&inM(o.pickedAt||o.readyAt||o.created)).reduce((s,o)=>s+oTotal(o),0);
   const sa=(S.sales||[]).filter(x=>inM(x.t)).reduce((s,x)=>s+x.total,0);
   return r+sa; }
-function ensureBranches(){ if(!S.branches){ S.branches=[
+function ensureBranches(){ if(!S.branches){ S.branches=S.__clean?[]:[
     {id:'br1',name:'Albstadt',rev:8420,orders:96,rating:4.6},
     {id:'br2',name:'Hechingen',rev:11180,orders:121,rating:4.9},
     {id:'br3',name:'Reutlingen',rev:7650,orders:88,rating:4.5}
@@ -2696,7 +2701,7 @@ const INTEGRATIONS={
   lexware:{lbl:'Lexware Office',ab:'LX',cat:'Buchhaltung',desc:'Rechnungen & Belege automatisch übertragen',field:'API-Schlüssel',ph:'lxo_…'},
   google:{lbl:'Google Bewertungen',ab:'G',cat:'Marketing',desc:'Automatische Bewertungsanfrage nach Abholung',field:'Bewertungs-Link',ph:'g.page/dein-shop/review'}
 };
-function ensureIntegrations(){ if(!S.integrations){S.integrations={sumup:{connected:true,val:'M72336DHD'},hellocash:{connected:false,val:''},lexware:{connected:true,val:'lxo_demo_4471'},google:{connected:true,val:SHOP.google}};save();} return S.integrations; }
+function ensureIntegrations(){ if(!S.integrations){S.integrations=S.__clean?{sumup:{connected:false,val:''},hellocash:{connected:false,val:''},lexware:{connected:false,val:''},google:{connected:false,val:''}}:{sumup:{connected:true,val:'M72336DHD'},hellocash:{connected:false,val:''},lexware:{connected:true,val:'lxo_demo_4471'},google:{connected:true,val:SHOP.google}};save();} return S.integrations; }
 function integDef(k){return INTEGRATIONS[k];}
 function integConnected(k){const r=ensureIntegrations()[k];return !!(r&&r.connected);}
 function googleReviewLink(){const r=ensureIntegrations().google;return (r&&r.connected&&r.val)||SHOP.google;}
@@ -2729,7 +2734,7 @@ const INSURERS={
   'AppleCare+':{lbl:'AppleCare+',direct:false,prefix:'AC',note:'Apple direkt · keine Fachhändler-Direktabrechnung – Kunde zahlt und reicht selbst ein.'}
 };
 function insProvDef(p){return INSURERS[p]||INSURERS.Wertgarantie;}
-function ensureInsurers(){ if(!S.insurers){ S.insurers={Wertgarantie:{connected:true,partnerNr:'FH-72336-4471'},Assona:{connected:true,partnerNr:'AS-4471-72336'},SchutzKlick:{connected:false,partnerNr:''},hepster:{connected:false,partnerNr:''},'AppleCare+':{connected:false,partnerNr:''}}; save(); } return S.insurers; }
+function ensureInsurers(){ if(!S.insurers){ S.insurers=S.__clean?{Wertgarantie:{connected:false,partnerNr:''},Assona:{connected:false,partnerNr:''},SchutzKlick:{connected:false,partnerNr:''},hepster:{connected:false,partnerNr:''},'AppleCare+':{connected:false,partnerNr:''}}:{Wertgarantie:{connected:true,partnerNr:'FH-72336-4471'},Assona:{connected:true,partnerNr:'AS-4471-72336'},SchutzKlick:{connected:false,partnerNr:''},hepster:{connected:false,partnerNr:''},'AppleCare+':{connected:false,partnerNr:''}}; save(); } return S.insurers; }
 function insProvConnected(p){const r=ensureInsurers()[p];return !!(r&&r.connected);}
 function connectedInsurers(){ensureInsurers();return Object.keys(INSURERS).filter(insProvConnected);}
 function insurerConnect(p){const r=ensureInsurers();r[p]=r[p]||{partnerNr:''};r[p].connected=true;save();toast(insProvDef(p).lbl+' verbunden');views.einstellungen();paintIcons();}
@@ -2901,7 +2906,7 @@ let buchTab='overview';
 const KONTEN={erloese:{nr:'8400',label:'Erlöse 19%'},wareneinkauf:{nr:'3400',label:'Wareneingang'},miete:{nr:'4210',label:'Raum/Miete'},telefon:{nr:'4920',label:'Telefon/Internet'},buero:{nr:'4930',label:'Bürobedarf'},versicherung:{nr:'4360',label:'Versicherungen'},werbung:{nr:'4600',label:'Werbung'},kfz:{nr:'4530',label:'Kfz-Kosten'},bank:{nr:'1200',label:'Bank'},kasse:{nr:'1000',label:'Kasse'},kreditor:{nr:'1600',label:'Verbindlichk.'},ust:{nr:'1776',label:'USt 19%'},vst:{nr:'1576',label:'Vorsteuer 19%'}};
 const CAT_LABEL={erloese:'Erlöse',wareneinkauf:'Wareneinkauf',miete:'Miete',telefon:'Telefon/Internet',buero:'Bürobedarf',versicherung:'Versicherung',werbung:'Werbung',kfz:'Kfz'};
 function defaultAcct(){return {mode:'euer',skr:'SKR03',datev:{connected:false,beraterNr:'',mandantNr:''},mailConnected:true,autoBook:true,autoThreshold:95,seeded:false};}
-function ensureAcct(){ if(!S.acct){S.acct=defaultAcct();save();} if(!S.acct.seeded)seedAcct(); return S.acct; }
+function ensureAcct(){ if(!S.acct){S.acct=defaultAcct();save();} if(!S.acct.seeded){ if(S.__clean){S.acct.seeded=true;save();} else seedAcct(); } return S.acct; }
 function seedAcct(){
   const a=S.acct; const dm=(o)=>{const x=new Date();x.setDate(x.getDate()+o);return x.toISOString().slice(0,10);};
   const B=[]; let n=1;
@@ -3249,9 +3254,9 @@ function addDaysStr(n){const x=new Date();x.setDate(x.getDate()+n);return x.toIS
 
 let empfFilter='alle', simChannel='anruf', simAfter=false;
 /* P10 – Website-Widget: Embed-Code, Konfiguration & WordPress-Plugin */
-function ensureWidget(){ if(!S.widget){ S.widget={slug:'dein-handy-doc',accent:'#0e7a3c',show:{preise:true,buchung:true,anfrage:true},height:900,autoresize:true,embedBase:''}; save(); } if(S.widget.embedBase===undefined){S.widget.embedBase='';save();} return S.widget; }
+function ensureWidget(){ if(!S.widget){ S.widget={slug:'meine-werkstatt',accent:'#0e7a3c',show:{preise:true,buchung:true,anfrage:true},height:900,autoresize:true,embedBase:''}; save(); } if(S.widget.embedBase===undefined){S.widget.embedBase='';save();} return S.widget; }
 function widgetBase(){ const w=ensureWidget(); if(w.embedBase&&w.embedBase.trim()) return w.embedBase.trim().replace(/\/+$/,''); try{ return new URL('.',location.href).href.replace(/\/+$/,''); }catch(e){ return location.origin; } }
-function widgetUrl(typ){ const w=ensureWidget(); const page=(typ==='anfrage'?'anfrage':'booking')+'.html'; return widgetBase()+'/'+page+'?embed=1&accent='+encodeURIComponent(w.accent.replace('#','')); }
+function widgetUrl(typ){ const w=ensureWidget(); const page=(typ==='anfrage'?'anfrage':'booking')+'.html'; return widgetBase()+'/'+page+'?embed=1&accent='+encodeURIComponent(w.accent.replace('#',''))+'&ws='+encodeURIComponent(SHOP.name)+(SHOP.phone?'&tel='+encodeURIComponent(SHOP.phone):''); }
 function widgetEmbed(typ){ const w=ensureWidget(); const id='reparado-'+typ; const url=widgetUrl(typ);
   const resize=w.autoresize?`\n<script>window.addEventListener('message',function(e){if(e.data&&e.data.reparadoHeight){var f=document.getElementById('${id}');if(f)f.style.height=e.data.reparadoHeight+'px';}});<\/script>`:'';
   return `<iframe id="${id}" src="${url}" style="width:100%;height:${w.height}px;border:0;border-radius:16px;box-shadow:0 2px 14px rgba(0,0,0,.08)" loading="lazy" title="${typ==='anfrage'?'Reparatur anfragen':'Termin buchen'}"><\/iframe>`+resize; }
@@ -3522,29 +3527,41 @@ function bootApp(){ensureWorkshop(); ensureMaster(); applyMaster(); ensureAcct()
   if(nq) setTimeout(()=>toast(nq+' neue Website-Anfrage'+(nq>1?'n':'')),900);
   if(n) setTimeout(()=>toast(n+' neue Online-Buchung'+(n>1?'en':'')+' übernommen'),500);
 }
-/* Server-Modus: Anmeldung an die echte Datenbank (nur wenn config.js vorhanden) */
+/* Frischer, komplett leerer Zustand für ein neu registriertes Konto (keine Demo-Daten). */
+function blankState(){ return {v:11, __clean:true, cust:[], ord:[], parts:[], orders:[], sold:[], counter:1000, rules:defaultRules(), sales:[], cash:{connected:''}, mailLog:[], calls:[], phone:defaultPhone(), users:[{id:'u1',name:'Inhaber',role:'inhaber',pin:'1234'}], userId:'u1', insurance:defaultInsurance(), wgLeads:[], drafts:[], quotes:[], requests:[], quoteCounter:1000, feedback:[], reactDone:[]}; }
+function finishServerBoot(hadState){ const ov=document.getElementById('sbLogin'); if(ov)ov.remove(); if(!hadState){ try{ localStorage.setItem(KEY, JSON.stringify(blankState())); }catch(e){} } S=load(); bootApp(); }
+/* Server-Modus: Anmeldung / Selbst-Registrierung an der echten Datenbank (nur mit config.js) */
+let _sbMode='login';
+function sbSwitch(m){ _sbMode=m; serverLoginOverlay(); }
 function serverLoginOverlay(err){
-  let ov=document.getElementById('sbLogin'); if(!ov){ov=document.createElement('div');ov.id='sbLogin';ov.style.cssText='position:fixed;inset:0;z-index:9999;background:#0f2318;display:grid;place-items:center;padding:20px';document.body.appendChild(ov);}
-  ov.innerHTML=`<div style="background:#fff;border-radius:16px;padding:28px;max-width:380px;width:100%;font-family:Inter,sans-serif">
+  let ov=document.getElementById('sbLogin'); if(!ov){ov=document.createElement('div');ov.id='sbLogin';ov.style.cssText='position:fixed;inset:0;z-index:9999;background:#0f2318;display:grid;place-items:center;padding:20px;overflow:auto';document.body.appendChild(ov);}
+  const signup=_sbMode==='signup';
+  const inp='width:100%;padding:11px;border:1px solid #eaedeb;border-radius:10px;margin:4px 0 12px';
+  ov.innerHTML=`<div style="background:#fff;border-radius:16px;padding:28px;max-width:390px;width:100%;font-family:Inter,sans-serif">
      <div style="display:flex;gap:10px;align-items:center;margin-bottom:4px"><span style="width:30px;height:30px;border-radius:9px;background:#0e7a3c;color:#fff;display:grid;place-items:center;font-weight:800">R</span><b style="font-size:18px">Reparado</b></div>
-     <div style="color:#5f6b64;font-size:13px;margin-bottom:16px">Anmeldung an dein Werkstatt-Konto</div>
-     <label style="font-size:12px;font-weight:700;color:#5f6b64">E-Mail</label><input id="sbEmail" type="email" style="width:100%;padding:11px;border:1px solid #eaedeb;border-radius:10px;margin:4px 0 12px" placeholder="werkstatt@mail.de">
-     <label style="font-size:12px;font-weight:700;color:#5f6b64">Passwort</label><input id="sbPw" type="password" style="width:100%;padding:11px;border:1px solid #eaedeb;border-radius:10px;margin:4px 0 12px" placeholder="••••••">
+     <div style="color:#5f6b64;font-size:13px;margin-bottom:16px">${signup?'Neue Werkstatt anlegen – kostenlos testen':'Anmeldung an dein Werkstatt-Konto'}</div>
+     ${signup?`<label style="font-size:12px;font-weight:700;color:#5f6b64">Werkstatt-Name</label><input id="sbWs" style="${inp}" placeholder="z. B. Handy Klinik Musterstadt">`:''}
+     <label style="font-size:12px;font-weight:700;color:#5f6b64">E-Mail</label><input id="sbEmail" type="email" style="${inp}" placeholder="werkstatt@mail.de">
+     <label style="font-size:12px;font-weight:700;color:#5f6b64">Passwort</label><input id="sbPw" type="password" style="${inp}" placeholder="${signup?'mind. 6 Zeichen':'••••••'}">
      ${err?`<div style="color:#c0392b;font-size:13px;margin-bottom:10px">${esc(err)}</div>`:''}
-     <button onclick="sbDoLogin()" style="width:100%;padding:12px;border:0;border-radius:10px;background:#0e7a3c;color:#fff;font-weight:700;cursor:pointer">Anmelden</button>
+     <button onclick="${signup?'sbDoSignup()':'sbDoLogin()'}" style="width:100%;padding:12px;border:0;border-radius:10px;background:#0e7a3c;color:#fff;font-weight:700;cursor:pointer">${signup?'Konto anlegen &amp; starten':'Anmelden'}</button>
+     <div style="text-align:center;margin-top:14px;font-size:13px;color:#5f6b64">${signup?`Schon registriert? <a onclick="sbSwitch('login')" style="color:#0e7a3c;font-weight:700;cursor:pointer">Anmelden</a>`:`Noch kein Konto? <a onclick="sbSwitch('signup')" style="color:#0e7a3c;font-weight:700;cursor:pointer">Werkstatt anlegen</a>`}</div>
      <div style="color:#8a938d;font-size:11px;margin-top:12px;text-align:center">Gesicherte Verbindung · Daten in der EU</div>
    </div>`;
-  const pw=document.getElementById('sbPw'); if(pw)pw.onkeydown=e=>{if(e.key==='Enter')sbDoLogin();};
+  const pw=document.getElementById('sbPw'); if(pw)pw.onkeydown=e=>{if(e.key==='Enter'){signup?sbDoSignup():sbDoLogin();}};
 }
 function sbDoLogin(){const em=(document.getElementById('sbEmail')||{}).value||'';const pw=(document.getElementById('sbPw')||{}).value||'';
   if(!em||!pw){serverLoginOverlay('Bitte E-Mail und Passwort eingeben.');return;}
-  DB.login(em.trim(),pw).then(()=>DB.hydrate()).then(()=>{
-    const ov=document.getElementById('sbLogin'); if(ov)ov.remove(); S=load(); bootApp();
-  }).catch(e=>serverLoginOverlay(e.message||'Anmeldung fehlgeschlagen.'));
+  DB.login(em.trim(),pw).then(()=>DB.hydrate()).then(had=>finishServerBoot(had)).catch(e=>serverLoginOverlay(e.message||'Anmeldung fehlgeschlagen.'));
+}
+function sbDoSignup(){const ws=(document.getElementById('sbWs')||{}).value||'';const em=(document.getElementById('sbEmail')||{}).value||'';const pw=(document.getElementById('sbPw')||{}).value||'';
+  if(!ws.trim()){serverLoginOverlay('Bitte einen Werkstatt-Namen angeben.');return;}
+  if(!em||!pw){serverLoginOverlay('Bitte E-Mail und Passwort angeben.');return;}
+  DB.signup(ws.trim(),em.trim(),pw).then(()=>{ finishServerBoot(false); try{masterSet('name',ws.trim());}catch(e){} }).catch(e=>serverLoginOverlay(e.message||'Registrierung fehlgeschlagen.'));
 }
 function startApp(){
   if(DB.backend==='server'){
-    if(DB.restoreSession()){ DB.hydrate().then(()=>{ S=load(); bootApp(); }).catch(()=>serverLoginOverlay('Bitte erneut anmelden.')); }
+    if(DB.restoreSession()){ DB.hydrate().then(had=>finishServerBoot(had)).catch(()=>serverLoginOverlay('Bitte erneut anmelden.')); }
     else { serverLoginOverlay(); }
   } else { bootApp(); }
 }

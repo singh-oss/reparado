@@ -206,6 +206,30 @@ class H(BaseHTTPRequestHandler):
             return self._send(200, {"token": token, "workshopId": u["workshop_id"],
                                     "name": u["name"], "role": u["role"]})
 
+        if self.path == "/api/auth/signup":
+            # Öffentliche Selbst-Registrierung: Werkstatt legt ihr eigenes Konto an.
+            wname = (body.get("workshopName") or "").strip()
+            email = (body.get("email") or "").strip().lower()
+            pw = body.get("password") or ""
+            uname = (body.get("userName") or "Inhaber").strip() or "Inhaber"
+            if not wname:
+                return self._send(400, {"error": "Bitte einen Werkstatt-Namen angeben"})
+            if "@" not in email or "." not in email.split("@")[-1]:
+                return self._send(400, {"error": "Bitte eine gültige E-Mail angeben"})
+            if len(pw) < 6:
+                return self._send(400, {"error": "Passwort mind. 6 Zeichen"})
+            now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            wid = uid("ws"); usr = uid("u"); ph, salt = hash_pw(pw)
+            try:
+                with _lock, db() as c:
+                    c.execute("INSERT INTO workshops(id,name,created) VALUES(?,?,?)", (wid, wname, now))
+                    c.execute("INSERT INTO users(id,workshop_id,email,pw_hash,pw_salt,role,name,created) VALUES(?,?,?,?,?,?,?,?)",
+                              (usr, wid, email, ph, salt, "inhaber", uname, now))
+            except sqlite3.IntegrityError:
+                return self._send(409, {"error": "Diese E-Mail ist bereits registriert"})
+            token = make_token(usr, wid)
+            return self._send(200, {"token": token, "workshopId": wid, "name": uname, "role": "inhaber"})
+
         if self.path == "/api/state":
             p = self._auth()
             if not p:

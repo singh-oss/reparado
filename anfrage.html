@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Anfrage & Rückruf · Dein Handy Doc</title>
+<title>Anfrage & Rückruf</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -60,12 +60,12 @@
 </style>
 </head>
 <body>
-<div class="top"><span class="dot">D</span><b>Dein Handy Doc</b><span class="m">Anfrage & Rückruf</span></div>
+<div class="top"><span class="dot" id="wsDot">W</span><b id="wsName">Werkstatt</b><span class="m">Anfrage & Rückruf</span></div>
 <div class="wrap">
-  <div class="callnow">Lieber direkt sprechen?<a href="tel:074339678444">07433 9678444</a></div>
+  <div class="callnow" id="wsCall" style="display:none">Lieber direkt sprechen? <a id="wsTel"></a></div>
   <div class="steps"><div class="s on" id="s1"></div><div class="s" id="s2"></div><div class="s" id="s3"></div></div>
   <div id="view"></div>
-  <div class="foot">Bahnhofstr. 12 · 72336 Balingen · 07433 9678444</div>
+  <div class="foot" id="wsFoot"></div>
 </div>
 
 <script>
@@ -124,7 +124,7 @@ function render(){
         <div class="r"><span>Anliegen</span><b>${esc(state.issue)}</b></div>
         <div class="r"><span>Kontakt per</span><b>${esc(state.contact)}</b></div>
       </div>
-      <div class="note">In der Regel antworten wir innerhalb eines Werktags. Bei dringenden Fällen erreichen Sie uns unter 07433 9678444.</div>
+      <div class="note">In der Regel antworten wir innerhalb eines Werktags.</div>
       <div class="nav"><button class="btn pri" onclick="reset()">Neue Anfrage</button></div></div>`;
   }
 }
@@ -152,6 +152,7 @@ function postH(){if(window.parent!==window){try{window.parent.postMessage({repar
 try{if(window.ResizeObserver)new ResizeObserver(postH).observe(document.body);}catch(e){}
 window.addEventListener('load',postH);window.addEventListener('resize',postH);
 if(new URLSearchParams(location.search).get('embed')==='1')document.body.classList.add('embedded');
+(function(){var q=new URLSearchParams(location.search);var ws=q.get('ws');if(ws){var n=document.getElementById('wsName');if(n)n.textContent=ws;var d=document.getElementById('wsDot');if(d)d.textContent=(ws.trim()[0]||'W').toUpperCase();document.title=document.title+' · '+ws;}var tel=q.get('tel');if(tel){var t=document.getElementById('wsTel');var c=document.getElementById('wsCall');if(t){t.textContent=tel;t.href='tel:'+tel.replace(/\s/g,'');}if(c)c.style.display='';}})();
 render();
 </script>
 </body>

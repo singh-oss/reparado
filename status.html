@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reparatur-Status · Dein Handy Doc</title>
+<title>Reparatur-Status</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -54,11 +54,12 @@
 </style>
 </head>
 <body>
-<div class="top"><span class="dot">D</span><b>Dein Handy Doc</b><span class="m">Reparatur-Status</span></div>
+<div class="top"><span class="dot" id="wsDot">W</span><b id="wsName">Werkstatt</b><span class="m">Reparatur-Status</span></div>
 <div class="wrap" id="wrap"></div>
 
 <script>
-const SHOP={name:"Dein Handy Doc",street:"Bahnhofstr. 12",zip:"72336",city:"Balingen",phone:"07433 9678444",hours:"Mo–Fr 9–18 Uhr, Sa 9–13 Uhr",google:"g.page/deinhandydoc/review"};
+const SHOP={name:(new URLSearchParams(location.search).get('ws')||"Werkstatt"),street:"",zip:"",city:"",phone:"",hours:"Mo–Fr 9–18 Uhr, Sa 9–13 Uhr",google:""};
+(function(){var n=document.getElementById('wsName');if(n)n.textContent=SHOP.name;var d=document.getElementById('wsDot');if(d)d.textContent=(SHOP.name.trim()[0]||'W').toUpperCase();document.title='Reparatur-Status · '+SHOP.name;})();
 const CK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><path d="M20 6L9 17l-5-5"/></svg>';
 function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 function eur(n){return '€ '+Number(n||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2});}

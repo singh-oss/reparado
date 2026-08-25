@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Termin buchen · Dein Handy Doc</title>
+<title>Termin buchen</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -53,11 +53,11 @@
 </style>
 </head>
 <body>
-<div class="top"><span class="dot">D</span><b>Dein Handy Doc</b><span class="m">Online-Terminbuchung</span></div>
+<div class="top"><span class="dot" id="wsDot">W</span><b id="wsName">Werkstatt</b><span class="m">Online-Terminbuchung</span></div>
 <div class="wrap">
   <div class="steps"><div class="s on" id="s1"></div><div class="s" id="s2"></div><div class="s" id="s3"></div><div class="s" id="s4"></div></div>
   <div id="view"></div>
-  <div class="foot">Bahnhofstr. 12 · 72336 Balingen · 07433 9678444</div>
+  <div class="foot" id="wsFoot"></div>
 </div>
 
 <script>
@@ -144,6 +144,7 @@ function postH(){if(window.parent!==window){try{window.parent.postMessage({repar
 try{if(window.ResizeObserver)new ResizeObserver(postH).observe(document.body);}catch(e){}
 window.addEventListener('load',postH);window.addEventListener('resize',postH);
 if(new URLSearchParams(location.search).get('embed')==='1')document.body.classList.add('embedded');
+(function(){var ws=new URLSearchParams(location.search).get('ws');if(ws){var n=document.getElementById('wsName');if(n)n.textContent=ws;var d=document.getElementById('wsDot');if(d)d.textContent=(ws.trim()[0]||'W').toUpperCase();document.title=document.title+' · '+ws;}})();
 render();
 </script>
 </body>
