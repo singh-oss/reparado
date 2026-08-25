@@ -585,6 +585,11 @@ function ensureWorkshop(){ if(!S.workshop){ S.workshop={id:'ws_'+Math.random().t
   DB.tenant=S.workshop.id; return S.workshop; }
 function wsSet(k,v){const w=ensureWorkshop();w[k]=v;save();}
 const PLAN_LBL={basic:'Basic',plus:'Plus',pro:'Pro'};
+/* Editierbare Stammdaten pro Werkstatt – überlagern die feste SHOP-Konstante.
+   Neutral vorbelegt, damit jeder (potenzielle Kunde) seine eigenen Daten einträgt. */
+function ensureMaster(){ if(!S.master){ S.master={name:'Meine Werkstatt',street:'',zip:'',city:'',phone:'',email:'',google:'',hours:'Mo–Fr 9–18 Uhr, Sa 9–13 Uhr',warranty:6}; save(); } return S.master; }
+function applyMaster(){ const m=ensureMaster(); ['name','street','zip','city','phone','email','google','hours','warranty'].forEach(k=>{ if(m[k]!==undefined&&m[k]!==null) SHOP[k]=m[k]; }); if(S.workshop) S.workshop.name=m.name; }
+function masterSet(k,v){ const m=ensureMaster(); m[k]=v; if(k==='name'&&S.workshop)S.workshop.name=v; applyMaster(); save(); }
 /* Hardware/Drucker (Repender-Punkt) – simuliert. QZ Tray = Browser-Druckbrücke für Etiketten/Bons. */
 function ensureHardware(){ if(!S.hardware){S.hardware={qz:false,scanner:true,labelName:'',labelOn:false,receiptName:'',receiptOn:false};save();} return S.hardware; }
 function hwSet(k,v){const h=ensureHardware();h[k]=v;save();views.einstellungen();paintIcons();}
@@ -2518,18 +2523,24 @@ views.einstellungen=function(){
      <div class="between" style="flex-wrap:wrap;gap:10px"><div><b>Werkstatt-Account</b> <span class="tag">${esc(PLAN_LBL[w.plan]||w.plan)}</span> <span class="pill ${w.status==='active'?'soft':'dash'}"><span class="d"></span>${w.status==='active'?'Aktiv':(w.status==='trial'?'Testphase':'Gesperrt')}</span>
        <div class="muted" style="font-size:12px;margin-top:2px">Werkstatt-ID <span class="mono">${esc(w.id)}</span> · Kürzel <span class="mono">${esc(w.slug)}</span> · ${members} Nutzer · seit ${fmtDate(w.createdAt)}</div></div>
        <span class="pill soft" title="Datenschicht bereit für Server-Anbindung"><span class="d"></span>Läuft lokal · server-bereit</span></div>
-     <div class="grid g2" style="margin-top:12px"><div><label class="f">Account-Name (Werkstatt)</label><input class="in" value="${esc(w.name)}" onchange="wsSet('name',this.value)"></div>
-       <div><label class="f">Account-E-Mail (Login)</label><input class="in" value="${esc(w.email||'')}" placeholder="werkstatt@mail.de" onchange="wsSet('email',this.value)"></div>
+     <div class="grid g2" style="margin-top:12px"><div><label class="f">Werkstatt-Name</label><input class="in" value="${esc(ensureMaster().name)}" onchange="masterSet('name',this.value.trim());views.einstellungen();paintIcons()"></div>
+       <div><label class="f">Login-E-Mail</label><input class="in" value="${esc(w.email||'')}" placeholder="werkstatt@mail.de" onchange="wsSet('email',this.value)"></div>
        <div><label class="f">Steuernummer</label><input class="in" value="${esc(w.taxNr||'')}" placeholder="12/345/67890" onchange="wsSet('taxNr',this.value)"></div>
        <div><label class="f">USt-IdNr (für E-Rechnung)</label><input class="in" value="${esc(w.ustId||'')}" placeholder="DE123456789" onchange="wsSet('ustId',this.value)"></div></div>
      <div class="note" style="margin-top:10px">Dieser Account trennt Ihre Daten von anderen Werkstätten (Mandantentrennung). Aktuell lokal auf diesem Gerät – beim Live-Schalten wird daraus ein echter Online-Login, ohne dass sich für Sie etwas ändert.</div>
    </div>`;})()}
    <div class="grid g2" style="margin-top:16px">
-     <div class="card"><b>Stammdaten</b>
-       <div class="grid g2" style="margin-top:12px"><div><label class="f">Firma</label><input class="in" value="${SHOP.name}"></div>
-       <div><label class="f">Telefon</label><input class="in" value="${SHOP.phone}"></div>
-       <div><label class="f">Straße</label><input class="in" value="${SHOP.street}"></div>
-       <div><label class="f">PLZ / Ort</label><input class="in" value="${SHOP.zip} ${SHOP.city}"></div></div>
+     <div class="card"><b>Stammdaten</b><p class="muted" style="font-size:13px;margin:4px 0 10px">Diese Angaben erscheinen auf Belegen, Angeboten, Etiketten &amp; im Status-Portal. Trage die Daten deiner Werkstatt ein – sie werden automatisch gespeichert.</p>
+       ${(function(){const m=ensureMaster();return `<div class="grid g2" style="margin-top:4px">
+         <div><label class="f">Firma / Werkstatt-Name</label><input class="in" value="${esc(m.name)}" placeholder="z. B. Handy Klinik Musterstadt" onchange="masterSet('name',this.value.trim());views.einstellungen();paintIcons()"></div>
+         <div><label class="f">Telefon</label><input class="in" value="${esc(m.phone)}" placeholder="07000 000000" onchange="masterSet('phone',this.value)"></div>
+         <div><label class="f">Straße &amp; Nr.</label><input class="in" value="${esc(m.street)}" placeholder="Musterstraße 1" onchange="masterSet('street',this.value)"></div>
+         <div class="grid g2" style="gap:8px"><div><label class="f">PLZ</label><input class="in" value="${esc(m.zip)}" placeholder="12345" onchange="masterSet('zip',this.value)"></div><div><label class="f">Ort</label><input class="in" value="${esc(m.city)}" placeholder="Musterstadt" onchange="masterSet('city',this.value)"></div></div>
+         <div><label class="f">E-Mail</label><input class="in" value="${esc(m.email)}" placeholder="info@werkstatt.de" onchange="masterSet('email',this.value)"></div>
+         <div><label class="f">Öffnungszeiten</label><input class="in" value="${esc(m.hours)}" onchange="masterSet('hours',this.value)"></div>
+         <div><label class="f">Garantie auf Reparaturen (Monate)</label><input class="in" type="number" value="${m.warranty}" onchange="masterSet('warranty',+this.value||6)"></div>
+         <div><label class="f">Google-Bewertungs-Link</label><input class="in" value="${esc(m.google)}" placeholder="g.page/deine-werkstatt/review" onchange="masterSet('google',this.value)"></div>
+       </div>`;})()}
        <label class="f" style="margin-top:12px">Logo (auf Belegen, Angeboten, Etiketten)</label>
        <div class="row" style="align-items:center;gap:12px">${(ensureSettings().logo)?`<img src="${ensureSettings().logo}" style="height:44px;max-width:150px;object-fit:contain;border:1px solid var(--line);border-radius:8px;background:#fff;padding:3px">`:'<span class="muted" style="font-size:13px">Kein Logo</span>'}<label class="btn sm" style="cursor:pointer">${ensureSettings().logo?'Logo ändern':'Logo hochladen'}<input type="file" accept="image/*" style="display:none" onchange="logoUpload(this)"></label>${ensureSettings().logo?`<button class="btn sm gho" onclick="logoClear()">Entfernen</button>`:''}</div>
        <button class="btn pri" style="margin-top:12px" onclick="toast('Stammdaten gespeichert')">Speichern</button>
@@ -3507,7 +3518,7 @@ function demoDone(){ if(_demoStop)return; const el=document.getElementById('demo
 
 /* ============================ BOOT ============================ */
 paintIcons();
-function bootApp(){ensureWorkshop(); ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); ensureInv(); ensureProc(); ensureTrade(); ensureShip(); ensureContracts(); ensureInsurers(); ensureIntegrations(); const n=pullBookings(); const nq=pullRequests(); pullFeedback(); pullWarranty(); go('dashboard'); applyNavRole(); if(!curUser())showLogin();
+function bootApp(){ensureWorkshop(); ensureMaster(); applyMaster(); ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); ensureInv(); ensureProc(); ensureTrade(); ensureShip(); ensureContracts(); ensureInsurers(); ensureIntegrations(); const n=pullBookings(); const nq=pullRequests(); pullFeedback(); pullWarranty(); go('dashboard'); applyNavRole(); if(!curUser())showLogin();
   if(nq) setTimeout(()=>toast(nq+' neue Website-Anfrage'+(nq>1?'n':'')),900);
   if(n) setTimeout(()=>toast(n+' neue Online-Buchung'+(n>1?'en':'')+' übernommen'),500);
 }
