@@ -20,6 +20,7 @@ Konfiguration: config.py (nicht im oeffentlichen Repo!). Fehlt sie, gelten lokal
 import json, os, sqlite3, hmac, hashlib, base64, time, smtplib, ssl, threading
 from email.message import EmailMessage
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlparse, parse_qs
 
 # ---------- Konfiguration ----------
 try:
@@ -66,6 +67,10 @@ def init_db():
         CREATE TABLE IF NOT EXISTS mail_log(
           id INTEGER PRIMARY KEY AUTOINCREMENT, workshop_id TEXT, ts TEXT,
           recipient TEXT, subject TEXT, sent INTEGER, note TEXT);
+        CREATE TABLE IF NOT EXISTS sign_sessions(
+          token TEXT PRIMARY KEY, workshop_id TEXT, data TEXT,
+          signature TEXT, consents TEXT, signed INTEGER DEFAULT 0,
+          created REAL, expires REAL);
         """)
 
 # ---------- Passwort & Token ----------
@@ -190,6 +195,18 @@ class H(BaseHTTPRequestHandler):
             if row:
                 return self._send(200, {"value": json.loads(row["value"]), "updated_at": row["updated_at"]})
             return self._send(200, {"value": None})
+        if self.path.startswith("/api/sign/get"):
+            # Öffentlich (Kunde ist nicht eingeloggt): Auftrags-Snapshot per Einmal-Token abrufen.
+            q = parse_qs(urlparse(self.path).query)
+            tok = (q.get("t") or [""])[0]
+            now = time.time()
+            with db() as c:
+                row = c.execute("SELECT data,signature,consents,signed,expires FROM sign_sessions WHERE token=?", (tok,)).fetchone()
+            if not row or (row["expires"] or 0) < now:
+                return self._send(404, {"error": "Signatur-Link ungültig oder abgelaufen"})
+            return self._send(200, {"ok": True, "data": json.loads(row["data"]), "signed": bool(row["signed"]),
+                                    "signature": row["signature"] or "",
+                                    "consents": json.loads(row["consents"]) if row["consents"] else None})
         return self._send(404, {"error": "not found"})
 
     def do_POST(self):
@@ -243,6 +260,40 @@ class H(BaseHTTPRequestHandler):
                              ON CONFLICT(workshop_id,key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at""",
                           (p["wid"], "reparado_v1", json.dumps(val), ts))
             return self._send(200, {"ok": True, "updated_at": ts})
+
+        if self.path == "/api/sign/create":
+            # Werkstatt (eingeloggt) legt eine Signatur-Session an -> Token für QR-Link.
+            p = self._auth()
+            if not p:
+                return self._send(401, {"error": "unauthorized"})
+            data = body.get("data")
+            if data is None:
+                return self._send(400, {"error": "data fehlt"})
+            tok = uid("s")
+            now = time.time(); exp = now + 45 * 60
+            with _lock, db() as c:
+                c.execute("DELETE FROM sign_sessions WHERE expires<?", (now,))
+                c.execute("INSERT INTO sign_sessions(token,workshop_id,data,signature,consents,signed,created,expires) VALUES(?,?,?,?,?,?,?,?)",
+                          (tok, p["wid"], json.dumps(data), "", "", 0, now, exp))
+            return self._send(200, {"token": tok})
+
+        if self.path == "/api/sign/submit":
+            # Öffentlich: Kunde reicht Unterschrift + Einwilligungen zum Token ein.
+            tok = body.get("t") or ""
+            sig = body.get("signature") or ""
+            consents = body.get("consents")
+            if not tok or not sig:
+                return self._send(400, {"error": "Token/Unterschrift fehlt"})
+            if len(sig) > 500000:
+                return self._send(413, {"error": "Unterschrift zu groß"})
+            now = time.time()
+            with _lock, db() as c:
+                row = c.execute("SELECT expires,signed FROM sign_sessions WHERE token=?", (tok,)).fetchone()
+                if not row or (row["expires"] or 0) < now:
+                    return self._send(404, {"error": "Signatur-Link ungültig oder abgelaufen"})
+                c.execute("UPDATE sign_sessions SET signature=?,consents=?,signed=1 WHERE token=?",
+                          (sig, json.dumps(consents), tok))
+            return self._send(200, {"ok": True})
 
         if self.path == "/api/mail/send":
             p = self._auth()

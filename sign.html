@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="robots" content="noindex,nofollow">
+<title>Auftrag prüfen & unterschreiben</title>
+<style>
+:root{--acc:#16a34a;--acc2:#0f7a37;--ink:#0f2318;--ink2:#5f6b64;--line:#e3e8e4;--soft:#f4f7f5;--bg:#fff}
+*{box-sizing:border-box}
+html,body{margin:0;background:#eef2ef;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;-webkit-text-size-adjust:100%}
+.wrap{max-width:560px;margin:0 auto;padding:16px 14px 40px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:14px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.head{background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;border-radius:14px;padding:18px 16px;margin-top:14px}
+.head h1{margin:0;font-size:19px}.head p{margin:4px 0 0;opacity:.9;font-size:13px}
+h2{font-size:15px;margin:0 0 8px}
+.muted{color:var(--ink2)}.sm{font-size:13px}.xs{font-size:12px}
+.row{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.dev{border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:10px;background:var(--soft)}
+.pos{display:flex;justify-content:space-between;font-size:14px;padding:4px 0;border-top:1px dashed var(--line)}
+.pos:first-of-type{border-top:0}
+.mono{font-variant-numeric:tabular-nums}
+.tot{display:flex;justify-content:space-between;font-weight:800;font-size:18px;margin-top:10px;padding-top:10px;border-top:2px solid var(--line)}
+.agb{max-height:180px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:10px;font-size:12px;line-height:1.55;color:#41504a;background:var(--soft)}
+label.chk{display:flex;gap:10px;align-items:flex-start;margin-top:12px;font-size:14px;cursor:pointer}
+label.chk input{width:22px;height:22px;margin-top:1px;accent-color:var(--acc);flex:0 0 auto}
+.sigbox{border:2px dashed var(--line);border-radius:12px;background:#fff;margin-top:8px;position:relative}
+canvas{display:block;width:100%;height:200px;touch-action:none;border-radius:12px}
+.sigline{position:absolute;left:14px;right:14px;bottom:34px;border-bottom:1px solid #cbd5cd}
+.btn{display:block;width:100%;border:0;border-radius:12px;padding:15px;font-size:16px;font-weight:700;cursor:pointer}
+.btn.pri{background:var(--acc);color:#fff}.btn.pri:disabled{background:#a9c9b4;cursor:not-allowed}
+.btn.gho{background:transparent;border:1px solid var(--line);color:var(--ink);padding:10px;font-size:14px;margin-top:8px}
+.ok{text-align:center;padding:30px 10px}.ok .big{font-size:54px}
+.err{background:#fdecea;color:#8a1c13;border:1px solid #f5c6c2;border-radius:10px;padding:12px;font-size:14px;margin-top:14px}
+.foot{text-align:center;color:var(--ink2);font-size:11px;margin-top:22px}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><div class="card"><p class="muted">Lädt…</p></div></div>
+<script>
+function $(id){return document.getElementById(id);}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function eur(n){return '€ '+Number(n||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function vatOf(b){b=+b||0;return b-b/1.19;}
+function token(){var m=location.search.match(/[?&]t=([^&]+)/);return m?decodeURIComponent(m[1]):'';}
+var T=token(), SNAP=null;
+
+function screenError(msg){ $('app').innerHTML='<div class="head"><h1>Reparaturauftrag</h1></div><div class="card"><div class="err">'+esc(msg)+'</div><p class="muted sm" style="margin-top:12px">Bitte wenden Sie sich an die Werkstatt oder scannen Sie den QR-Code erneut.</p></div>'; }
+
+function load(){
+  if(!T){return screenError('Kein gültiger Auftrags-Link. Bitte scannen Sie den QR-Code in der Werkstatt.');}
+  fetch('/api/sign/get?t='+encodeURIComponent(T)).then(function(r){return r.json();}).then(function(res){
+    if(!res||!res.data){return screenError((res&&res.error)||'Auftrag nicht gefunden.');}
+    if(res.signed){return screenDone(true);}
+    SNAP=res.data; render();
+  }).catch(function(){ screenError('Verbindungsproblem. Bitte erneut versuchen.'); });
+}
+
+function render(){
+  var s=SNAP;
+  var devHtml=(s.devices||[]).map(function(d,i){
+    var pos=(d.positions||[]).map(function(p){
+      return '<div class="pos"><span>'+esc(p.name)+(p.qual?' <span class="muted xs">· '+esc(p.qual)+'</span>':'')+
+        (p.price>0?'<div class="xs muted">darin 19 % MwSt: '+eur(vatOf(p.price))+'</div>':'')+
+        '</span><b class="mono">'+eur(p.price)+'</b></div>';
+    }).join('');
+    return '<div class="dev"><div class="row"><b>Gerät '+(i+1)+': '+esc(d.title)+'</b></div>'+
+      ((d.imei||d.lock)?'<div class="muted xs" style="margin-top:2px">'+[d.imei?'IMEI '+esc(d.imei):'',d.lock?'🔒 '+esc(d.lock):''].filter(Boolean).join(' · ')+'</div>':'')+
+      pos+'</div>';
+  }).join('');
+  var agb=(s.agb||'Es gelten die Allgemeinen Geschäftsbedingungen der Werkstatt. Bei Datenverlust wird keine Haftung übernommen – bitte sichern Sie Ihre Daten vor der Abgabe.');
+  $('app').innerHTML=
+   '<div class="head"><h1>'+esc(s.workshop||'Werkstatt')+'</h1><p>Reparaturauftrag'+(s.nr?' '+esc(s.nr):'')+' · bitte prüfen &amp; unterschreiben</p></div>'+
+   '<div class="card"><h2>Ihre Daten</h2>'+
+     '<div class="row sm"><span class="muted">Name</span><b>'+esc(s.customer.name||'—')+'</b></div>'+
+     (s.customer.tel?'<div class="row sm"><span class="muted">Telefon</span><span>'+esc(s.customer.tel)+'</span></div>':'')+
+     (s.customer.mail?'<div class="row sm"><span class="muted">E-Mail</span><span>'+esc(s.customer.mail)+'</span></div>':'')+
+   '</div>'+
+   '<div class="card"><h2>Auftrag</h2>'+devHtml+
+     '<div class="tot"><span>Gesamt (inkl. MwSt.)</span><span class="mono">'+eur(s.total)+'</span></div>'+
+     (s.total>0?'<div class="row xs muted" style="margin-top:2px"><span>Netto '+eur(s.total/1.19)+'</span><span>darin 19 % MwSt: '+eur(vatOf(s.total))+'</span></div>':'')+
+   '</div>'+
+   '<div class="card"><h2>AGB &amp; Einwilligungen</h2>'+
+     '<div class="agb">'+esc(agb).replace(/\n/g,'<br>')+'</div>'+
+     '<label class="chk"><input type="checkbox" id="c_agb" onchange="upd()"> Ich habe die AGB gelesen und bin mit dem Reparaturauftrag einverstanden.</label>'+
+     '<label class="chk"><input type="checkbox" id="c_data" onchange="upd()"> Mir ist bekannt, dass ich meine Daten vor der Abgabe sichern soll. Für Datenverlust wird keine Haftung übernommen.</label>'+
+   '</div>'+
+   '<div class="card"><h2>Unterschrift</h2><p class="muted sm">Bitte mit dem Finger im Feld unterschreiben.</p>'+
+     '<div class="sigbox"><canvas id="sig"></canvas><div class="sigline"></div></div>'+
+     '<button class="btn gho" onclick="clearSig()">Unterschrift löschen</button>'+
+   '</div>'+
+   '<div id="errbox"></div>'+
+   '<div style="margin-top:16px"><button class="btn pri" id="submit" disabled onclick="submitSig()">Auftrag bestätigen &amp; unterschreiben</button></div>'+
+   '<div class="foot">Sichere Übertragung · '+esc(s.workshop||'')+'</div>';
+  initSig(); upd();
+}
+
+/* Signatur-Pad */
+var _c,_x,_drawing=false,_dirty=false,_last=null;
+function initSig(){
+  _c=$('sig'); var r=_c.getBoundingClientRect(); var dpr=window.devicePixelRatio||1;
+  _c.width=r.width*dpr; _c.height=r.height*dpr; _x=_c.getContext('2d'); _x.scale(dpr,dpr);
+  _x.lineWidth=2.4; _x.lineCap='round'; _x.lineJoin='round'; _x.strokeStyle='#12331f';
+  _dirty=false;
+  function pt(e){var rr=_c.getBoundingClientRect();var t=e.touches&&e.touches[0]?e.touches[0]:e;return {x:t.clientX-rr.left,y:t.clientY-rr.top};}
+  function down(e){_drawing=true;_last=pt(e);e.preventDefault();}
+  function move(e){if(!_drawing)return;var p=pt(e);_x.beginPath();_x.moveTo(_last.x,_last.y);_x.lineTo(p.x,p.y);_x.stroke();_last=p;_dirty=true;upd();e.preventDefault();}
+  function up(){_drawing=false;}
+  _c.addEventListener('mousedown',down);_c.addEventListener('mousemove',move);window.addEventListener('mouseup',up);
+  _c.addEventListener('touchstart',down,{passive:false});_c.addEventListener('touchmove',move,{passive:false});window.addEventListener('touchend',up);
+}
+function clearSig(){if(!_x)return;_x.clearRect(0,0,_c.width,_c.height);_dirty=false;upd();}
+function upd(){var ok=$('c_agb')&&$('c_agb').checked&&$('c_data')&&$('c_data').checked&&_dirty;var b=$('submit');if(b)b.disabled=!ok;}
+
+function submitSig(){
+  if(!_dirty||!$('c_agb').checked||!$('c_data').checked)return;
+  var b=$('submit'); b.disabled=true; b.textContent='Wird gesendet…';
+  var sig=_c.toDataURL('image/png');
+  fetch('/api/sign/submit',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({t:T,signature:sig,consents:{agb:true,dataloss:true,at:new Date().toISOString()}})})
+   .then(function(r){return r.json();}).then(function(res){
+     if(res&&res.ok){screenDone(false);}else{ $('errbox').innerHTML='<div class="err">'+esc((res&&res.error)||'Senden fehlgeschlagen.')+'</div>'; b.disabled=false; b.textContent='Auftrag bestätigen & unterschreiben'; }
+   }).catch(function(){ $('errbox').innerHTML='<div class="err">Verbindungsproblem. Bitte erneut versuchen.</div>'; b.disabled=false; b.textContent='Auftrag bestätigen & unterschreiben'; });
+}
+
+function screenDone(already){
+  $('app').innerHTML='<div class="head"><h1>'+esc((SNAP&&SNAP.workshop)||'Werkstatt')+'</h1></div>'+
+   '<div class="card ok"><div class="big">✅</div><h2 style="font-size:19px">'+(already?'Bereits unterschrieben':'Vielen Dank!')+'</h2>'+
+   '<p class="muted">'+(already?'Für diesen Auftrag liegt bereits eine Unterschrift vor.':'Ihre Unterschrift wurde übermittelt. Sie können Ihr Smartphone jetzt weglegen – die Werkstatt setzt den Auftrag fort.')+'</p></div>';
+}
+load();
+</script>
+</body>
+</html>

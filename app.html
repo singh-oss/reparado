@@ -1109,19 +1109,185 @@ function noSign(){ openModal(`<div class="dhead"><b style="flex:1">Unterschrift 
   <div class="sigwrap"><canvas id="sig" width="520" height="150"></canvas></div>
   <div class="row" style="margin-top:12px;justify-content:space-between"><button class="btn gho" onclick="clearSig()">Löschen</button><button class="btn pri" onclick="noSaveSig()">Übernehmen</button></div></div>`); setTimeout(initSig,30); }
 function noSaveSig(){const c=document.getElementById('sig');if(!window.__sigDirty){toast('Bitte zuerst unterschreiben');return;}noCollect();NO.sig=c.toDataURL('image/png');noSaveDraft();closeAll();renderNewOrder();}
+/* === Eigener QR-Encoder (Byte-Modus, EC-M, v1-10) – eigenes Werk, keine Fremdlib === */
+var RQR=(function(){
+  // EC-Level M: [ecPerBlock, [[blocks,dataPerBlock],...]]
+  var M={1:[10,[[1,16]]],2:[16,[[1,28]]],3:[26,[[1,44]]],4:[18,[[2,32]]],5:[24,[[2,43]]],
+         6:[16,[[4,27]]],7:[18,[[4,31]]],8:[22,[[2,38],[2,39]]],9:[22,[[3,36],[2,37]]],10:[26,[[4,43],[1,44]]]};
+  var ALIGN={1:[],2:[6,18],3:[6,22],4:[6,26],5:[6,30],6:[6,34],7:[6,22,38],8:[6,24,42],9:[6,26,46],10:[6,28,50]};
+  var VERINFO={7:0x07C94,8:0x085BC,9:0x09A99,10:0x0A4D3};
+  // GF(256), Primitivpolynom 0x11d
+  var EXP=new Array(512),LOG=new Array(256);
+  (function(){var x=1;for(var i=0;i<255;i++){EXP[i]=x;LOG[x]=i;x<<=1;if(x&0x100)x^=0x11d;}for(var i=255;i<512;i++)EXP[i]=EXP[i-255];})();
+  function gmul(a,b){if(a===0||b===0)return 0;return EXP[LOG[a]+LOG[b]];}
+  function rsGen(n){var g=[1];for(var i=0;i<n;i++){var ng=new Array(g.length+1);for(var k=0;k<ng.length;k++)ng[k]=0;for(var j=0;j<g.length;j++){ng[j]^=gmul(g[j],EXP[i]);ng[j+1]^=g[j];}g=ng;}return g.reverse();}
+  function rsEc(data,n){var g=rsGen(n);var res=data.slice();for(var i=0;i<n;i++)res.push(0);for(var i=0;i<data.length;i++){var c=res[i];if(c!==0){for(var j=0;j<g.length;j++)res[i+j]^=gmul(g[j],c);}}return res.slice(data.length);}
+  function dataCap(v){var s=0;M[v][1].forEach(function(b){s+=b[0]*b[1];});return s;}
+  function fmtBits(mask){ // EC-Level M = 0
+    var data=(0<<3)|mask; var d=data<<10; var g=0x537;
+    for(var i=14;i>=10;i--){if(d&(1<<i))d^=g<<(i-10);}
+    return ((data<<10)|(d&0x3ff))^0x5412;
+  }
+  var MASKS=[
+    function(r,c){return (r+c)%2===0;},
+    function(r,c){return r%2===0;},
+    function(r,c){return c%3===0;},
+    function(r,c){return (r+c)%3===0;},
+    function(r,c){return (Math.floor(r/2)+Math.floor(c/3))%2===0;},
+    function(r,c){return ((r*c)%2)+((r*c)%3)===0;},
+    function(r,c){return (((r*c)%2)+((r*c)%3))%2===0;},
+    function(r,c){return (((r+c)%2)+((r*c)%3))%2===0;}
+  ];
+  function encode(text,forceV){
+    var bytes=[]; for(var i=0;i<text.length;i++){var cc=text.charCodeAt(i);
+      if(cc<128)bytes.push(cc);
+      else if(cc<2048){bytes.push(192|(cc>>6));bytes.push(128|(cc&63));}
+      else{bytes.push(224|(cc>>12));bytes.push(128|((cc>>6)&63));bytes.push(128|(cc&63));}
+    }
+    var v=forceV||0;
+    if(!v){for(var vv=1;vv<=10;vv++){var cci=(vv<=9)?8:16;var need=4+cci+8*bytes.length;need=Math.ceil(need/8);if(need<=dataCap(vv)){v=vv;break;}}}
+    if(!v)throw new Error('Daten zu lang für QR v1-10');
+    var cci=(v<=9)?8:16;
+    // Bitstrom
+    var bits=[];
+    function put(val,len){for(var i=len-1;i>=0;i--)bits.push((val>>i)&1);}
+    put(4,4); put(bytes.length,cci); for(var i=0;i<bytes.length;i++)put(bytes[i],8);
+    var cap=dataCap(v)*8;
+    for(var t=0;t<4&&bits.length<cap;t++)bits.push(0);       // Terminator
+    while(bits.length%8!==0)bits.push(0);                     // Byte-Grenze
+    var pads=[0xEC,0x11],pi=0;
+    while(bits.length<cap){put(pads[pi&1],8);pi++;}
+    // Datencodewörter
+    var dcw=[];for(var i=0;i<bits.length;i+=8){var b=0;for(var j=0;j<8;j++)b=(b<<1)|bits[i+j];dcw.push(b);}
+    // Blöcke
+    var layout=M[v][1],ecn=M[v][0];
+    var blocks=[],pos=0;
+    layout.forEach(function(grp){for(var b=0;b<grp[0];b++){var d=dcw.slice(pos,pos+grp[1]);pos+=grp[1];blocks.push({d:d,e:rsEc(d,ecn)});}});
+    // Interleave
+    var maxD=0;blocks.forEach(function(b){if(b.d.length>maxD)maxD=b.d.length;});
+    var final=[];
+    for(var i=0;i<maxD;i++)blocks.forEach(function(b){if(i<b.d.length)final.push(b.d[i]);});
+    for(var i=0;i<ecn;i++)blocks.forEach(function(b){final.push(b.e[i]);});
+    // Matrix
+    var size=17+4*v;
+    var mod=[],res=[];
+    for(var r=0;r<size;r++){mod.push(new Array(size).fill(null));res.push(new Array(size).fill(false));}
+    function setF(r,c,val){mod[r][c]=val?1:0;res[r][c]=true;}
+    function finder(r,c){for(var a=-1;a<=7;a++)for(var b=-1;b<=7;b++){var rr=r+a,cc=c+b;if(rr<0||cc<0||rr>=size||cc>=size)continue;var on=(a>=0&&a<=6&&b>=0&&b<=6)&&((a===0||a===6||b===0||b===6)||(a>=2&&a<=4&&b>=2&&b<=4));setF(rr,cc,on);}}
+    finder(0,0);finder(0,size-7);finder(size-7,0);
+    // Timing
+    for(var i=8;i<size-8;i++){setF(6,i,i%2===0);setF(i,6,i%2===0);}
+    // Alignment
+    var ap=ALIGN[v];
+    ap.forEach(function(ar){ap.forEach(function(ac){
+      if((ar===6&&ac===6)||(ar===6&&ac===size-7)||(ar===size-7&&ac===6))return;
+      for(var a=-2;a<=2;a++)for(var b=-2;b<=2;b++){var on=(Math.abs(a)===2||Math.abs(b)===2||(a===0&&b===0));setF(ar+a,ac+b,on);}
+    });});
+    // Dark module
+    setF(size-8,8,true);
+    // Reserve Format-Bereiche
+    for(var i=0;i<9;i++){if(!res[8][i])res[8][i]=true;if(!res[i][8])res[i][8]=true;}
+    for(var i=0;i<8;i++){res[8][size-1-i]=true;res[size-1-i][8]=true;}
+    // Reserve Versions-Bereiche (v>=7)
+    if(v>=7){for(var i=0;i<6;i++)for(var j=0;j<3;j++){res[i][size-11+j]=true;res[size-11+j][i]=true;}}
+    // Datenplatzierung (Zickzack)
+    var di=0,dir=-1;
+    for(var col=size-1;col>0;col-=2){
+      if(col===6)col=5;
+      for(var i=0;i<size;i++){
+        var row=(dir<0)?(size-1-i):i;
+        for(var cc2=0;cc2<2;cc2++){var c=col-cc2;
+          if(res[row][c])continue;
+          var bit=(di<final.length*8)?((final[di>>3]>>(7-(di&7)))&1):0;di++;
+          mod[row][c]=bit;
+        }
+      }
+      dir=-dir;
+    }
+    // Maske wählen (geringste Strafe)
+    function applyMask(mk){var m=[];for(var r=0;r<size;r++)m.push(mod[r].slice());for(var r=0;r<size;r++)for(var c=0;c<size;c++){if(!res[r][c]&&MASKS[mk](r,c))m[r][c]^=1;}return m;}
+    function penalty(m){var p=0,r,c;
+      // Rule1: Reihen/Spalten von 5+
+      for(r=0;r<size;r++){for(var line=0;line<2;line++){var last=-1,run=0;for(c=0;c<size;c++){var v2=line?m[c][r]:m[r][c];if(v2===last){run++;}else{if(run>=5)p+=3+(run-5);last=v2;run=1;}}if(run>=5)p+=3+(run-5);}}
+      // Rule2: 2x2 Blöcke
+      for(r=0;r<size-1;r++)for(c=0;c<size-1;c++){var v2=m[r][c];if(v2===m[r][c+1]&&v2===m[r+1][c]&&v2===m[r+1][c+1])p+=3;}
+      // Rule3: Muster 10111010000 / umgekehrt
+      var pat1=[1,0,1,1,1,0,1,0,0,0,0],pat2=[0,0,0,0,1,0,1,1,1,0,1];
+      for(r=0;r<size;r++)for(c=0;c<size-10;c++){var ok1=true,ok2=true;for(var k=0;k<11;k++){if(m[r][c+k]!==pat1[k])ok1=false;if(m[r][c+k]!==pat2[k])ok2=false;}if(ok1)p+=40;if(ok2)p+=40;}
+      for(c=0;c<size;c++)for(r=0;r<size-10;r++){var ok1=true,ok2=true;for(var k=0;k<11;k++){if(m[r+k][c]!==pat1[k])ok1=false;if(m[r+k][c]!==pat2[k])ok2=false;}if(ok1)p+=40;if(ok2)p+=40;}
+      // Rule4: Dunkel-Anteil
+      var dark=0;for(r=0;r<size;r++)for(c=0;c<size;c++)if(m[r][c])dark++;
+      var pct=dark*100/(size*size);var dev=Math.floor(Math.abs(pct-50)/5)*10;p+=dev;
+      return p;
+    }
+    var best=0,bestP=1e9,bestM=null;
+    for(var mk=0;mk<8;mk++){var m=applyMask(mk);var pen=penalty(m);if(pen<bestP){bestP=pen;best=mk;bestM=m;}}
+    // Format-Info platzieren (15 Bit, zwei Kopien) — Standard nach ISO/IEC 18004
+    var fb=fmtBits(best);
+    function gb(val,i){return (val>>i)&1;}
+    for(var i=0;i<=5;i++)bestM[i][8]=gb(fb,i);
+    bestM[7][8]=gb(fb,6); bestM[8][8]=gb(fb,7); bestM[8][7]=gb(fb,8);
+    for(var i=9;i<15;i++)bestM[8][14-i]=gb(fb,i);
+    for(var i=0;i<8;i++)bestM[8][size-1-i]=gb(fb,i);
+    for(var i=8;i<15;i++)bestM[size-15+i][8]=gb(fb,i);
+    bestM[size-8][8]=1; // Dunkelmodul
+    // Versions-Info (v>=7), 18 Bit, zwei Kopien
+    if(v>=7){var vi=VERINFO[v];for(var i=0;i<18;i++){var b=gb(vi,i);var a=size-11+(i%3),bb=Math.floor(i/3);bestM[bb][a]=b;bestM[a][bb]=b;}}
+    return {size:size,version:v,mask:best,fb:fb,mod:bestM,res:res,ecn:ecn,dataLen:final.length};
+  }
+  function svg(text,opt){opt=opt||{};var cell=opt.cell||4,margin=(opt.margin==null?4:opt.margin);var r=encode(text,opt.version);var n=r.size;var dim=(n+margin*2)*cell;var rects='';for(var y=0;y<n;y++)for(var x=0;x<n;x++){if(r.mod[y][x])rects+='<rect x="'+((x+margin)*cell)+'" y="'+((y+margin)*cell)+'" width="'+cell+'" height="'+cell+'"/>';}return '<svg xmlns="http://www.w3.org/2000/svg" width="'+dim+'" height="'+dim+'" viewBox="0 0 '+dim+' '+dim+'" shape-rendering="crispEdges" style="background:#fff;border-radius:8px"><rect width="'+dim+'" height="'+dim+'" fill="#fff"/><g fill="#000">'+rects+'</g></svg>';}
+  return {encode:encode,dataCap:dataCap,fmtBits:fmtBits,gmul:gmul,rsEc:rsEc,svg:svg};
+})();
 function qrSVG(str,px){px=px||170;const cells=25;let x=2166136261>>>0;const grid=[];for(let i=0;i<cells*cells;i++){x=(x*1103515245+12345+str.charCodeAt(i%str.length||0))>>>0;grid.push(((x>>>7)%100)<46?1:0);}
   function finder(r,c){for(let a=-1;a<8;a++)for(let b=-1;b<8;b++){const rr=r+a,cc=c+b;if(rr<0||cc<0||rr>=cells||cc>=cells)continue;const on=(a>=0&&a<7&&b>=0&&b<7)&&((a===0||a===6||b===0||b===6)||(a>=2&&a<=4&&b>=2&&b<=4));grid[rr*cells+cc]=on?1:0;}}
   finder(0,0);finder(0,cells-7);finder(cells-7,0);
   const s=px/cells;let rects='';for(let r=0;r<cells;r++)for(let c=0;c<cells;c++){if(grid[r*cells+c])rects+=`<rect x="${(c*s).toFixed(1)}" y="${(r*s).toFixed(1)}" width="${Math.ceil(s)}" height="${Math.ceil(s)}"/>`;}
   return `<svg width="${px}" height="${px}" viewBox="0 0 ${px} ${px}" style="background:#fff;border-radius:8px" fill="#0f2318">${rects}</svg>`;}
 function makeSigStamp(text){const c=document.createElement('canvas');c.width=520;c.height=150;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,520,150);x.fillStyle='#0e7a3c';x.font='600 22px Inter,sans-serif';x.fillText(text,20,72);x.fillStyle='#5f6b64';x.font='13px Inter,sans-serif';x.fillText(new Date().toLocaleString('de-DE'),20,102);return c.toDataURL('image/png');}
-function noSignQR(){ noCollect(); const url='reparado.de/sign/'+(NO.draftId||'auftrag'); openModal(`<div class="dhead"><b style="flex:1">Unterschrift per QR-Code</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
-  <div class="dbody" style="text-align:center"><p class="muted" style="font-size:13px">Der Kunde scannt den Code mit dem eigenen Handy und unterschreibt dort – ideal bei Abgabe ohne Tablet oder für Fernaufträge.</p>
-  <div style="display:flex;justify-content:center;margin:12px 0">${qrSVG(url,180)}</div>
-  <div class="mono" style="font-size:13px;color:var(--ink2)">${url}</div>
-  <div class="note" style="margin-top:12px;text-align:left">Prototyp: Der Signatur-Link wird beim echten System an das Kundenhandy übermittelt. Für die Vorführung können Sie die Unterschrift direkt als eingegangen markieren.</div>
-  <div class="row" style="margin-top:14px;justify-content:center"><button class="btn pri" onclick="noQRDone()">Unterschrift als eingegangen markieren</button></div></div>`); }
-function noQRDone(){ noCollect(); NO.sig=makeSigStamp('Digital signiert · QR-Fernunterschrift'); noSaveDraft(); closeAll(); renderNewOrder(); toast('QR-Unterschrift eingegangen'); }
+/* P7: Snapshot für die mobile Signatur-Seite (nur kundenrelevante Daten) */
+function noSignSnapshot(){
+  const devs=NO.devices.filter(d=>d.brand||d.model).map(d=>({
+    title:[d.brand,d.model].filter(Boolean).join(' ')||'Gerät',
+    imei:d.imei||'', lock:lockLabel(d),
+    positions:devPositions(d).filter(p=>p.reparatur).map(p=>({name:p.reparatur,qual:p.qual||'',price:+p.price||0}))
+  }));
+  const total=devs.reduce((s,d)=>s+d.positions.reduce((a,p)=>a+(+p.price||0),0),0);
+  return { workshop:SHOP.name||'Werkstatt', workshopTel:SHOP.phone||'',
+    nr:(NO.editId&&(S.ord.find(x=>x.id===NO.editId)||{}).nr)||'',
+    customer:{name:((NO.vorname||'')+' '+(NO.nachname||'')).trim()||NO.firma||'Kunde', tel:NO.tel||'', mail:NO.mail||''},
+    devices:devs, total:total, agb:ensureSettings().agb||'', created:new Date().toISOString() };
+}
+let __signPoll=null;
+function noSignQR(){ noCollect();
+  const d0=NO.devices[0]||{}; if(!(d0.brand||d0.model)||!devPositions(d0).some(p=>p.reparatur)){toast('Bitte zuerst Gerät und Fehler erfassen');return;}
+  if(DB.backend!=='server'){ // Demo/lokal ohne Backend
+    openModal(`<div class="dhead"><b style="flex:1">Unterschrift per QR-Code</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+      <div class="dbody"><div class="note">Der QR-Signatur-Ablauf braucht die Server-Anbindung (im Demo-Modus nicht aktiv). Für die Vorführung kann die Unterschrift direkt als eingegangen markiert werden.</div>
+      <div class="row" style="margin-top:14px;justify-content:center"><button class="btn pri" onclick="noQRDone()">Unterschrift als eingegangen markieren</button></div></div>`);
+    return; }
+  openModal(`<div class="dhead"><b style="flex:1">Unterschrift per QR-Code</b><button class="btn sm gho" onclick="noSignPollStop();closeAll()">Schließen</button></div><div class="dbody" style="text-align:center"><p class="muted">QR-Code wird erstellt…</p></div>`);
+  fetch(API+'/api/sign/create',{method:'POST',headers:DB._hdr(),body:JSON.stringify({data:noSignSnapshot()})})
+    .then(r=>r.json()).then(res=>{
+      if(!res.token)throw new Error(res.error||'Fehler beim Erstellen');
+      const url=location.origin+'/sign.html?t='+res.token;
+      openModal(`<div class="dhead"><b style="flex:1">Unterschrift per QR-Code</b><button class="btn sm gho" onclick="noSignPollStop();closeAll()">Schließen</button></div>
+        <div class="dbody" style="text-align:center">
+          <p class="muted" style="font-size:13px">Der Kunde scannt den Code mit dem <b>eigenen Smartphone</b>, prüft den Auftrag, bestätigt die AGB und unterschreibt dort.</p>
+          <div style="display:flex;justify-content:center;margin:12px 0">${RQR.svg(url,{cell:5,margin:4})}</div>
+          <div class="mono" style="font-size:12px;word-break:break-all;color:var(--ink2)">${esc(url)}</div>
+          <div id="signStatus" class="note" style="margin-top:12px">⏳ Warte auf Unterschrift des Kunden…</div>
+          <div class="row" style="margin-top:12px;justify-content:center"><button class="btn gho" onclick="noSignPollStop();closeAll()">Abbrechen</button></div>
+        </div>`);
+      noSignPollStart(res.token);
+    }).catch(e=>{ openModal(`<div class="dhead"><b style="flex:1">Fehler</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div><div class="dbody"><div class="note">Konnte den Signatur-Link nicht erstellen: ${esc(e.message||'Fehler')}</div></div>`); });
+}
+function noSignPollStart(token){ noSignPollStop(); __signPoll=setInterval(function(){
+  fetch(API+'/api/sign/get?t='+encodeURIComponent(token)).then(r=>r.json()).then(res=>{
+    if(res&&res.signed&&res.signature){ noSignPollStop(); noCollect(); NO.sig=res.signature; NO.sigConsents=res.consents||null; NO.sigVia='qr'; noSaveDraft(); closeAll(); renderNewOrder(); toast('✓ Unterschrift vom Kundenhandy erhalten'); }
+  }).catch(()=>{});
+},2500); }
+function noSignPollStop(){ if(__signPoll){clearInterval(__signPoll);__signPoll=null;} }
+function noQRDone(){ noCollect(); NO.sig=makeSigStamp('Digital signiert · QR-Fernunterschrift'); NO.sigVia='qr-demo'; noSaveDraft(); closeAll(); renderNewOrder(); toast('QR-Unterschrift eingegangen'); }
 function noSignKiosk(){ noCollect(); const nm=(NO.vorname+' '+NO.nachname).trim()||'Kunde'; const ov=document.createElement('div'); ov.id='kioskOv';
   ov.style.cssText='position:fixed;inset:0;z-index:300;background:#0f2318;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;gap:18px';
   ov.innerHTML=`<div style="color:#fff;text-align:center"><div style="font-size:24px;font-weight:800">Bitte hier unterschreiben</div><div style="opacity:.75;font-size:14px;margin-top:4px">${esc(SHOP.name)} · Reparaturauftrag für ${esc(nm)}</div><div style="opacity:.6;font-size:12px;margin-top:2px">Mit der Unterschrift bestätige ich die Auftragserteilung und den Hinweis zur Datensicherung.</div></div>
@@ -1149,13 +1315,14 @@ function noFinalize(){ noCollect();
   if(req.imei&&NO.devices.some(d=>(d.brand||d.model)&&!(d.imei||'').trim())){toast('Pflichtfeld: IMEI/Seriennummer je Gerät angeben');return;}
   if(req.sig&&!NO.sig){toast('Pflichtfeld: Unterschrift des Kunden erfassen');return;}
   const devs=noBuildDevices();
-  if(NO.editId){const o=S.ord.find(x=>x.id===NO.editId);if(o){Object.assign(o,{cid:c.id,devices:devs},noMirror(devs),{lock:NO.lock,lockval:NO.lockval,prio:NO.prio,appt:NO.terminMode==='termin'?NO.appt:'',due:NO.due,notes:NO.notes,technikerId:NO.technikerId,sig:NO.sig||o.sig});}save();toast('Auftrag gespeichert');NO=null;go('auftraege');return;}
+  if(NO.editId){const o=S.ord.find(x=>x.id===NO.editId);if(o){Object.assign(o,{cid:c.id,devices:devs},noMirror(devs),{lock:NO.lock,lockval:NO.lockval,prio:NO.prio,appt:NO.terminMode==='termin'?NO.appt:'',due:NO.due,notes:NO.notes,technikerId:NO.technikerId,sig:NO.sig||o.sig,sigConsents:NO.sigConsents||o.sigConsents||null,sigVia:NO.sigVia||o.sigVia||''});}save();toast('Auftrag gespeichert');NO=null;go('auftraege');return;}
   const nr=nextOrderNr();
-  const o=Object.assign({id:uid('o'),nr,cid:c.id,devices:devs,lock:NO.lock,lockval:NO.lockval,status:'offen',prio:NO.prio,created:today(),due:NO.due,appt:NO.terminMode==='termin'?NO.appt:'',notes:NO.notes,readyAt:'',sig:NO.sig||'',source:'',technikerId:NO.technikerId},noMirror(devs));
+  const o=Object.assign({id:uid('o'),nr,cid:c.id,devices:devs,lock:NO.lock,lockval:NO.lockval,status:'offen',prio:NO.prio,created:today(),due:NO.due,appt:NO.terminMode==='termin'?NO.appt:'',notes:NO.notes,readyAt:'',sig:NO.sig||'',sigConsents:NO.sigConsents||null,sigVia:NO.sigVia||'',source:'',technikerId:NO.technikerId},noMirror(devs));
   if(NO.diagPhoto)o.photos=[NO.diagPhoto];
   S.ord.unshift(o); const rc=S.rules.find(x=>x.id==='r_confirm'); if(rc&&rc.on&&c.mail)logMail(o,rc,'automatisch (Anlage)');
   S.drafts=(S.drafts||[]).filter(x=>x.id!==NO.draftId); save();
-  toast('Auftrag '+nr+' angelegt'+(devs.length>1?(' · '+devs.length+' Geräte'):'')); NO=null; go('auftraege');
+  const wasSigned=!!o.sig; toast('Auftrag '+nr+' angelegt'+(devs.length>1?(' · '+devs.length+' Geräte'):'')); NO=null; go('auftraege');
+  if(wasSigned)setTimeout(function(){printReceipt(o.id);},150); /* P8: nach Abschluss direkt Druckvorschau */
 }
 function noBuildDevices(){ const built=[];
   NO.devices.forEach(d=>{ if(!(d.brand||d.model))return;
@@ -1415,12 +1582,23 @@ function printLabel(id){const o=S.ord.find(x=>x.id===id);const c=cust(o.cid);
     <div class="lrow"><b>Angenommen:</b> ${fmtDate(o.created)}</div>${o.imei?`<div class="lrow"><b>IMEI:</b> ${esc(o.imei)}</div>`:''}
     <div class="lrow" style="margin-top:8px;color:#555">reparado.de/status/${o.nr}</div></div>`);
   }
+function devDetailRows(o){ return oDevices(o).map((d,i)=>{const meta=[d.imei?'IMEI/SN: '+esc(d.imei):'',d.fach?'Fach: '+esc(d.fach):'',lockLabel(d)?'Sperre: '+esc(lockLabel(d)):'',(d.technikerId&&techName(d.technikerId))?'Techniker: '+esc(techName(d.technikerId)):''].filter(Boolean).join(' · ');return meta?`<div style="font-size:11px;color:#666;margin-top:2px"><b>Gerät ${i+1} (${esc(d.brand)} ${esc(d.model)}):</b> ${meta}</div>`:'';}).join(''); }
+function sigBlock(o){ if(!o.sig)return '';
+  const conf=o.sigConsents?'☑ AGB gelesen &amp; akzeptiert &nbsp;&nbsp; ☑ Hinweis zur Datensicherung bestätigt':'Der Kunde hat den Auftrag bestätigt.';
+  return `<div style="margin-top:18px;padding-top:12px;border-top:1px solid #ddd">
+    <div style="font-size:12px;color:#444;margin-bottom:6px">${conf}</div>
+    <div style="font-size:12px;color:#555">Unterschrift des Kunden (Auftragserteilung):</div>
+    <img src="${o.sig}" style="height:64px;margin-top:4px;border-bottom:1px solid #999;max-width:280px"/>
+    <div style="font-size:11px;color:#888;margin-top:2px">Digital unterschrieben${o.sigVia==='qr'?' (per QR-Code auf dem Kundengerät)':''} · ${fmtDate(o.created)}</div></div>`;
+}
 function printReceipt(id){const o=S.ord.find(x=>x.id===id);const c=cust(o.cid);
   printHTML('Beleg '+o.nr, shopHead()+`<h2>Beleg / Quittung</h2><div class="muted">Auftrag ${o.nr} · ${fmtDate(o.created)}</div>
     <div class="box" style="margin-top:12px"><b>${esc(c.name)}</b><br><span class="muted">${esc(c.adr)}</span></div>
-    <table><thead><tr><th>Position</th><th style="text-align:right">Betrag</th></tr></thead>
+    ${devDetailRows(o)}
+    <table style="margin-top:10px"><thead><tr><th>Position</th><th style="text-align:right">Betrag</th></tr></thead>
     <tbody>${posRows(o)}</tbody></table>
     <div class="tot"><span>Gesamt (inkl. MwSt.)</span><span>${eur(oTotal(o))}</span></div>${totVatLine(o)}
+    ${sigBlock(o)}
     <div class="foot">Preis inkl. gesetzlicher MwSt. · Garantie: ${o.warranty} Monate auf die durchgeführte Reparatur.<br>Vielen Dank für Ihren Auftrag bei ${SHOP.name}.</div>
     ${ensureSettings().agb?`<div style="margin-top:14px;padding-top:10px;border-top:1px solid #ddd;font-size:11px;color:#666;line-height:1.5">${esc(ensureSettings().agb)}</div>`:''}`);
   }
