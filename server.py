@@ -76,6 +76,13 @@ def init_db():
           workshop_name TEXT, workshop_tel TEXT, data TEXT,
           submitted INTEGER DEFAULT 0, consumed INTEGER DEFAULT 0,
           created REAL, expires REAL);
+        CREATE TABLE IF NOT EXISTS portal_sessions(
+          token TEXT PRIMARY KEY, workshop_id TEXT, order_id TEXT,
+          data TEXT, created REAL, updated REAL);
+        CREATE TABLE IF NOT EXISTS portal_replies(
+          id INTEGER PRIMARY KEY AUTOINCREMENT, token TEXT, workshop_id TEXT,
+          order_id TEXT, text TEXT, at REAL, consumed INTEGER DEFAULT 0);
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_portal_ws_order ON portal_sessions(workshop_id, order_id);
         """)
 
 # ---------- Passwort & Token ----------
@@ -147,6 +154,25 @@ def send_mail(workshop_id, to, subject, body, html=None):
         c.execute("INSERT INTO mail_log(workshop_id,ts,recipient,subject,sent,note) VALUES(?,?,?,?,?,?)",
                   (workshop_id, ts, to, subject, 1 if ok else 0, note))
     return ok, note
+
+# ---------- KI-Formulierungshilfe (optional, nur mit Schlüssel) ----------
+def _ai_rewrite(key, raw, kind):
+    import urllib.request
+    sys_prompt = ("Du bist Assistenz einer Handy-/Elektronik-Reparaturwerkstatt. Formuliere den folgenden internen "
+                  "Stichpunkt-Text zu einer professionellen, freundlichen und klaren Kundennachricht auf Deutsch um. "
+                  "WICHTIG: Erfinde KEINE neuen Fakten, Preise, Termine oder technischen Zusagen. Verbessere nur "
+                  "Formulierung, Rechtschreibung, Verständlichkeit und Ton. Gib NUR den fertigen Nachrichtentext "
+                  "zurück, ohne Erklärungen oder Anführungszeichen.")
+    payload = {"model": _cfg("LLM_MODEL", "claude-haiku-4-5"), "max_tokens": 600,
+               "system": sys_prompt, "messages": [{"role": "user", "content": raw}]}
+    req = urllib.request.Request("https://api.anthropic.com/v1/messages",
+                                 data=json.dumps(payload).encode(),
+                                 headers={"content-type": "application/json", "x-api-key": key,
+                                          "anthropic-version": "2023-06-01"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        res = json.loads(r.read().decode())
+    parts = res.get("content") or []
+    return "".join(b.get("text", "") for b in parts if b.get("type") == "text").strip() or raw
 
 # ---------- HTTP ----------
 class H(BaseHTTPRequestHandler):
@@ -234,6 +260,24 @@ class H(BaseHTTPRequestHandler):
             out = [{"token": r["token"], "herkunft": r["herkunft"] or "online",
                     "data": json.loads(r["data"]) if r["data"] else None, "created": r["created"]} for r in rows]
             return self._send(200, {"ok": True, "items": out})
+        if self.path.startswith("/api/portal/get"):
+            # Öffentlich: Kunde ruft Auftrags-Portal per Token ab.
+            q = parse_qs(urlparse(self.path).query)
+            tok = (q.get("t") or [""])[0]
+            with db() as c:
+                row = c.execute("SELECT data FROM portal_sessions WHERE token=?", (tok,)).fetchone()
+            if not row:
+                return self._send(404, {"error": "Portal nicht gefunden"})
+            return self._send(200, {"ok": True, "data": json.loads(row["data"]) if row["data"] else None})
+        if self.path == "/api/portal/replies":
+            p = self._auth()
+            if not p:
+                return self._send(401, {"error": "unauthorized"})
+            with db() as c:
+                rows = c.execute("SELECT id,token,order_id,text,at FROM portal_replies WHERE workshop_id=? AND consumed=0 ORDER BY at ASC",
+                                 (p["wid"],)).fetchall()
+            return self._send(200, {"ok": True, "items": [{"id": r["id"], "token": r["token"], "orderId": r["order_id"],
+                                                           "text": r["text"], "at": r["at"]} for r in rows]})
         return self._send(404, {"error": "not found"})
 
     def do_POST(self):
@@ -362,6 +406,70 @@ class H(BaseHTTPRequestHandler):
                     for t in toks:
                         c.execute("UPDATE intake_sessions SET consumed=1 WHERE token=? AND workshop_id=?", (t, p["wid"]))
             return self._send(200, {"ok": True})
+
+        if self.path == "/api/portal/sync":
+            # Werkstatt veröffentlicht/aktualisiert das Kundenportal für einen Auftrag. Gibt (Einmal-)Token zurück.
+            p = self._auth()
+            if not p:
+                return self._send(401, {"error": "unauthorized"})
+            oid = (body.get("orderId") or "").strip()
+            data = body.get("data")
+            if not oid or data is None:
+                return self._send(400, {"error": "orderId/data fehlt"})
+            now = time.time()
+            with _lock, db() as c:
+                row = c.execute("SELECT token FROM portal_sessions WHERE workshop_id=? AND order_id=?", (p["wid"], oid)).fetchone()
+                if row:
+                    tok = row["token"]
+                    c.execute("UPDATE portal_sessions SET data=?,updated=? WHERE token=?", (json.dumps(data), now, tok))
+                else:
+                    tok = uid("p")
+                    c.execute("INSERT INTO portal_sessions(token,workshop_id,order_id,data,created,updated) VALUES(?,?,?,?,?,?)",
+                              (tok, p["wid"], oid, json.dumps(data), now, now))
+            return self._send(200, {"token": tok})
+
+        if self.path == "/api/portal/reply":
+            # Öffentlich: Kunde antwortet über sein Portal.
+            tok = body.get("t") or ""
+            text = (body.get("text") or "").strip()
+            if not tok or not text:
+                return self._send(400, {"error": "Token/Text fehlt"})
+            if len(text) > 4000:
+                text = text[:4000]
+            with _lock, db() as c:
+                row = c.execute("SELECT workshop_id,order_id FROM portal_sessions WHERE token=?", (tok,)).fetchone()
+                if not row:
+                    return self._send(404, {"error": "Portal nicht gefunden"})
+                c.execute("INSERT INTO portal_replies(token,workshop_id,order_id,text,at,consumed) VALUES(?,?,?,?,?,0)",
+                          (tok, row["workshop_id"], row["order_id"], text, time.time()))
+            return self._send(200, {"ok": True})
+
+        if self.path == "/api/portal/replies/consume":
+            p = self._auth()
+            if not p:
+                return self._send(401, {"error": "unauthorized"})
+            ids = body.get("ids") or []
+            if ids:
+                with _lock, db() as c:
+                    for i in ids:
+                        c.execute("UPDATE portal_replies SET consumed=1 WHERE id=? AND workshop_id=?", (i, p["wid"]))
+            return self._send(200, {"ok": True})
+
+        if self.path == "/api/ai/rewrite":
+            # KI-Formulierungshilfe. Nur aktiv, wenn ein LLM-Schlüssel konfiguriert ist.
+            p = self._auth()
+            if not p:
+                return self._send(401, {"error": "unauthorized"})
+            key = _cfg("ANTHROPIC_API_KEY", "") or _cfg("LLM_API_KEY", "")
+            raw = (body.get("text") or "").strip()
+            if not key:
+                return self._send(200, {"enabled": False, "text": raw,
+                                        "note": "KI-Formulierung ist noch nicht freigeschaltet (kein Schlüssel hinterlegt)."})
+            try:
+                out = _ai_rewrite(key, raw, body.get("kind") or "nachricht")
+                return self._send(200, {"enabled": True, "text": out})
+            except Exception as e:
+                return self._send(200, {"enabled": True, "text": raw, "note": "KI nicht erreichbar: " + str(e)})
 
         if self.path == "/api/mail/send":
             p = self._auth()

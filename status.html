@@ -85,8 +85,62 @@ function sTotal(o){return sDevices(o).reduce((s,d)=>s+(+d.price||0),0);}
 function sDevLabel(o){return sDevices(o).map(d=>[d.brand,d.model].filter(Boolean).join(' ')).filter(Boolean).join(' + ');}
 function sIssue(o){return sDevices(o).map(d=>d.reparatur).filter(Boolean).join(' · ');}
 
+function stepIndexP(status){return {offen:0,angenommen:0,bearbeitung:1,warten:1,fertig:2,abgeholt:3,abgeschlossen:3}[status]??1;}
+function loadPortal(t){
+  const wrap=document.getElementById('wrap');
+  wrap.innerHTML='<p class="muted">Lädt…</p>';
+  fetch('/api/portal/get?t='+encodeURIComponent(t)).then(r=>r.json()).then(res=>{
+    if(!res||!res.ok||!res.data){ wrap.innerHTML='<h1>Nicht gefunden</h1><p class="sub">Dieser Auftrags-Link ist ungültig oder abgelaufen.</p>'; return; }
+    renderPortal(res.data,t);
+  }).catch(()=>{ wrap.innerHTML='<h1>Verbindungsproblem</h1><p class="sub">Bitte später erneut versuchen.</p>'; });
+}
+function renderPortal(d,t){
+  const wrap=document.getElementById('wrap');
+  document.getElementById('wsName').textContent=d.workshop||'Werkstatt';
+  document.getElementById('wsDot').textContent=((d.workshop||'W').trim()[0]||'W').toUpperCase();
+  document.title='Reparatur-Status · '+(d.workshop||'Werkstatt');
+  const cur=stepIndexP(d.status); const ready=d.status==='fertig', done=d.status==='abgeholt';
+  const msgs=(d.messages||[]);
+  wrap.innerHTML=`
+    <h1>Hallo ${esc((d.customerName||'').split(' ')[0]||'')},</h1>
+    <p class="sub">hier ist der aktuelle Stand Ihrer Reparatur.</p>
+    <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div><div style="font-weight:800;font-size:18px">${esc(d.device||'')}</div>
+        <div class="muted" style="font-size:14px">${esc(d.issue||'')} · Auftrag ${esc(d.nr||'')}</div></div>
+      <span class="badge" style="border-color:${esc(d.statusColor||'#0e7a3c')};color:${esc(d.statusColor||'#0e7a3c')}"><span class="d"></span>${esc(d.statusLabel||'')}</span></div></div>
+    <div class="card"><div class="steps">
+      ${STEPS.map((st,i)=>{const cls=i<cur?'done':(i===cur?'cur':'future');const showWait=(d.status==='warten'&&i===1);
+        return `<div class="step ${cls}"><div class="linewrap"><div class="cir">${i<cur?CK:(i+1)}</div><div class="bar"></div></div>
+        <div class="txt"><div class="t">${st.t}</div><div class="s">${i<=cur?st.s:''}</div>${showWait?'<div class="note">Wir warten aktuell auf ein passendes Ersatzteil und melden uns, sobald es da ist.</div>':''}</div></div>`;}).join('')}
+    </div></div>
+    ${d.kva?`<div class="card" style="border:2px solid #0e7a3c"><div style="font-weight:800;font-size:17px;margin-bottom:6px">Kostenvoranschlag</div>
+      <div class="row"><span>Voraussichtlicher Betrag</span><b>${eur(d.kva.amount)}</b></div>
+      ${d.kva.note?`<p class="muted" style="font-size:14px;margin-top:8px;white-space:pre-wrap">${esc(d.kva.note)}</p>`:''}
+      <p class="muted" style="font-size:13px;margin-top:8px">Bitte antworten Sie uns unten, ob wir die Reparatur durchführen dürfen.</p></div>`:''}
+    ${ready?`<div class="card" style="border:2px solid #0e7a3c"><div style="font-weight:800;font-size:17px;margin-bottom:6px">Ihr Gerät ist abholbereit</div>
+      <div class="row"><span>Abholung</span><b>${esc(d.hours||'')}</b></div>${d.address?`<div class="row"><span>Adresse</span><b>${esc(d.address)}</b></div>`:''}<div class="row"><span>Endbetrag</span><b>${eur(d.price)}</b></div></div>`:''}
+    <div class="card"><div style="font-weight:800;margin-bottom:8px">Nachrichten</div>
+      <div id="thread">${msgs.length?msgs.map(m=>{const w=m.from!=='kunde';return `<div style="display:flex;justify-content:${w?'flex-start':'flex-end'};margin:5px 0"><div style="max-width:82%;background:${w?'var(--soft)':'#0e7a3c'};color:${w?'var(--ink)':'#fff'};border-radius:12px;padding:9px 12px;font-size:14px"><div style="white-space:pre-wrap">${esc(m.text)}</div><div style="opacity:.7;font-size:11px;margin-top:3px">${w?esc(d.workshop||'Werkstatt'):'Sie'} · ${fmtDate(m.at)}${m.kind==='kva'?' · KVA':''}</div></div></div>`;}).join(''):'<p class="muted" style="font-size:13px">Noch keine Nachrichten.</p>'}</div>
+      <textarea class="in" id="pReply" rows="2" placeholder="Ihre Nachricht oder Rückmeldung an die Werkstatt…"></textarea>
+      <button class="btn" onclick="portalReply('${t}')">Nachricht senden</button>
+      <div id="pReplyRes"></div></div>
+    <div class="card"><div class="row"><span>Voraussichtlicher Preis</span><b>${eur(d.price)}</b></div>
+      ${d.appt?`<div class="row"><span>Termin</span><b>${fmtDate(d.appt)}</b></div>`:''}
+      <div class="row"><span>Garantie</span><b>${d.warranty||0} Monate</b></div></div>
+    ${d.workshopTel?`<a class="cta" href="tel:${(d.workshopTel||'').replace(/\\s/g,'')}">Lieber anrufen? ${esc(d.workshopTel)}</a>`:''}
+    <div class="foot">${esc(d.workshop||'')}${d.address?' · '+esc(d.address):''}<br>${esc(d.workshopTel||'')}</div>`;
+}
+function portalReply(t){
+  const el=document.getElementById('pReply'); const v=el?el.value.trim():''; if(!v)return;
+  const res=document.getElementById('pReplyRes'); if(res)res.innerHTML='<p class="muted" style="font-size:13px;margin-top:8px">Wird gesendet…</p>';
+  fetch('/api/portal/reply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({t:t,text:v})})
+   .then(r=>r.json()).then(r=>{ if(r&&r.ok){ if(el)el.value=''; if(res)res.innerHTML='<p style="color:#0e7a3c;font-weight:700;font-size:14px;margin-top:8px">✓ Ihre Nachricht wurde an die Werkstatt gesendet.</p>'; } else { if(res)res.innerHTML='<p class="muted" style="font-size:13px;margin-top:8px">'+esc((r&&r.error)||'Senden fehlgeschlagen')+'</p>'; } })
+   .catch(()=>{ if(res)res.innerHTML='<p class="muted" style="font-size:13px;margin-top:8px">Verbindungsproblem.</p>'; });
+}
 function render(){
   const wrap=document.getElementById('wrap');
+  const t=param('t');
+  if(t){ return loadPortal(t); }
   const nr=param('nr');
   if(!nr){ return lookup(wrap); }
   const res=findOrder(nr);

@@ -870,7 +870,7 @@ function aufSelCount(){return Object.keys(aufSel).filter(k=>aufSel[k]).length;}
 function aufToggleSel(id){aufSel[id]=!aufSel[id];views.auftraege();paintIcons();}
 function aufSelAll(ids,on){ids.forEach(id=>aufSel[id]=on);views.auftraege();paintIcons();}
 function sortOrders(list){const l=list.slice();if(aufSort==='neu')l.sort((a,b)=>(b.created||'').localeCompare(a.created||'')||String(b.nr).localeCompare(String(a.nr)));else if(aufSort==='alt')l.sort((a,b)=>(a.created||'').localeCompare(b.created||'')||String(a.nr).localeCompare(String(b.nr)));else if(aufSort==='preis')l.sort((a,b)=>oTotal(b)-oTotal(a));else if(aufSort==='faellig')l.sort((a,b)=>(a.due||'zzzz').localeCompare(b.due||'zzzz'));return l;}
-function setStatusRow(id,s){const o=S.ord.find(x=>x.id===id);if(!o)return;o.status=s;if(s==='fertig'&&!o.readyAt)o.readyAt=today();if(s==='abgeholt')o.pickedAt=today();save();const def=statusDef(s);const notified=!!(def&&(def.email||def.sms||def.wa));if(notified)statusNotify(o,def);toast('Status: '+statusLabel(s)+(notified?' · Kunde benachrichtigt':''));views.auftraege();paintIcons();refreshBadges();if(s==='warten')setTimeout(function(){openPartWaitDialog(id);},120);}
+function setStatusRow(id,s){const o=S.ord.find(x=>x.id===id);if(!o)return;o.status=s;(o.statusHistory=o.statusHistory||[]).push({status:s,at:new Date().toISOString()});if(s==='fertig'&&!o.readyAt)o.readyAt=today();if(s==='abgeholt')o.pickedAt=today();save();if(DB.backend==='server')portalSync(o);const def=statusDef(s);const notified=!!(def&&(def.email||def.sms||def.wa));if(notified)statusNotify(o,def);toast('Status: '+statusLabel(s)+(notified?' · Kunde benachrichtigt':''));views.auftraege();paintIcons();refreshBadges();if(s==='warten')setTimeout(function(){openPartWaitDialog(id);},120);}
 function archiveOrder(id){const o=S.ord.find(x=>x.id===id);if(o){o.archived=true;save();closeAll();toast('Auftrag archiviert');views.auftraege();paintIcons();refreshBadges();}}
 function trashOrder(id){const o=S.ord.find(x=>x.id===id);if(o){o.trashed=true;save();closeAll();toast('In den Papierkorb verschoben');views.auftraege();paintIcons();refreshBadges();}}
 function restoreOrder(id){const o=S.ord.find(x=>x.id===id);if(o){o.trashed=false;o.archived=false;save();toast('Wiederhergestellt');views.auftraege();paintIcons();refreshBadges();}}
@@ -949,6 +949,8 @@ views.auftraege=function(){
 
 function openOrder(id){
   const o=S.ord.find(x=>x.id===id); if(!o)return; const c=cust(o.cid);
+  if(!Array.isArray(o.statusHistory)||!o.statusHistory.length){o.statusHistory=[{status:o.status,at:o.created||new Date().toISOString()}];}
+  if(DB.backend==='server')portalSync(o); /* Portal aktuell halten + Token sichern */
   const track='reparado.de/status/'+o.nr;
   const warrUntil=o.pickedAt?addMonths(o.pickedAt,o.warranty):(o.readyAt?addMonths(o.readyAt,o.warranty):'');
   const dr=document.getElementById('drawer');
@@ -981,6 +983,7 @@ function openOrder(id){
      </div>`:''}
      ${o.notes?`<div class="note" style="margin-top:12px">Notiz: ${esc(o.notes)}</div>`:''}
 
+     ${orderCommsPanel(o)}
      ${margeCard(o)}
      ${photoSection(o)}
 
@@ -1019,9 +1022,10 @@ function openOrder(id){
 
 function setStatus(id,s){
   const o=S.ord.find(x=>x.id===id); o.status=s;
+  (o.statusHistory=o.statusHistory||[]).push({status:s,at:new Date().toISOString()});
   if(s==='fertig'&&!o.readyAt) o.readyAt=today();
   if(s==='abgeholt') o.pickedAt=today();
-  save();
+  save(); if(DB.backend==='server')portalSync(o);
   const def=statusDef(s); const notified=!!(def&&(def.email||def.sms||def.wa));
   if(notified) statusNotify(o,def);
   toast('Status: '+statusLabel(s)+(notified?' · Kunde benachrichtigt':''));
@@ -1691,6 +1695,58 @@ function intakeImport(silent){
     if(!silent)toast(res.items.length+' neue Vorab-Anfrage'+(res.items.length>1?'n':''));
   }).catch(()=>{});
 }
+/* ---- P16: Kundenkommunikation (extern/intern) + Kundenportal (QR) + KI-Formulierung ---- */
+function ensureComms(o){ if(!Array.isArray(o.comms))o.comms=[]; return o.comms; }
+function commLog(o,dir,internal,text,kind){ const u=curUser(); ensureComms(o).push({id:uid('m'),dir:dir,internal:!!internal,text:text,kind:kind||'nachricht',by:(u&&u.name)||'',at:new Date().toISOString()}); }
+function orderCommsPanel(o){ const cs=ensureComms(o);
+  const ext=cs.filter(c=>!c.internal), int=cs.filter(c=>c.internal); const c=cust(o.cid);
+  const bubble=(m)=>{const mine=m.dir!=='in'; return `<div style="display:flex;justify-content:${mine?'flex-end':'flex-start'};margin:4px 0"><div style="max-width:82%;background:${mine?'var(--accent,#16a34a)':'var(--soft)'};color:${mine?'#fff':'var(--ink)'};border-radius:12px;padding:8px 11px;font-size:13px"><div style="white-space:pre-wrap">${esc(m.text)}</div><div style="opacity:.7;font-size:10px;margin-top:3px">${m.dir==='in'?'Kunde':(esc(m.by||'Werkstatt'))} · ${new Date(m.at).toLocaleString('de-DE')}${m.kind==='kva'?' · KVA':''}</div></div></div>`;};
+  return `<div class="card" style="margin-top:14px"><b>Kommunikation</b>
+    <div class="row" style="gap:6px;margin-top:8px"><button class="btn sm ${(!o._commTab||o._commTab==='ext')?'pri':'gho'}" onclick="commTab('${o.id}','ext')">Kundenkommunikation</button><button class="btn sm ${o._commTab==='int'?'pri':'gho'}" onclick="commTab('${o.id}','int')">Interne Notizen</button></div>
+    ${(!o._commTab||o._commTab==='ext')?`
+      <div style="margin-top:10px;max-height:230px;overflow:auto;padding:4px;border:1px solid var(--line);border-radius:10px;background:#fff">${ext.length?ext.map(bubble).join(''):'<div class="muted" style="font-size:12px;text-align:center;padding:10px">Noch keine Nachrichten an den Kunden.</div>'}</div>
+      <textarea class="in" id="cm_ext_${o.id}" rows="2" placeholder="Nachricht an den Kunden…" style="margin-top:8px"></textarea>
+      <div class="row" style="gap:8px;margin-top:6px;flex-wrap:wrap"><button class="btn sm gho" onclick="orderAiRewrite('${o.id}')">✨ Mit KI formulieren</button><button class="btn sm" onclick="orderSendKVA('${o.id}')">Kostenvoranschlag senden</button><button class="btn sm pri" onclick="orderSendExternal('${o.id}')">An Kunden senden${c.mail?'':' (Log)'}</button></div>
+      <div class="muted" style="font-size:11px;margin-top:4px">Extern = für den Kunden sichtbar (E-Mail + im Kundenportal). ${c.mail?('E-Mail: '+esc(c.mail)):'Keine Kunden-E-Mail hinterlegt – wird protokolliert.'}</div>`
+    :`
+      <div style="margin-top:10px;max-height:230px;overflow:auto;padding:4px;border:1px solid var(--line);border-radius:10px;background:#fff">${int.length?int.map(bubble).join(''):'<div class="muted" style="font-size:12px;text-align:center;padding:10px">Keine internen Notizen.</div>'}</div>
+      <textarea class="in" id="cm_int_${o.id}" rows="2" placeholder="Interne Notiz (nur fürs Team, NIE für den Kunden sichtbar)…" style="margin-top:8px"></textarea>
+      <div class="row" style="justify-content:flex-end;margin-top:6px"><button class="btn sm pri" onclick="orderAddNote('${o.id}')">Notiz speichern</button></div>
+      <div class="muted" style="font-size:11px;margin-top:4px">🔒 Interne Notizen sind ausschließlich für Mitarbeiter – sie erscheinen nie im Kundenportal oder in Kunden-E-Mails.</div>`}
+  </div>`; }
+function commTab(id,t){ const o=S.ord.find(x=>x.id===id); if(!o)return; o._commTab=t; openOrder(id); }
+function orderAddNote(id){ const o=S.ord.find(x=>x.id===id); const e=document.getElementById('cm_int_'+id); const v=e?e.value.trim():''; if(!v){toast('Bitte Notiz eingeben');return;} commLog(o,'out',true,v,'notiz'); save(); openOrder(id); toast('Interne Notiz gespeichert'); }
+function orderSendExternal(id){ const o=S.ord.find(x=>x.id===id); const e=document.getElementById('cm_ext_'+id); const v=e?e.value.trim():''; if(!v){toast('Bitte Nachricht eingeben');return;} _orderSendMsg(o,v,'nachricht','Nachricht Ihrer Werkstatt'); }
+function orderSendKVA(id){ const o=S.ord.find(x=>x.id===id); const e=document.getElementById('cm_ext_'+id); let v=e?e.value.trim():''; if(!v)v='Wir haben Ihr Gerät geprüft. Unser Kostenvoranschlag für die Reparatur beträgt '+eur(oTotal(o))+'. Bitte geben Sie uns kurz Bescheid, ob wir die Reparatur durchführen dürfen.'; o.kva={amount:oTotal(o),at:new Date().toISOString(),note:v}; _orderSendMsg(o,v,'kva','Kostenvoranschlag – '+SHOP.name); }
+function _orderSendMsg(o,text,kind,subject){ const c=cust(o.cid); commLog(o,'out',false,text,kind); save();
+  if(DB.backend==='server'&&c.mail){ fetch(API+'/api/mail/send',{method:'POST',headers:DB._hdr(),body:JSON.stringify({to:c.mail,subject:subject+' · '+o.nr,body:text+'\n\nStatus & Antwort: '+(o.portalToken?(location.origin+'/status.html?t='+o.portalToken):'—')+'\n\nIhr Team von '+SHOP.name})}).then(r=>r.json()).then(res=>{ toast(res.sent?'✓ An Kunden gesendet':'Protokolliert (E-Mail: '+(res.note||'—')+')'); }).catch(()=>toast('Gesendet (Protokoll)')); }
+  else { S.mailLog&&S.mailLog.unshift({t:new Date().toISOString(),to:c.name,ch:'E-Mail',rule:kind==='kva'?'Kostenvoranschlag':'Kundennachricht',subj:subject,how:'manuell'}); toast(c.mail?'Nachricht protokolliert':'Keine Kunden-E-Mail – nur protokolliert'); }
+  portalSync(o); const el=document.getElementById('cm_ext_'+o.id); if(el)el.value=''; openOrder(o.id); }
+function orderAiRewrite(id){ const o=S.ord.find(x=>x.id===id); const e=document.getElementById('cm_ext_'+id); const v=e?e.value.trim():''; if(!v){toast('Bitte zuerst Stichpunkte eingeben');return;}
+  if(DB.backend!=='server'){ toast('KI-Formulierung braucht Server-Anbindung'); return; }
+  openModal(`<div class="dhead"><b style="flex:1">KI formuliert…</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div><div class="dbody"><p class="muted">Einen Moment…</p></div>`);
+  fetch(API+'/api/ai/rewrite',{method:'POST',headers:DB._hdr(),body:JSON.stringify({text:v,kind:'nachricht'})}).then(r=>r.json()).then(res=>{
+    if(res.enabled===false){ openModal(`<div class="dhead"><b style="flex:1">KI-Formulierung</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div><div class="dbody"><div class="note">${esc(res.note||'Noch nicht freigeschaltet.')}</div><p class="muted" style="font-size:12px;margin-top:8px">Sobald ein KI-Schlüssel hinterlegt ist, formuliert die KI Ihren Text automatisch professionell aus.</p></div>`); return; }
+    openModal(`<div class="dhead"><b style="flex:1">KI-Vorschlag – bitte prüfen</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+     <div class="dbody"><p class="muted" style="font-size:13px">Vor dem Senden prüfen und bei Bedarf anpassen. Die KI verbessert nur die Formulierung.</p>
+       <textarea class="in" id="ai_out" rows="6" style="margin-top:8px">${esc(res.text||v)}</textarea>
+       <div class="row" style="margin-top:12px;justify-content:flex-end;gap:8px"><button class="btn gho" onclick="closeAll()">Verwerfen</button><button class="btn pri" onclick="aiAccept('${o.id}')">Übernehmen</button></div></div>`);
+  }).catch(()=>{ openModal(`<div class="dhead"><b style="flex:1">Fehler</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div><div class="dbody"><div class="note">KI aktuell nicht erreichbar.</div></div>`); }); }
+function aiAccept(id){ const out=document.getElementById('ai_out'); const t=out?out.value:''; closeAll(); const e=document.getElementById('cm_ext_'+id); if(e){e.value=t;e.focus();} }
+function portalSnapshot(o){ const c=cust(o.cid); const hist=(o.statusHistory||[]).map(h=>({status:h.status,at:h.at}));
+  return { workshop:SHOP.name, workshopTel:SHOP.phone, hours:SHOP.hours, address:(SHOP.street?SHOP.street+', ':'')+SHOP.zip+' '+SHOP.city, google:SHOP.google,
+    nr:o.nr, customerName:(c.name||''), device:oDevices(o).map(d=>[d.brand,d.model].filter(Boolean).join(' ')).join(' + '), issue:oIssueLabel(o),
+    status:o.status, statusLabel:statusLabel(o.status), statusColor:statusColor(o.status), timeline:hist,
+    price:oTotal(o), warranty:o.warranty||0, appt:o.appt||'', readyAt:o.readyAt||'', created:o.created||'',
+    kva:o.kva||null, messages:ensureComms(o).filter(m=>!m.internal).map(m=>({from:m.dir==='in'?'kunde':'werkstatt',text:m.text,at:m.at,kind:m.kind})),
+    updatedAt:new Date().toISOString() }; }
+function portalSync(o,cb){ if(DB.backend!=='server')return; fetch(API+'/api/portal/sync',{method:'POST',headers:DB._hdr(),body:JSON.stringify({orderId:o.id,data:portalSnapshot(o)})}).then(r=>r.json()).then(res=>{ if(res.token&&o.portalToken!==res.token){o.portalToken=res.token;save();} if(cb)cb(res.token); }).catch(()=>{}); }
+function portalPollReplies(){ if(DB.backend!=='server')return; fetch(API+'/api/portal/replies',{headers:DB._hdr()}).then(r=>r.json()).then(res=>{
+    if(!res||!res.items||!res.items.length)return; const ids=[]; let n=0;
+    res.items.forEach(it=>{ ids.push(it.id); const o=S.ord.find(x=>x.id===it.orderId); if(o){ commLog(o,'in',false,it.text,'nachricht'); n++; } });
+    fetch(API+'/api/portal/replies/consume',{method:'POST',headers:DB._hdr(),body:JSON.stringify({ids:ids})}).catch(()=>{});
+    if(n){ save(); if(current==='auftraege')views.auftraege(); paintIcons(); refreshBadges&&refreshBadges(); toast(n+' neue Kundenantwort'+(n>1?'en':'')); }
+  }).catch(()=>{}); }
 /* ---- Bewertungs-Booster (L6): Feedback von der Statusseite ---- */
 function pullFeedback(){let arr=[];try{arr=JSON.parse(localStorage.getItem('reparado_feedback')||'[]');}catch(e){}if(!arr.length)return 0;S.feedback=S.feedback||[];arr.forEach(f=>{S.feedback.unshift(Object.assign({id:uid('fb')},f,{ts:f.ts?(typeof f.ts==='number'?new Date(f.ts).toISOString():f.ts):new Date().toISOString()}));});localStorage.removeItem('reparado_feedback');save();return arr.length;}
 function dismissFb(id){S.feedback=(S.feedback||[]).filter(f=>f.id!==id);save();views.dashboard();paintIcons();toast('Erledigt');}
@@ -1755,6 +1811,7 @@ function printReceipt(id){const o=S.ord.find(x=>x.id===id);const c=cust(o.cid);
     <tbody>${posRows(o)}</tbody></table>
     <div class="tot"><span>Gesamt (inkl. MwSt.)</span><span>${eur(oTotal(o))}</span></div>${totVatLine(o)}
     ${sigBlock(o)}
+    ${o.portalToken?`<div style="margin-top:16px;padding-top:12px;border-top:1px solid #ddd;display:flex;gap:14px;align-items:center"><div style="flex:none">${RQR.svg(location.origin+'/status.html?t='+o.portalToken,{cell:3,margin:2})}</div><div style="font-size:12px;color:#444"><b>Auftrag online verfolgen</b><br>Scannen Sie diesen Code mit dem Smartphone: aktueller Reparaturstatus, Kostenvoranschlag und direkte Nachricht an uns.</div></div>`:''}
     <div class="foot">Preis inkl. gesetzlicher MwSt. · Garantie: ${o.warranty} Monate auf die durchgeführte Reparatur.<br>Vielen Dank für Ihren Auftrag bei ${SHOP.name}.</div>
     ${ensureSettings().agb?`<div style="margin-top:14px;padding-top:10px;border-top:1px solid #ddd;font-size:11px;color:#666;line-height:1.5">${esc(ensureSettings().agb)}</div>`:''}`);
   }
@@ -3948,7 +4005,7 @@ paintIcons();
 function bootApp(){ensureWorkshop(); ensureMaster(); applyMaster(); ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); ensureInv(); ensureProc(); ensureTrade(); ensureShip(); ensureContracts(); ensureInsurers(); ensureIntegrations(); const n=pullBookings(); const nq=pullRequests(); pullFeedback(); pullWarranty(); go('dashboard'); applyNavRole(); if(!curUser())showLogin();
   if(nq) setTimeout(()=>toast(nq+' neue Website-Anfrage'+(nq>1?'n':'')),900);
   if(n) setTimeout(()=>toast(n+' neue Online-Buchung'+(n>1?'en':'')+' übernommen'),500);
-  if(DB.backend==='server'){ setTimeout(()=>intakeImport(false),1500); if(!window.__intakePoll)window.__intakePoll=setInterval(()=>intakeImport(false),90000); }
+  if(DB.backend==='server'){ setTimeout(()=>intakeImport(false),1500); setTimeout(()=>portalPollReplies(),2200); if(!window.__intakePoll)window.__intakePoll=setInterval(()=>intakeImport(false),90000); if(!window.__portalPoll)window.__portalPoll=setInterval(()=>portalPollReplies(),90000); }
 }
 /* Frischer, komplett leerer Zustand für ein neu registriertes Konto (keine Demo-Daten). */
 function blankState(){ return {v:11, __clean:true, cust:[], ord:[], parts:[], orders:[], sold:[], counter:1000, rules:defaultRules(), sales:[], cash:{connected:''}, mailLog:[], calls:[], phone:defaultPhone(), users:[{id:'u1',name:'Inhaber',role:'inhaber',pin:'1234'}], userId:'u1', insurance:defaultInsurance(), wgLeads:[], drafts:[], quotes:[], requests:[], quoteCounter:1000, feedback:[], reactDone:[]}; }
@@ -3989,7 +4046,7 @@ function startApp(){
   } else { bootApp(); }
 }
 startApp();
-window.addEventListener('focus',()=>{const n=pullBookings(); const nq=pullRequests(); const nf=pullFeedback(); if(n||nq||nf){if(current!=='neworder')go(current);if(n)toast(n+' neue Online-Buchung'+(n>1?'en':'')+' übernommen');else if(nq)toast(nq+' neue Website-Anfrage'+(nq>1?'n':''));else if(nf)toast(nf+' neue Kundenbewertung'+(nf>1?'en':''));} if(DB.backend==='server'&&current!=='neworder')intakeImport(false);});
+window.addEventListener('focus',()=>{const n=pullBookings(); const nq=pullRequests(); const nf=pullFeedback(); if(n||nq||nf){if(current!=='neworder')go(current);if(n)toast(n+' neue Online-Buchung'+(n>1?'en':'')+' übernommen');else if(nq)toast(nq+' neue Website-Anfrage'+(nq>1?'n':''));else if(nf)toast(nf+' neue Kundenbewertung'+(nf>1?'en':''));} if(DB.backend==='server'&&current!=='neworder'){intakeImport(false);portalPollReplies();}});
 </script>
 </body>
 </html>
