@@ -749,9 +749,58 @@ function checkinDo(){const g=id=>(document.getElementById(id)||{}).value||'';con
   S.ord.unshift(o);save();refreshBadges();
   document.getElementById('checkinOv').innerHTML=`<div style="max-width:560px;margin:60px auto;text-align:center"><div style="width:70px;height:70px;border-radius:50%;background:#0e7a3c;color:#fff;display:grid;place-items:center;margin:0 auto 18px;font-size:32px">✓</div><div style="font-size:24px;font-weight:800">Danke, ${esc(name.split(' ')[0])}!</div><p class="muted" style="margin:8px 0 4px">Ihr Gerät ist angemeldet.</p><div style="font-weight:800;font-size:20px">${nr}</div><p class="muted" style="font-size:13px;margin-top:8px">Status verfolgen: reparado.de/status/${nr}</p><button class="btn pri" style="margin-top:18px" onclick="checkinCancel()">Fertig</button></div>`;}
 /* ============================ DASHBOARD ============================ */
+/* ---- P13: Aufgaben-System (zuweisen / Status / abhaken / Protokoll) ---- */
+function ensureTasks(){ if(!Array.isArray(S.tasks))S.tasks=[]; return S.tasks; }
+function taskStatusLabel(s){return {offen:'Offen',bearbeitung:'In Bearbeitung',erledigt:'Erledigt'}[s]||s;}
+function taskStatusColor(s){return {offen:'#6b7280',bearbeitung:'#e0a000',erledigt:'#16a34a'}[s]||'#6b7280';}
+function taskAdd(title,opts){ opts=opts||{}; title=(title||'').trim(); if(!title)return null; const u=curUser(); const now=new Date().toISOString();
+  const t={id:uid('t'),title:title,note:opts.note||'',assignee:opts.assignee||'',status:'offen',createdBy:(u&&u.id)||'',createdByName:(u&&u.name)||'',createdAt:now,due:opts.due||today(),orderId:opts.orderId||'',
+    history:[{action:'erstellt'+(opts.assignee?(' · zugewiesen an '+techName(opts.assignee)):''),by:(u&&u.name)||'System',at:now}]};
+  ensureTasks().unshift(t); save(); return t; }
+function taskSetStatus(id,st){ const t=ensureTasks().find(x=>x.id===id); if(!t)return; const u=curUser(); const now=new Date().toISOString();
+  t.status=st; (t.history=t.history||[]).push({action:'Status → '+taskStatusLabel(st),by:(u&&u.name)||'',at:now});
+  if(st==='erledigt'){t.doneBy=(u&&u.id)||'';t.doneByName=(u&&u.name)||'';t.doneAt=now;} else {t.doneAt='';t.doneBy='';t.doneByName='';}
+  save(); (views[current]||views.dashboard)(); paintIcons(); refreshBadges&&refreshBadges(); }
+function taskCycle(id){ const t=ensureTasks().find(x=>x.id===id); if(!t)return; taskSetStatus(id,{offen:'bearbeitung',bearbeitung:'erledigt',erledigt:'offen'}[t.status]||'offen'); }
+function taskReassign(id,uid2){ const t=ensureTasks().find(x=>x.id===id); if(!t)return; const u=curUser(); const oldN=t.assignee?techName(t.assignee):'niemand';
+  t.assignee=uid2; (t.history=t.history||[]).push({action:'zugewiesen an '+(uid2?techName(uid2):'niemand')+' (vorher '+oldN+')',by:(u&&u.name)||'',at:new Date().toISOString()});
+  save(); (views[current]||views.dashboard)(); paintIcons(); }
+function taskDelete(id){ if(!confirm('Aufgabe löschen?'))return; S.tasks=ensureTasks().filter(x=>x.id!==id); save(); (views[current]||views.dashboard)(); paintIcons(); }
+function taskHistory(id){ const t=ensureTasks().find(x=>x.id===id); if(!t)return;
+  openModal(`<div class="dhead"><b style="flex:1">Verlauf: ${esc(t.title)}</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+   <div class="dbody">${(t.history||[]).slice().reverse().map(h=>`<div style="padding:8px 0;border-bottom:1px solid var(--line)"><b style="font-size:13px">${esc(h.action)}</b><div class="muted" style="font-size:12px">${esc(h.by||'—')} · ${new Date(h.at).toLocaleString('de-DE')}</div></div>`).join('')||'<div class="empty">Kein Verlauf</div>'}</div>`); }
+function dashAddTask(){ const e=document.getElementById('dashTaskInput'); if(!e||!e.value.trim())return; const a=document.getElementById('dashTaskAssignee'); taskAdd(e.value,{assignee:(a?a.value:'')}); e.value=''; views.dashboard(); paintIcons(); }
+function orderTaskDialog(id){ const o=S.ord.find(x=>x.id===id); if(!o)return;
+  openModal(`<div class="dhead"><b style="flex:1">Aufgabe zum Auftrag ${esc(o.nr)}</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+   <div class="dbody">
+     <label class="f">Aufgabe</label><input class="in" id="ot_title" placeholder="z. B. Kunde wegen Kostenvoranschlag anrufen">
+     <div class="row" style="gap:8px;margin-top:8px">${['Kunde zurückrufen','Ersatzteil bestellen','Kunde über Fertigstellung informieren'].map(s=>`<button class="btn sm gho" onclick="document.getElementById('ot_title').value='${s} · '+'${esc(o.nr)}'">${s}</button>`).join('')}</div>
+     <label class="f" style="margin-top:10px">Zuweisen an</label><select class="in" id="ot_assignee"><option value="">Mir${curUser()?(' ('+esc(curUser().name)+')'):''}</option>${(S.users||[]).map(u=>`<option value="${u.id}">${esc(u.name)}</option>`).join('')}</select>
+     <div class="row" style="margin-top:14px;justify-content:flex-end;gap:8px"><button class="btn gho" onclick="closeAll()">Abbrechen</button><button class="btn pri" onclick="orderTaskSave('${id}')">Aufgabe anlegen</button></div>
+   </div>`);
+  setTimeout(function(){const e=document.getElementById('ot_title');if(e)e.focus();},40); }
+function orderTaskSave(id){ const o=S.ord.find(x=>x.id===id); const g=x=>{const e=document.getElementById(x);return e?e.value:'';}; const title=g('ot_title').trim(); if(!title){toast('Bitte Aufgabe eingeben');return;}
+  taskAdd(title,{assignee:g('ot_assignee'),orderId:id}); closeAll(); toast('Aufgabe angelegt'); (views[current]||views.dashboard)(); paintIcons(); }
+function taskRow(t){ const col=taskStatusColor(t.status); const done=t.status==='erledigt';
+  return `<div class="listitem" style="box-shadow:inset 3px 0 0 ${col};align-items:center;gap:8px">
+    <button class="btn sm" style="min-width:34px;background:${done?col:'transparent'};border:1px solid ${col};color:${done?'#fff':col}" title="Status wechseln" onclick="taskCycle('${t.id}')">${done?'✓':(t.status==='bearbeitung'?'▶':'○')}</button>
+    <div style="flex:1;min-width:0"><div style="font-weight:600${done?';text-decoration:line-through;opacity:.6':''}">${esc(t.title)}</div>
+      <div class="muted" style="font-size:12px">${taskStatusLabel(t.status)} · ${t.assignee?('👤 '+esc(techName(t.assignee))):'nicht zugewiesen'}${t.orderId?(' · '+esc((S.ord.find(o=>o.id===t.orderId)||{}).nr||'')):''}${done&&t.doneByName?(' · ✓ '+esc(t.doneByName)):''}</div></div>
+    <select class="in" style="max-width:120px;padding:4px 6px" onchange="taskReassign('${t.id}',this.value)" title="Zuweisen"><option value="">— zuweisen —</option>${(S.users||[]).map(u=>`<option value="${u.id}" ${t.assignee===u.id?'selected':''}>${esc(u.name)}</option>`).join('')}</select>
+    <button class="btn sm gho" onclick="taskHistory('${t.id}')" title="Verlauf">🕘</button>
+    <button class="btn sm gho" onclick="taskDelete('${t.id}')" title="Löschen">✕</button>
+  </div>`; }
+function tasksCard(){ const me=S.userId; const all=ensureTasks(); const open=all.filter(t=>t.status!=='erledigt');
+  open.sort((a,b)=>{ const am=(a.assignee===me||!a.assignee)?0:1, bm=(b.assignee===me||!b.assignee)?0:1; if(am!==bm)return am-bm; return (a.due||'').localeCompare(b.due||''); });
+  const doneCount=all.filter(t=>t.status==='erledigt').length;
+  return `<div class="card"><div class="between"><b>Aufgaben für heute</b><span class="muted" style="font-size:12px">${open.length} offen · ${doneCount} erledigt</span></div>
+    <div class="row" style="gap:8px;margin-top:8px;flex-wrap:nowrap"><input class="in" id="dashTaskInput" placeholder="Neue Aufgabe… (z. B. Kunde Meier zurückrufen)" onkeydown="if(event.key==='Enter')dashAddTask()"><select class="in" id="dashTaskAssignee" style="max-width:140px"><option value="">Mir</option>${(S.users||[]).map(u=>`<option value="${u.id}">${esc(u.name)}</option>`).join('')}</select><button class="btn pri" onclick="dashAddTask()">Hinzufügen</button></div>
+    <div style="margin-top:10px">${open.length?open.slice(0,12).map(t=>taskRow(t)).join(''):'<div class="empty">Keine offenen Aufgaben – alles erledigt. 🎉</div>'}</div>
+  </div>`; }
 views.dashboard=function(){
   const m=document.getElementById('main');
   const src=visibleOrders();
+  const warten=src.filter(o=>o.status==='warten').length;
   const monthRev=src.filter(o=>(o.status==='abgeholt'||o.status==='fertig')&&isThisMonth(o.pickedAt||o.readyAt||o.created)).reduce((s,o)=>s+oTotal(o),0)+ S.sales.filter(x=>isThisMonth(x.t)).reduce((s,x)=>s+x.total,0);
   const offen=src.filter(o=>o.status!=='abgeholt').length;
   const fertig=src.filter(o=>o.status==='fertig').length;
@@ -770,8 +819,8 @@ views.dashboard=function(){
      <div style="margin-top:10px;opacity:.9;font-size:13px">Diese Woche: ${b.count} Reparaturen erledigt · Marge ${eur(b.margeW)}</div></div>`;})():''}
    <div class="grid g4" style="margin-top:16px">
      ${curRole()==='inhaber'?`<div class="card kpi"><div class="n">${eur(monthRev)}</div><div class="l">Umsatz diesen Monat</div><div class="t">Reparaturen führen</div></div>`:`<div class="card kpi"><div class="n">${src.filter(o=>o.status==='abgeholt'&&isThisMonth(o.pickedAt||o.readyAt||o.created)).length}</div><div class="l">Erledigt diesen Monat</div><div class="t">Weiter so</div></div>`}
-     <div class="card kpi"><div class="n">${offen}</div><div class="l">Offene Aufträge</div><div class="t">${fertig} abholbereit</div></div>
-     <div class="card kpi"><div class="n">${heute}</div><div class="l">Termine heute</div><div class="t">Kalender ansehen</div></div>
+     <div class="card kpi" onclick="go('auftraege')" style="cursor:pointer"><div class="n">${offen}</div><div class="l">Offene Aufträge</div><div class="t">${fertig} abholbereit · ${warten} auf Ersatzteil</div></div>
+     <div class="card kpi" onclick="go('kalender')" style="cursor:pointer"><div class="n">${heute}</div><div class="l">Termine heute</div><div class="t">Kalender ansehen</div></div>
      <div class="card kpi"><div class="n">${q.length}</div><div class="l">Geplante Erinnerungen</div><div class="t">Kunde &amp; Werkstatt</div></div>
    </div>
    <div class="card" style="background:#0e7a3c;color:#fff;margin-top:16px">
@@ -791,6 +840,7 @@ views.dashboard=function(){
      <div style="margin-top:8px">${S.warrantyClaims.slice(0,4).map(w=>`<div class="listitem"><span class="pill" style="border-color:#8b5cf6;color:#8b5cf6"><span class="d" style="background:#8b5cf6"></span>Garantie</span><div style="flex:1;min-width:0"><b>${esc(w.nr||'—')}</b><div class="muted" style="font-size:13px">${esc(w.text||'ohne Beschreibung')}</div></div><button class="btn sm gho" onclick="dismissWarranty('${w.id}')">Erledigt</button></div>`).join('')}</div></div>`:''}
    ${(S.feedback&&S.feedback.length)?`<div class="card" style="margin-top:16px"><div class="between"><b>Kundenstimmen</b><span class="muted" style="font-size:12px">${S.feedback.length} Rückmeldung${S.feedback.length>1?'en':''} · ${(S.feedback||[]).filter(f=>f.rating>=3).length} positiv → Google · ${(S.feedback||[]).filter(f=>f.rating<3).length} zur Bearbeitung</span></div>
      <div style="margin-top:8px">${S.feedback.slice(0,4).map(f=>`<div class="listitem"><span class="pill ${f.rating>=3?'solid':'soft'}"><span class="d"></span>${f.rating>=3?'Positiv':(f.rating===2?'Neutral':'Kritik')}</span><div style="flex:1;min-width:0"><b>${esc(f.nr||'—')}</b><div class="muted" style="font-size:13px">${esc(f.text||(f.rating>=3?'Auf Google weitergeleitet':'ohne Kommentar'))}</div></div><button class="btn sm gho" onclick="dismissFb('${f.id}')">Erledigt</button></div>`).join('')}</div></div>`:''}
+   <div style="margin-top:16px">${tasksCard()}</div>
    <div class="grid g2" style="margin-top:16px">
      <div class="card">
        <div class="between"><b>Heute zu tun</b><button class="btn sm gho" onclick="go('kalender')">Alle</button></div>
@@ -946,6 +996,7 @@ function openOrder(id){
        <button class="btn" onclick="printKVA('${o.id}')">Kostenvoranschlag</button>
        <button class="btn" onclick="playbook('${o.id}')">Reparatur-Anleitung</button>
        <button class="btn" onclick="printReceipt('${o.id}')">Beleg / Quittung</button>
+       <button class="btn" onclick="orderTaskDialog('${o.id}')">+ Aufgabe</button>
        <button class="btn" onclick="downloadEInvoice('${o.id}')">E-Rechnung (XML)</button>
        <button class="btn" onclick="printLabel('${o.id}')">Etikett drucken</button>
        <button class="btn" onclick="printWarranty('${o.id}')">Garantie-Beleg</button>
