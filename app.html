@@ -540,10 +540,14 @@ function statAdd(){const nm=(prompt('Name des neuen Status:')||'').trim();if(!nm
 function cust(id){return S.cust.find(c=>c.id===id)||{name:'—',tel:'',mail:'',adr:''};}
 /* Geräte pro Auftrag (mehrere möglich); Alt-Aufträge ohne devices[] werden aus den Einzelfeldern synthetisiert */
 function oDevices(o){ if(o&&o.devices&&o.devices.length) return o.devices; return [{typ:(o&&o.devtyp)||'Smartphone',brand:(o&&o.brand)||'',model:(o&&o.model)||'',imei:(o&&o.imei)||'',fach:(o&&o.fach)||'',ref:(o&&o.ref)||'',reparatur:(o&&o.issue)||'',qual:(o&&o.qual)||'Original',price:+(o&&o.price)||0,warranty:(o&&o.warranty)||6,lock:normLock(o&&o.lock),lockval:(o&&o.lockval)||''}]; }
-function oTotal(o){ return oDevices(o).reduce((s,d)=>s+(+d.price||0),0); }
+/* P4: mehrere Reparatur-Positionen je Gerät. d.positions[] ist die Quelle; d.reparatur/qual/price bleiben Spiegel von positions[0]. */
+function blankPosition(){return {reparatur:'',qual:'Original',price:''};}
+function devPositions(d){ if(d&&Array.isArray(d.positions)&&d.positions.length) return d.positions; return [{reparatur:(d&&d.reparatur)||'',qual:(d&&d.qual)||'Original',price:(d&&d.price!==undefined?d.price:'')}]; }
+function devTotal(d){ return devPositions(d).reduce((s,p)=>s+(+p.price||0),0); }
+function oTotal(o){ return oDevices(o).reduce((s,d)=>s+devTotal(d),0); }
 function oDevLabel(o){ return oDevices(o).map(d=>[d.brand,d.model].filter(Boolean).join(' ')).filter(Boolean).join(' + ')||'—'; }
-function oIssueLabel(o){ return oDevices(o).map(d=>d.reparatur).filter(Boolean).join(' · '); }
-function posRows(o){ return oDevices(o).map(d=>`<tr><td>${esc(d.brand)} ${esc(d.model)} — ${esc(d.reparatur)} (${esc(d.qual)})${(+d.price>0)?`<div style="font-size:11px;color:#666">darin ${MWST_RATE} % MwSt: ${eur(vatOf(d.price))}</div>`:''}</td><td style="text-align:right" class="mono">${eur(d.price)}</td></tr>`).join(''); }
+function oIssueLabel(o){ return oDevices(o).reduce((a,d)=>a.concat(devPositions(d).map(p=>p.reparatur)),[]).filter(Boolean).join(' · '); }
+function posRows(o){ return oDevices(o).map(d=>devPositions(d).map(p=>`<tr><td>${esc(d.brand)} ${esc(d.model)} — ${esc(p.reparatur)} (${esc(p.qual)})${(+p.price>0)?`<div style="font-size:11px;color:#666">darin ${MWST_RATE} % MwSt: ${eur(vatOf(p.price))}</div>`:''}</td><td style="text-align:right" class="mono">${eur(p.price)}</td></tr>`).join('')).join(''); }
 function totVatLine(o){const b=oTotal(o);if(!(b>0))return '';return `<div class="between" style="font-size:13px;color:#555;margin-top:3px"><span>Netto</span><span class="mono">${eur(netOf(b))}</span></div><div class="between" style="font-size:13px;color:#555"><span>darin enthaltene MwSt. (${MWST_RATE} %)</span><span class="mono">${eur(vatOf(b))}</span></div>`;}
 /* Techniker (Mitarbeiter) sehen nur ihnen zugewiesene + noch nicht zugewiesene Aufträge */
 function visRole(){ if(curRole()==='inhaber') return S.ord; const u=S.userId; return S.ord.filter(o=>!o.technikerId||o.technikerId===u); }
@@ -886,7 +890,7 @@ function openOrder(id){
      </div>
      <div class="grid g2" style="margin-top:14px">
        <div style="grid-column:1/-1"><label class="f">Gerät${oDevices(o).length>1?'e ('+oDevices(o).length+')':''} &amp; Reparatur</label>
-         ${oDevices(o).map(d=>{const ll=lockLabel(d);return `<div class="between" style="padding:7px 0;border-bottom:1px solid var(--line)"><div style="min-width:0"><b>${esc(d.brand)} ${esc(d.model)}</b><div class="muted" style="font-size:13px">${esc(d.reparatur)} · ${esc(d.qual)}${d.imei?' · IMEI '+esc(d.imei):''}${d.fach?' · '+esc(d.fach):''}${ll?' · 🔒 '+esc(ll):''}</div></div><b class="mono">${eur(d.price)}</b></div>`;}).join('')}
+         ${oDevices(o).map((d,di)=>{const ll=lockLabel(d);const ps=devPositions(d);const meta=[d.imei?'IMEI '+esc(d.imei):'',d.fach?esc(d.fach):'',ll?'🔒 '+esc(ll):'',d.technikerId?'👤 '+esc(techName(d.technikerId)):''].filter(Boolean).join(' · ');return `<div style="padding:8px 0;border-bottom:1px solid var(--line)"><div class="between"><b style="min-width:0">Gerät ${di+1}: ${esc(d.brand)} ${esc(d.model)}</b><b class="mono">${eur(devTotal(d))}</b></div>${meta?`<div class="muted" style="font-size:12px;margin-top:2px">${meta}</div>`:''}${ps.map(p=>`<div class="between" style="font-size:13px;padding:4px 0 0"><span class="muted">${esc(p.reparatur)}${p.qual?' · '+esc(p.qual):''}</span><span class="mono">${eur(p.price)}</span></div>`).join('')}</div>`;}).join('')}
          <div class="between" style="padding:9px 0"><b>Gesamt (inkl. MwSt.)</b><b style="font-size:18px">${eur(oTotal(o))}</b></div>${(oTotal(o)>0)?`<div class="between" style="font-size:12px;color:var(--ink2)"><span>Netto ${eur(netOf(oTotal(o)))}</span><span>darin ${MWST_RATE} % MwSt: ${eur(vatOf(oTotal(o)))}</span></div>`:''}</div>
        <div><label class="f">Priorität</label><div style="font-weight:700">${esc(o.prio)}</div></div>
        <div><label class="f">Termin / Fällig</label><div style="font-weight:700">${o.appt?'Termin '+fmtDate(o.appt)+' · ':''}Fällig ${fmtDate(o.due)}</div></div>
@@ -993,21 +997,22 @@ function saveSig(id){const c=document.getElementById('sig');const o=S.ord.find(x
 
 /* ============================ NEUER / EDIT AUFTRAG (Reparatur-Eingang, mit Entwurf) ============================ */
 function priceFor(brand,model,repair){const c=ensureCat();const k=brand+'|'+model+'|'+repair;if(c.prices[k]!==undefined&&c.prices[k]!=='')return +c.prices[k];const base=c.base[repair];if(base===undefined)return '';const names=catModelNames(brand);const i=names.indexOf(model);const f=i>=0?1+((i%3)*0.06):1;const bf=(c.brandMul&&c.brandMul[brand])||(brand==='Sonstige'||!brand?1:1.05);return Math.round(base*bf*f);}
-function blankDevice(){return {typ:'Smartphone',brand:'',model:'',imei:'',fach:'',ref:'',reparatur:'',price:'',qual:'Original',warranty:6,lock:'Kein',lockval:''};}
+function blankDevice(){return {typ:'Smartphone',brand:'',model:'',imei:'',fach:'',ref:'',reparatur:'',price:'',qual:'Original',warranty:6,lock:'Kein',lockval:'',technikerId:'',positions:[blankPosition()]};}
 /* Sperr-Typ normalisieren (Altdaten: 'Passwort / PIN' / 'Muster (Pattern)' / 'Keine') */
 function normLock(s){s=s||'';if(/PIN|Passwort/i.test(s))return 'PIN';if(/Muster|Pattern/i.test(s))return 'Muster';return 'Kein';}
 function lockLabel(d){const l=normLock(d&&d.lock);if(l==='PIN')return 'PIN'+((d&&d.lockval)?' · '+d.lockval:'');if(l==='Muster')return 'Muster'+((d&&d.lockval)?' · '+d.lockval:'');return '';}
+function techName(id){const u=(typeof S!=='undefined'&&S.users||[]).find(x=>x.id===id);return u?u.name:'';}
 function blankForm(){return {mode:'auftrag',draftId:'',editId:'',quoteEditId:'',fromRequest:'',cid:'',typ:'Privat',anrede:'Herr',firma:'',vorname:'',nachname:'',tel:'+49 ',mail:'',plz:'',stadt:'',adr:'',lock:'Keine',lockval:'',devices:[blankDevice()],prio:'Standard',technikerId:'',notes:'',terminMode:'kein',appt:'',due:today(),sig:''};}
 function dPlus(n){const x=new Date();x.setDate(x.getDate()+(+n||0));return x.toISOString().slice(0,10);}
 function newQuote(pref){ closeAll(); NO=blankForm(); NO.mode='angebot'; NO.draftId=uid('dr'); NO.due=dPlus(14); if(pref)Object.assign(NO,pref); current='neworder'; renderNewOrder(); window.scrollTo(0,0); }
 function editQuote(id){ closeAll(); const q=(S.quotes||[]).find(x=>x.id===id); if(!q)return; NO=quoteToForm(q); NO.mode='angebot'; NO.quoteEditId=id; NO.draftId=uid('dr'); current='neworder'; renderNewOrder(); window.scrollTo(0,0); }
-function quoteToForm(q){const c=cust(q.cid);const nm=(c.name||'').split(' ');const f=blankForm();f.mode='angebot';f.cid=q.cid;f.typ=c.typ||'Privat';f.firma=c.firma||'';f.anrede=c.anrede||'Herr';f.vorname=nm.slice(0,-1).join(' ')||nm[0]||'';f.nachname=nm.length>1?nm[nm.length-1]:'';f.tel=c.tel||'+49 ';f.mail=c.mail||'';f.plz=c.plz||'';f.stadt=c.stadt||'';f.adr=c.adr||'';f.notes=q.notes||'';f.due=q.validUntil||dPlus(14);f.devices=oDevices(q).map(d=>({typ:d.typ||'Smartphone',brand:d.brand||'',model:d.model||'',imei:d.imei||'',fach:d.fach||'',ref:d.ref||'',reparatur:d.reparatur||'',price:(d.price!==undefined&&d.price!==''?d.price:''),qual:d.qual||'Original',warranty:d.warranty||6,lock:normLock(d.lock),lockval:d.lockval||''}));return f;}
+function quoteToForm(q){const c=cust(q.cid);const nm=(c.name||'').split(' ');const f=blankForm();f.mode='angebot';f.cid=q.cid;f.typ=c.typ||'Privat';f.firma=c.firma||'';f.anrede=c.anrede||'Herr';f.vorname=nm.slice(0,-1).join(' ')||nm[0]||'';f.nachname=nm.length>1?nm[nm.length-1]:'';f.tel=c.tel||'+49 ';f.mail=c.mail||'';f.plz=c.plz||'';f.stadt=c.stadt||'';f.adr=c.adr||'';f.notes=q.notes||'';f.due=q.validUntil||dPlus(14);f.devices=oDevices(q).map(d=>({typ:d.typ||'Smartphone',brand:d.brand||'',model:d.model||'',imei:d.imei||'',fach:d.fach||'',ref:d.ref||'',reparatur:d.reparatur||'',price:(d.price!==undefined&&d.price!==''?d.price:''),qual:d.qual||'Original',warranty:d.warranty||6,lock:normLock(d.lock),lockval:d.lockval||'',technikerId:d.technikerId||'',positions:(Array.isArray(d.positions)&&d.positions.length?d.positions.map(p=>({reparatur:p.reparatur||'',qual:p.qual||'Original',price:(p.price!==undefined&&p.price!==''?p.price:'')})):[{reparatur:d.reparatur||'',qual:d.qual||'Original',price:(d.price!==undefined&&d.price!==''?d.price:'')}])}));return f;}
 function noQuoteSave(status){ noCollect();
   if(!NO.vorname&&!NO.nachname&&!NO.firma){toast('Bitte Kundennamen angeben');return;}
   if((NO.tel||'').replace(/\D/g,'').length<5){toast('Bitte Telefonnummer angeben');return;}
   const d0=NO.devices[0]||{}; if(!d0.brand&&!d0.model){toast('Bitte Gerät (Marke/Modell) angeben');return;}
-  if(!d0.reparatur){toast('Bitte Reparaturart angeben');return;}
-  for(const d of NO.devices){ if((d.brand||d.model)&&!d.reparatur){toast('Bitte für jedes Gerät eine Reparaturart angeben');return;} }
+  if(!devPositions(d0).some(p=>p.reparatur)){toast('Bitte mindestens eine Reparaturposition angeben');return;}
+  for(const d of NO.devices){ if((d.brand||d.model)&&!devPositions(d).some(p=>p.reparatur)){toast('Bitte für jedes Gerät mindestens eine Reparaturposition angeben');return;} }
   const name=((NO.vorname+' '+NO.nachname).trim())||NO.firma; const digits=(NO.tel||'').replace(/\D/g,'');
   let c=NO.cid?S.cust.find(x=>x.id===NO.cid):null;
   if(!c)c=S.cust.find(x=>x.tel&&x.tel.replace(/\D/g,'')===digits&&digits.length>5);
@@ -1023,14 +1028,17 @@ let NO=null;
 function newOrder(){ closeAll(); NO=blankForm(); NO.draftId=uid('dr'); current='neworder'; renderNewOrder(); window.scrollTo(0,0); }
 function editOrder(id){ closeAll(); const o=S.ord.find(x=>x.id===id); if(!o)return; NO=orderToForm(o); NO.editId=id; current='neworder'; renderNewOrder(); window.scrollTo(0,0); }
 function resumeDraft(did){ closeAll(); const d=(S.drafts||[]).find(x=>x.id===did); if(!d)return; NO=Object.assign(blankForm(),JSON.parse(JSON.stringify(d.data))); NO.draftId=did; NO.editId=''; current='neworder'; renderNewOrder(); window.scrollTo(0,0); }
-function orderToForm(o){const c=cust(o.cid);const nm=(c.name||'').split(' ');const f=blankForm();f.cid=o.cid;f.typ=c.typ||'Privat';f.firma=c.firma||'';f.anrede=c.anrede||'Herr';f.vorname=nm.slice(0,-1).join(' ')||nm[0]||'';f.nachname=nm.length>1?nm[nm.length-1]:'';f.tel=c.tel||'+49 ';f.mail=c.mail||'';f.plz=c.plz||'';f.stadt=c.stadt||'';f.adr=c.adr||'';f.lock=o.lock||'Keine';f.lockval=o.lockval||'';f.prio=o.prio||'Standard';f.technikerId=o.technikerId||'';f.notes=o.notes||'';f.due=o.due||today();f.appt=o.appt||'';f.terminMode=o.appt?'termin':'kein';f.sig=o.sig||'';f.devices=oDevices(o).map((d,idx)=>({typ:d.typ||'Smartphone',brand:d.brand||'',model:d.model||'',imei:d.imei||'',fach:d.fach||'',ref:d.ref||'',reparatur:d.reparatur||'',price:(d.price!==undefined&&d.price!==0?d.price:(d.price===0?0:'')),qual:d.qual||'Original',warranty:d.warranty||6,lock:normLock(d.lock!==undefined?d.lock:(idx===0?o.lock:'')),lockval:(d.lockval!==undefined?d.lockval:(idx===0?(o.lockval||''):''))}));return f;}
-function noHasContent(){ if(!NO)return false; const d=NO.devices[0]||{}; return !!(NO.vorname||NO.nachname||(NO.tel||'').replace(/\D/g,'').length>3||NO.firma||NO.mail||d.brand||d.model||d.reparatur||NO.notes); }
+function orderToForm(o){const c=cust(o.cid);const nm=(c.name||'').split(' ');const f=blankForm();f.cid=o.cid;f.typ=c.typ||'Privat';f.firma=c.firma||'';f.anrede=c.anrede||'Herr';f.vorname=nm.slice(0,-1).join(' ')||nm[0]||'';f.nachname=nm.length>1?nm[nm.length-1]:'';f.tel=c.tel||'+49 ';f.mail=c.mail||'';f.plz=c.plz||'';f.stadt=c.stadt||'';f.adr=c.adr||'';f.lock=o.lock||'Keine';f.lockval=o.lockval||'';f.prio=o.prio||'Standard';f.technikerId=o.technikerId||'';f.notes=o.notes||'';f.due=o.due||today();f.appt=o.appt||'';f.terminMode=o.appt?'termin':'kein';f.sig=o.sig||'';f.devices=oDevices(o).map((d,idx)=>({typ:d.typ||'Smartphone',brand:d.brand||'',model:d.model||'',imei:d.imei||'',fach:d.fach||'',ref:d.ref||'',reparatur:d.reparatur||'',price:(d.price!==undefined&&d.price!==0?d.price:(d.price===0?0:'')),qual:d.qual||'Original',warranty:d.warranty||6,lock:normLock(d.lock!==undefined?d.lock:(idx===0?o.lock:'')),lockval:(d.lockval!==undefined?d.lockval:(idx===0?(o.lockval||''):'')),technikerId:d.technikerId||'',positions:(Array.isArray(d.positions)&&d.positions.length?d.positions.map(p=>({reparatur:p.reparatur||'',qual:p.qual||'Original',price:(p.price!==undefined&&p.price!==''?p.price:'')})):[{reparatur:d.reparatur||'',qual:d.qual||'Original',price:(d.price!==undefined&&d.price!==0?d.price:(d.price===0?0:''))}])}));return f;}
+function noHasContent(){ if(!NO)return false; const d=NO.devices[0]||{}; return !!(NO.vorname||NO.nachname||(NO.tel||'').replace(/\D/g,'').length>3||NO.firma||NO.mail||d.brand||d.model||d.reparatur||(d.positions&&d.positions.some(p=>p.reparatur))||NO.notes); }
 function noTitleOf(){const nm=((NO.vorname+' '+NO.nachname).trim())||NO.firma||'Unbenannter Kunde';const d=NO.devices[0]||{};const dev=[d.brand,d.model].filter(Boolean).join(' ');return nm+(dev?' · '+dev:'');}
 function noCollect(){ if(!NO)return; const g=id=>{const e=document.getElementById(id);return e?e.value:'';};
   NO.typ=g('no_typ')||NO.typ;NO.anrede=g('no_anrede');NO.firma=g('no_firma');NO.vorname=g('no_vorname');NO.nachname=g('no_nachname');NO.tel=g('no_tel');NO.mail=g('no_mail');NO.plz=g('no_plz');NO.stadt=g('no_stadt');NO.adr=g('no_adr');
   NO.prio=g('no_prio')||NO.prio;NO.technikerId=g('no_tech');NO.notes=g('no_notes');NO.due=g('no_due')||NO.due;NO.appt=g('no_appt');
   const tm=document.querySelector('input[name=no_termin]:checked');if(tm)NO.terminMode=tm.value;
-  NO.devices.forEach((d,i)=>{d.typ=g('dev'+i+'_typ')||d.typ;d.brand=g('dev'+i+'_brand');d.model=g('dev'+i+'_model');d.imei=g('dev'+i+'_imei');d.fach=g('dev'+i+'_fach');d.ref=g('dev'+i+'_ref');d.reparatur=g('dev'+i+'_reparatur');d.price=g('dev'+i+'_price');d.qual=g('dev'+i+'_qual')||d.qual;d.warranty=g('dev'+i+'_warranty')||d.warranty;
+  NO.devices.forEach((d,i)=>{d.typ=g('dev'+i+'_typ')||d.typ;d.brand=g('dev'+i+'_brand');d.model=g('dev'+i+'_model');d.imei=g('dev'+i+'_imei');d.fach=g('dev'+i+'_fach');d.ref=g('dev'+i+'_ref');d.warranty=g('dev'+i+'_warranty')||d.warranty;const gt=document.getElementById('dev'+i+'_tech');if(gt)d.technikerId=gt.value;
+    if(!Array.isArray(d.positions)||!d.positions.length)d.positions=[blankPosition()];
+    d.positions.forEach((p,j)=>{const gr=document.getElementById('dev'+i+'_pos'+j+'_reparatur');if(gr)p.reparatur=gr.value;const gp=document.getElementById('dev'+i+'_pos'+j+'_price');if(gp)p.price=gp.value;const gq=document.getElementById('dev'+i+'_pos'+j+'_qual');if(gq)p.qual=gq.value||p.qual;});
+    const p0=d.positions[0]||{};d.reparatur=p0.reparatur||'';d.qual=p0.qual||'Original';d.price=(p0.price!==undefined?p0.price:''); /* Spiegel positions[0] */
     const lk=document.querySelector('input[name=dev'+i+'_lock]:checked');if(lk)d.lock=lk.value; d.lock=normLock(d.lock);
     if(d.lock==='PIN')d.lockval=g('dev'+i+'_lockval'); else if(d.lock==='Kein')d.lockval=''; /* Muster: lockval wird beim Zeichnen gesetzt */});
   /* Auftrags-Spiegel (Rückwärtskompatibilität): Sperre des 1. Geräts */
@@ -1042,9 +1050,26 @@ function noSaveDraft(){ if(!NO||NO.editId||NO.mode==='angebot')return; if(!noHas
 let _noT=null; function noSaveDraftDebounced(){clearTimeout(_noT);_noT=setTimeout(()=>{noCollect();noSaveDraft();},600);}
 function noAutosave(){noCollect();noSaveDraft();}
 function noBrandChange(i){noCollect();NO.devices[i].model='';renderNewOrder();}
-function noModelPick(i){noCollect();const d=NO.devices[i];if(d.brand&&d.model){const t=catModelType(d.brand,d.model);if(t)d.typ=t;}if(d.brand&&d.reparatur){const p=priceFor(d.brand,d.model,d.reparatur);if(p!=='')d.price=p;}renderNewOrder();}
+function noModelPick(i){noCollect();const d=NO.devices[i];if(d.brand&&d.model){const t=catModelType(d.brand,d.model);if(t)d.typ=t;}const p0=(d.positions&&d.positions[0]);if(p0&&d.brand&&p0.reparatur){const pr=priceFor(d.brand,d.model,p0.reparatur);if(pr!=='')p0.price=pr;}renderNewOrder();}
 function noPrice(i){noCollect();const d=NO.devices[i];if(d.brand&&d.reparatur){const p=priceFor(d.brand,d.model,d.reparatur);if(p!==''){const e=document.getElementById('dev'+i+'_price');if(e)e.value=p;d.price=p;}}noVat(i);noSaveDraft();}
 function noVat(i){const e=document.getElementById('dev'+i+'_price');const h=document.getElementById('dev'+i+'_vathint');if(!e||!h)return;h.textContent=vatHint(+e.value||0);}
+/* ---- P4: Positions-Block je Gerät ---- */
+function noPosBlock(i,j,p,n){
+  return `<div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:8px;background:var(--soft)">
+    <div class="between"><b style="font-size:13px">Position ${j+1}</b>${n>1?`<button type="button" class="btn sm gho" onclick="noRemovePosition(${i},${j})">Entfernen</button>`:''}</div>
+    <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin-top:8px">
+      <div><label class="f">Fehler / Reparaturart *</label><input class="in" id="dev${i}_pos${j}_reparatur" list="allRepairs" value="${esc(p.reparatur||'')}" placeholder="Standardfehler oder eintippen…" onchange="noPosPrice(${i},${j})"></div>
+      <div><label class="f">Preis (€, brutto)</label><input class="in" id="dev${i}_pos${j}_price" type="number" step="0.01" value="${(p.price!==''&&p.price!=null)?p.price:''}" placeholder="0.00" oninput="noPosVat(${i},${j})"></div>
+      <div><label class="f">Qualität</label><select class="in" id="dev${i}_pos${j}_qual">${catQuals().map(q=>`<option ${p.qual===q?'selected':''}>${esc(q)}</option>`).join('')}</select></div>
+    </div>
+    <div id="dev${i}_pos${j}_vathint" class="muted" style="font-size:12px;margin-top:6px">${vatHint(p.price)}</div>
+  </div>`;
+}
+function noEnsurePositions(){ if(!NO||!NO.devices)return; NO.devices.forEach(d=>{ if(!Array.isArray(d.positions)||!d.positions.length){ d.positions=[{reparatur:d.reparatur||'',qual:d.qual||'Original',price:(d.price!==undefined?d.price:'')}]; } }); }
+function noAddPosition(i){noCollect();NO.devices[i].positions.push(blankPosition());renderNewOrder();}
+function noRemovePosition(i,j){noCollect();NO.devices[i].positions.splice(j,1);if(!NO.devices[i].positions.length)NO.devices[i].positions.push(blankPosition());renderNewOrder();}
+function noPosVat(i,j){const e=document.getElementById('dev'+i+'_pos'+j+'_price');const h=document.getElementById('dev'+i+'_pos'+j+'_vathint');if(!e||!h)return;h.textContent=vatHint(+e.value||0);}
+function noPosPrice(i,j){noCollect();const d=NO.devices[i];const p=d.positions[j];if(d.brand&&p.reparatur){const pr=priceFor(d.brand,d.model,p.reparatur);if(pr!==''){const e=document.getElementById('dev'+i+'_pos'+j+'_price');if(e)e.value=pr;p.price=pr;}}noPosVat(i,j);noSaveDraft();}
 /* ---- P9: grafisches Entsperrmuster (3x3-Punkteraster, mit Maus/Finger zeichnen) ---- */
 let __pat={}; let __patCur=null;
 function patDot(k){return {cx:30+(k%3)*60, cy:30+Math.floor(k/3)*60};}
@@ -1072,7 +1097,7 @@ if(!window.__patGlobal){window.__patGlobal=1;
   window.addEventListener('mouseup',up);window.addEventListener('touchend',up);
 }
 function noLockPick(i,l){noCollect();NO.devices[i].lock=l;renderNewOrder();}
-function noQuickPick(i){const v=(document.getElementById('dev'+i+'_search').value||'').trim();if(!v)return;noCollect();const brand=catBrands().find(b=>v.toLowerCase().startsWith(b.toLowerCase()));const d=NO.devices[i];if(brand){d.brand=brand;const rest=v.slice(brand.length).trim();const mm=catModelNames(brand).find(x=>x.toLowerCase()===rest.toLowerCase());d.model=mm||rest;if(d.model){const t=catModelType(brand,d.model);if(t)d.typ=t;}}else{d.model=v;}if(d.brand&&d.reparatur){const p=priceFor(d.brand,d.model,d.reparatur);if(p!=='')d.price=p;}renderNewOrder();}
+function noQuickPick(i){const v=(document.getElementById('dev'+i+'_search').value||'').trim();if(!v)return;noCollect();const brand=catBrands().find(b=>v.toLowerCase().startsWith(b.toLowerCase()));const d=NO.devices[i];if(brand){d.brand=brand;const rest=v.slice(brand.length).trim();const mm=catModelNames(brand).find(x=>x.toLowerCase()===rest.toLowerCase());d.model=mm||rest;if(d.model){const t=catModelType(brand,d.model);if(t)d.typ=t;}}else{d.model=v;}const p0=(d.positions&&d.positions[0]);if(p0&&d.brand&&p0.reparatur){const pr=priceFor(d.brand,d.model,p0.reparatur);if(pr!=='')p0.price=pr;}renderNewOrder();}
 function noAddDevice(){noCollect();NO.devices.push(blankDevice());renderNewOrder();}
 function noRemoveDevice(i){noCollect();NO.devices.splice(i,1);renderNewOrder();}
 function noTyp(){noCollect();renderNewOrder();}
@@ -1111,8 +1136,8 @@ function noFinalize(){ noCollect();
   if(!NO.vorname&&!NO.nachname&&!NO.firma){toast('Bitte Kundennamen angeben');return;}
   if((NO.tel||'').replace(/\D/g,'').length<5){toast('Bitte Telefonnummer angeben');return;}
   const d0=NO.devices[0]||{}; if(!d0.brand&&!d0.model){toast('Bitte Gerät (Marke/Modell) angeben');return;}
-  if(!d0.reparatur){toast('Bitte Reparaturart angeben');return;}
-  for(const d of NO.devices){ if((d.brand||d.model)&&!d.reparatur){toast('Bitte für jedes Gerät eine Reparaturart angeben');return;} }
+  if(!devPositions(d0).some(p=>p.reparatur)){toast('Bitte mindestens eine Reparaturposition angeben');return;}
+  for(const d of NO.devices){ if((d.brand||d.model)&&!devPositions(d).some(p=>p.reparatur)){toast('Bitte für jedes Gerät mindestens eine Reparaturposition angeben');return;} }
   const name=((NO.vorname+' '+NO.nachname).trim())||NO.firma; const digits=(NO.tel||'').replace(/\D/g,'');
   let c=NO.cid?S.cust.find(x=>x.id===NO.cid):null;
   if(!c)c=S.cust.find(x=>x.tel&&x.tel.replace(/\D/g,'')===digits&&digits.length>5);
@@ -1132,8 +1157,16 @@ function noFinalize(){ noCollect();
   S.drafts=(S.drafts||[]).filter(x=>x.id!==NO.draftId); save();
   toast('Auftrag '+nr+' angelegt'+(devs.length>1?(' · '+devs.length+' Geräte'):'')); NO=null; go('auftraege');
 }
-function noBuildDevices(){ const built=NO.devices.filter(d=>d.reparatur&&(d.brand||d.model)).map(d=>({typ:d.typ,brand:d.brand,model:d.model,imei:d.imei,fach:d.fach,ref:d.ref,reparatur:d.reparatur,qual:d.qual,price:+d.price||0,warranty:+d.warranty||6,lock:normLock(d.lock),lockval:(normLock(d.lock)==='Kein'?'':(d.lockval||''))})); built.forEach(d=>catLearnRepair(d.reparatur)); return built; }
-function noMirror(devs){ const f=devs[0]||{}; return {devtyp:f.typ||'Smartphone',brand:f.brand||'',model:f.model||'',imei:f.imei||'',fach:f.fach||'',ref:f.ref||'',qual:f.qual||'Original',warranty:f.warranty||6,lock:normLock(f.lock),lockval:f.lockval||'',issue:devs.map(d=>d.reparatur).filter(Boolean).join(' · '),price:devs.reduce((s,d)=>s+(+d.price||0),0)}; }
+function noBuildDevices(){ const built=[];
+  NO.devices.forEach(d=>{ if(!(d.brand||d.model))return;
+    const ps=devPositions(d).filter(p=>p.reparatur).map(p=>({reparatur:p.reparatur,qual:p.qual||'Original',price:+p.price||0}));
+    if(!ps.length)return;
+    ps.forEach(p=>catLearnRepair(p.reparatur));
+    const p0=ps[0];
+    built.push({typ:d.typ,brand:d.brand,model:d.model,imei:d.imei,fach:d.fach,ref:d.ref,warranty:+d.warranty||6,lock:normLock(d.lock),lockval:(normLock(d.lock)==='Kein'?'':(d.lockval||'')),technikerId:d.technikerId||'',positions:ps,reparatur:p0.reparatur,qual:p0.qual,price:p0.price});
+  });
+  return built; }
+function noMirror(devs){ const f=devs[0]||{}; return {devtyp:f.typ||'Smartphone',brand:f.brand||'',model:f.model||'',imei:f.imei||'',fach:f.fach||'',ref:f.ref||'',qual:f.qual||'Original',warranty:f.warranty||6,lock:normLock(f.lock),lockval:f.lockval||'',issue:devs.reduce((a,d)=>a.concat(devPositions(d).map(p=>p.reparatur)),[]).filter(Boolean).join(' · '),price:devs.reduce((s,d)=>s+devTotal(d),0)}; }
 function noDevBlock(d,i){
   const brands=catBrands();
   const modelNames=catModelNames(d.brand);
@@ -1155,13 +1188,13 @@ function noDevBlock(d,i){
       <div><label class="f">Reparaturfach-Nr.</label><input class="in" id="dev${i}_fach" value="${esc(d.fach)}" placeholder="z. B. Fach 42"></div>
       <div><label class="f">Referenznummer</label><input class="in" id="dev${i}_ref" value="${esc(d.ref)}" placeholder="Kundenreferenz / Auftragsnr."></div>
     </div>
-    <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin-top:10px">
-      <div><label class="f">Fehler / Reparaturart *</label><input class="in" id="dev${i}_reparatur" list="allRepairs" value="${esc(d.reparatur)}" placeholder="Standardfehler wählen oder neuen eingeben…" onchange="noPrice(${i})"><div class="muted" style="font-size:11px;margin-top:3px">Nicht in der Liste? Einfach eintippen – wird automatisch gespeichert.</div></div>
-      <div><label class="f">Preis (€, brutto)</label><input class="in" id="dev${i}_price" type="number" step="0.01" value="${d.price!==''?d.price:''}" placeholder="0.00" oninput="noVat(${i})"></div>
-      <div><label class="f">Qualität</label><select class="in" id="dev${i}_qual">${catQuals().map(q=>`<option ${d.qual===q?'selected':''}>${esc(q)}</option>`).join('')}</select></div>
-    </div>
-    <div id="dev${i}_vathint" class="muted" style="font-size:12px;margin-top:6px">${vatHint(d.price)}</div>
-    <div class="grid g2" style="margin-top:10px"><div><label class="f">Garantie (Monate)</label><select class="in" id="dev${i}_warranty">${[6,12,24,0].map(w=>`<option ${(+d.warranty)===w?'selected':''}>${w}</option>`).join('')}</select></div></div>
+    <label class="f" style="margin-top:12px">Fehler / Reparaturposition(en) *</label>
+    ${devPositions(d).map((p,j)=>noPosBlock(i,j,p,devPositions(d).length)).join('')}
+    <button type="button" class="btn sm" style="margin-top:8px" onclick="noAddPosition(${i})">+ Weiteren Fehler hinzufügen</button>
+    <div class="muted" style="font-size:11px;margin-top:6px">Nicht in der Liste? Fehler einfach eintippen – wird automatisch gespeichert.</div>
+    ${devPositions(d).length>1?`<div class="between" style="margin-top:10px;padding-top:8px;border-top:1px solid var(--line);font-weight:700"><span>Gerät ${i+1} gesamt</span><span class="mono">${eur(devTotal(d))}</span></div>`:''}
+    <div class="grid g2" style="margin-top:10px"><div><label class="f">Garantie (Monate)</label><select class="in" id="dev${i}_warranty">${[6,12,24,0].map(w=>`<option ${(+d.warranty)===w?'selected':''}>${w}</option>`).join('')}</select></div>
+      <div><label class="f">Techniker (dieses Gerät)</label><select class="in" id="dev${i}_tech"><option value="">— wie Auftrag —</option>${(S.users||[]).map(u=>`<option value="${u.id}" ${d.technikerId===u.id?'selected':''}>${esc(u.name)}${u.role?' ('+(ROLE_LABEL[u.role]||u.role)+')':''}</option>`).join('')}</select></div></div>
     <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line)">
       <label class="f">Displaysperre / Entsperrmethode</label>
       <div class="row" style="margin-top:4px">${['Kein','PIN','Muster'].map(l=>{const cur=normLock(d.lock);return `<label class="chip ${cur===l?'on':''}" style="cursor:pointer"><input type="radio" name="dev${i}_lock" value="${l}" ${cur===l?'checked':''} onchange="noLockPick(${i},'${l}')" style="display:none">${l==='Kein'?'Kein Sperrcode':(l==='PIN'?'PIN / Passwort':'Muster')}</label>`;}).join('')}</div>
@@ -1176,6 +1209,7 @@ function noDevBlock(d,i){
 }
 function renderNewOrder(){
   const m=document.getElementById('main'); if(!m||!NO)return;
+  noEnsurePositions();
   const _sy=window.scrollY;
   document.querySelectorAll('#nav a').forEach(a=>a.classList.remove('active'));
   document.getElementById('side').classList.remove('show');
@@ -1290,7 +1324,7 @@ function openQuote(id){ const q=(S.quotes||[]).find(x=>x.id===id); if(!q)return;
    <div class="dbody">
      <div class="card" style="background:var(--soft);border:0"><div class="between"><div><div style="font-weight:800;font-size:16px">${esc(c.name)}</div><div class="muted" style="font-size:13px">${esc(c.tel)}${c.mail?' · '+esc(c.mail):''}</div></div><div class="avatar" style="width:44px;height:44px">${initials(c.name)}</div></div></div>
      <div class="grid g2" style="margin-top:14px">
-       <div style="grid-column:1/-1"><label class="f">Positionen</label>${oDevices(q).map(d=>`<div class="between" style="padding:7px 0;border-bottom:1px solid var(--line)"><div><b>${esc(d.brand)} ${esc(d.model)}</b><div class="muted" style="font-size:13px">${esc(d.reparatur)} · ${esc(d.qual)}</div></div><b class="mono">${eur(d.price)}</b></div>`).join('')}<div class="between" style="padding:9px 0"><b>Gesamt (inkl. MwSt.)</b><b style="font-size:18px">${eur(oTotal(q))}</b></div>${(oTotal(q)>0)?`<div class="between" style="font-size:12px;color:var(--ink2)"><span>Netto ${eur(netOf(oTotal(q)))}</span><span>darin ${MWST_RATE} % MwSt: ${eur(vatOf(oTotal(q)))}</span></div>`:''}</div>
+       <div style="grid-column:1/-1"><label class="f">Positionen</label>${oDevices(q).map((d,di)=>`<div style="padding:7px 0;border-bottom:1px solid var(--line)"><div class="between"><b>Gerät ${di+1}: ${esc(d.brand)} ${esc(d.model)}</b><b class="mono">${eur(devTotal(d))}</b></div>${devPositions(d).map(p=>`<div class="between" style="font-size:13px;padding:3px 0 0"><span class="muted">${esc(p.reparatur)}${p.qual?' · '+esc(p.qual):''}</span><span class="mono">${eur(p.price)}</span></div>`).join('')}</div>`).join('')}<div class="between" style="padding:9px 0"><b>Gesamt (inkl. MwSt.)</b><b style="font-size:18px">${eur(oTotal(q))}</b></div>${(oTotal(q)>0)?`<div class="between" style="font-size:12px;color:var(--ink2)"><span>Netto ${eur(netOf(oTotal(q)))}</span><span>darin ${MWST_RATE} % MwSt: ${eur(vatOf(oTotal(q)))}</span></div>`:''}</div>
        <div><label class="f">Status</label><div>${qBadge(qExpired(q)?'abgelaufen':q.status)}</div></div>
        <div><label class="f">Gültig bis</label><div style="font-weight:700">${fmtDate(q.validUntil)}</div></div>
      </div>
@@ -1397,10 +1431,11 @@ function genEInvoiceXML(o){
   const w=ensureWorkshop(); const c=cust(o.cid); const RATE=19;
   const parseAdr=(adr)=>{const m=String(adr||'').match(/(\d{5})\s+(.+)$/);return{plz:m?m[1]:'',city:m?m[2].trim():'',street:(String(adr||'').replace(/,?\s*\d{5}.*$/,'').trim())};};
   const ba=parseAdr(c.adr);
-  const devs=oDevices(o); const lineNets=devs.map(d=>r2((+d.price||0)/(1+RATE/100)));
+  const devs=oDevices(o); const items=[]; devs.forEach(d=>{devPositions(d).forEach(p=>{if((+p.price||0)>0||p.reparatur)items.push({name:([d.brand,d.model].filter(Boolean).join(' ')+(p.reparatur?' · '+p.reparatur:''))||'Reparatur',price:+p.price||0});});}); if(!items.length)items.push({name:'Reparatur',price:oTotal(o)});
+  const lineNets=items.map(it=>r2(it.price/(1+RATE/100)));
   const net=r2(lineNets.reduce((s,x)=>s+x,0)); const tax=r2(net*RATE/100); const gross=r2(net+tax);
   const issue=(o.pickedAt||o.readyAt||o.created||today()).replace(/-/g,'');
-  const lines=devs.map((d,i)=>{const ln=lineNets[i]; const nm=[d.brand,d.model].filter(Boolean).join(' ')+(d.reparatur?' · '+d.reparatur:'')||'Reparatur';
+  const lines=items.map((it,i)=>{const ln=lineNets[i]; const nm=it.name;
     return `  <ram:IncludedSupplyChainTradeLineItem>
     <ram:AssociatedDocumentLineDocument><ram:LineID>${i+1}</ram:LineID></ram:AssociatedDocumentLineDocument>
     <ram:SpecifiedTradeProduct><ram:Name>${xesc(nm)}</ram:Name></ram:SpecifiedTradeProduct>
