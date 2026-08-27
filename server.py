@@ -71,6 +71,11 @@ def init_db():
           token TEXT PRIMARY KEY, workshop_id TEXT, data TEXT,
           signature TEXT, consents TEXT, signed INTEGER DEFAULT 0,
           created REAL, expires REAL);
+        CREATE TABLE IF NOT EXISTS intake_sessions(
+          token TEXT PRIMARY KEY, workshop_id TEXT, herkunft TEXT,
+          workshop_name TEXT, workshop_tel TEXT, data TEXT,
+          submitted INTEGER DEFAULT 0, consumed INTEGER DEFAULT 0,
+          created REAL, expires REAL);
         """)
 
 # ---------- Passwort & Token ----------
@@ -207,6 +212,28 @@ class H(BaseHTTPRequestHandler):
             return self._send(200, {"ok": True, "data": json.loads(row["data"]), "signed": bool(row["signed"]),
                                     "signature": row["signature"] or "",
                                     "consents": json.loads(row["consents"]) if row["consents"] else None})
+        if self.path.startswith("/api/intake/get"):
+            # Öffentlich: Kunde öffnet Vorab-Auftragsformular per Token.
+            q = parse_qs(urlparse(self.path).query)
+            tok = (q.get("t") or [""])[0]
+            now = time.time()
+            with db() as c:
+                row = c.execute("SELECT workshop_name,workshop_tel,submitted,expires FROM intake_sessions WHERE token=?", (tok,)).fetchone()
+            if not row or (row["expires"] or 0) < now:
+                return self._send(404, {"error": "Formular-Link ungültig oder abgelaufen"})
+            return self._send(200, {"ok": True, "workshop": row["workshop_name"] or "Werkstatt",
+                                    "tel": row["workshop_tel"] or "", "submitted": bool(row["submitted"])})
+        if self.path == "/api/intake/pending":
+            # Werkstatt holt neue, noch nicht übernommene Vorab-Anfragen ab.
+            p = self._auth()
+            if not p:
+                return self._send(401, {"error": "unauthorized"})
+            with db() as c:
+                rows = c.execute("SELECT token,herkunft,data,created FROM intake_sessions WHERE workshop_id=? AND submitted=1 AND consumed=0 ORDER BY created DESC",
+                                 (p["wid"],)).fetchall()
+            out = [{"token": r["token"], "herkunft": r["herkunft"] or "online",
+                    "data": json.loads(r["data"]) if r["data"] else None, "created": r["created"]} for r in rows]
+            return self._send(200, {"ok": True, "items": out})
         return self._send(404, {"error": "not found"})
 
     def do_POST(self):
@@ -293,6 +320,47 @@ class H(BaseHTTPRequestHandler):
                     return self._send(404, {"error": "Signatur-Link ungültig oder abgelaufen"})
                 c.execute("UPDATE sign_sessions SET signature=?,consents=?,signed=1 WHERE token=?",
                           (sig, json.dumps(consents), tok))
+            return self._send(200, {"ok": True})
+
+        if self.path == "/api/intake/create":
+            # Werkstatt erzeugt Vorab-Auftrags-Link (mit Herkunft Telefon/E-Mail/Online).
+            p = self._auth()
+            if not p:
+                return self._send(401, {"error": "unauthorized"})
+            herkunft = (body.get("herkunft") or "online").strip()
+            wname = (body.get("workshopName") or "Werkstatt").strip()
+            wtel = (body.get("workshopTel") or "").strip()
+            tok = uid("i")
+            now = time.time(); exp = now + 7 * 86400
+            with _lock, db() as c:
+                c.execute("DELETE FROM intake_sessions WHERE expires<?", (now,))
+                c.execute("INSERT INTO intake_sessions(token,workshop_id,herkunft,workshop_name,workshop_tel,data,submitted,consumed,created,expires) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                          (tok, p["wid"], herkunft, wname, wtel, "", 0, 0, now, exp))
+            return self._send(200, {"token": tok})
+
+        if self.path == "/api/intake/submit":
+            # Öffentlich: Kunde reicht seine Vorab-Daten ein.
+            tok = body.get("t") or ""
+            data = body.get("data")
+            if not tok or data is None:
+                return self._send(400, {"error": "Token/Daten fehlen"})
+            now = time.time()
+            with _lock, db() as c:
+                row = c.execute("SELECT expires,submitted FROM intake_sessions WHERE token=?", (tok,)).fetchone()
+                if not row or (row["expires"] or 0) < now:
+                    return self._send(404, {"error": "Formular-Link ungültig oder abgelaufen"})
+                c.execute("UPDATE intake_sessions SET data=?,submitted=1 WHERE token=?", (json.dumps(data), tok))
+            return self._send(200, {"ok": True})
+
+        if self.path == "/api/intake/consume":
+            p = self._auth()
+            if not p:
+                return self._send(401, {"error": "unauthorized"})
+            toks = body.get("tokens") or []
+            if toks:
+                with _lock, db() as c:
+                    for t in toks:
+                        c.execute("UPDATE intake_sessions SET consumed=1 WHERE token=? AND workshop_id=?", (t, p["wid"]))
             return self._send(200, {"ok": True})
 
         if self.path == "/api/mail/send":

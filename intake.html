@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="robots" content="noindex,nofollow">
+<title>Reparatur vorab anmelden</title>
+<style>
+:root{--acc:#16a34a;--acc2:#0f7a37;--ink:#0f2318;--ink2:#5f6b64;--line:#e3e8e4;--soft:#f4f7f5;--bg:#fff}
+*{box-sizing:border-box}
+html,body{margin:0;background:#eef2ef;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;-webkit-text-size-adjust:100%}
+.wrap{max-width:560px;margin:0 auto;padding:16px 14px 40px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:14px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.head{background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;border-radius:14px;padding:18px 16px;margin-top:14px}
+.head h1{margin:0;font-size:19px}.head p{margin:4px 0 0;opacity:.92;font-size:13px}
+label.f{display:block;font-size:13px;font-weight:600;margin:12px 0 4px;color:#374151}
+.in{width:100%;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:16px;background:#fff}
+textarea.in{min-height:88px;resize:vertical}
+.req{color:#dc2626}
+.muted{color:var(--ink2)}.sm{font-size:13px}
+.btn{display:block;width:100%;border:0;border-radius:12px;padding:15px;font-size:16px;font-weight:700;cursor:pointer;margin-top:16px}
+.btn.pri{background:var(--acc);color:#fff}.btn.pri:disabled{background:#a9c9b4}
+.ok{text-align:center;padding:30px 10px}.ok .big{font-size:54px}
+.err{background:#fdecea;color:#8a1c13;border:1px solid #f5c6c2;border-radius:10px;padding:12px;font-size:14px;margin-top:14px}
+.foot{text-align:center;color:var(--ink2);font-size:11px;margin-top:22px}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><div class="card"><p class="muted">Lädt…</p></div></div>
+<script>
+function $(id){return document.getElementById(id);}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function token(){var m=location.search.match(/[?&]t=([^&]+)/);return m?decodeURIComponent(m[1]):'';}
+var T=token(), WS='Werkstatt';
+
+function screenError(msg){ $('app').innerHTML='<div class="head"><h1>Reparatur anmelden</h1></div><div class="card"><div class="err">'+esc(msg)+'</div></div>'; }
+
+function load(){
+  if(!T){return screenError('Kein gültiger Link. Bitte fragen Sie die Werkstatt nach einem neuen Link.');}
+  fetch('/api/intake/get?t='+encodeURIComponent(T)).then(function(r){return r.json();}).then(function(res){
+    if(!res||!res.ok){return screenError((res&&res.error)||'Formular nicht gefunden.');}
+    if(res.submitted){return screenDone(true);}
+    WS=res.workshop||'Werkstatt'; render();
+  }).catch(function(){ screenError('Verbindungsproblem. Bitte erneut versuchen.'); });
+}
+
+var GTYPES=['Smartphone','Tablet','Smartwatch','Laptop','Konsole','Kopfhörer','Sonstiges'];
+function render(){
+  $('app').innerHTML=
+   '<div class="head"><h1>'+esc(WS)+'</h1><p>Melden Sie Ihre Reparatur vorab an – dann geht es vor Ort schneller.</p></div>'+
+   '<div class="card">'+
+     '<label class="f">Ihr Name <span class="req">*</span></label><input class="in" id="f_name" autocomplete="name" placeholder="Vor- und Nachname">'+
+     '<label class="f">Telefon <span class="req">*</span></label><input class="in" id="f_tel" type="tel" autocomplete="tel" placeholder="Für Rückfragen">'+
+     '<label class="f">E-Mail</label><input class="in" id="f_mail" type="email" autocomplete="email" placeholder="optional">'+
+   '</div>'+
+   '<div class="card">'+
+     '<label class="f">Gerät <span class="req">*</span></label><select class="in" id="f_typ">'+GTYPES.map(function(t){return '<option>'+t+'</option>';}).join('')+'</select>'+
+     '<label class="f">Hersteller / Marke</label><input class="in" id="f_brand" list="brands" placeholder="z. B. Apple, Samsung, Xiaomi">'+
+     '<datalist id="brands"><option value="Apple"><option value="Samsung"><option value="Xiaomi"><option value="Huawei"><option value="Google"><option value="OnePlus"><option value="Sony"><option value="Nokia"></datalist>'+
+     '<label class="f">Modell</label><input class="in" id="f_model" placeholder="z. B. iPhone 13, Galaxy S22">'+
+     '<label class="f">Was ist das Problem? <span class="req">*</span></label><textarea class="in" id="f_issue" placeholder="z. B. Display gesprungen, Akku hält nicht, Gerät geht nicht an…"></textarea>'+
+   '</div>'+
+   '<div id="errbox"></div>'+
+   '<button class="btn pri" id="submit" onclick="submitForm()">Reparatur anmelden</button>'+
+   '<div class="foot">Ihre Daten werden nur zur Bearbeitung Ihrer Reparatur an '+esc(WS)+' übermittelt.</div>';
+}
+
+function submitForm(){
+  var g=function(id){return ($(id)&&$(id).value||'').trim();};
+  var name=g('f_name'), tel=g('f_tel'), issue=g('f_issue');
+  if(!name||!tel||!issue){ $('errbox').innerHTML='<div class="err">Bitte Name, Telefon und Problembeschreibung ausfüllen.</div>'; return; }
+  var b=$('submit'); b.disabled=true; b.textContent='Wird gesendet…';
+  var data={name:name,tel:tel,mail:g('f_mail'),type:g('f_typ'),brand:g('f_brand'),model:g('f_model'),issue:issue,at:new Date().toISOString()};
+  fetch('/api/intake/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({t:T,data:data})})
+   .then(function(r){return r.json();}).then(function(res){
+     if(res&&res.ok){screenDone(false);}else{ $('errbox').innerHTML='<div class="err">'+esc((res&&res.error)||'Senden fehlgeschlagen.')+'</div>'; b.disabled=false; b.textContent='Reparatur anmelden'; }
+   }).catch(function(){ $('errbox').innerHTML='<div class="err">Verbindungsproblem. Bitte erneut versuchen.</div>'; b.disabled=false; b.textContent='Reparatur anmelden'; });
+}
+
+function screenDone(already){
+  $('app').innerHTML='<div class="head"><h1>'+esc(WS)+'</h1></div>'+
+   '<div class="card ok"><div class="big">✅</div><h2 style="font-size:19px">'+(already?'Bereits übermittelt':'Vielen Dank!')+'</h2>'+
+   '<p class="muted">'+(already?'Für diesen Link liegen bereits Angaben vor.':'Ihre Angaben wurden an '+esc(WS)+' übermittelt. Bei Ihrem Besuch sind Ihre Daten bereits hinterlegt – das spart Zeit vor Ort.')+'</p></div>';
+}
+load();
+</script>
+</body>
+</html>

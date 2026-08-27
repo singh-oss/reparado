@@ -1428,7 +1428,7 @@ function noFinalize(){ noCollect();
   const devs=noBuildDevices();
   if(NO.editId){const o=S.ord.find(x=>x.id===NO.editId);if(o){Object.assign(o,{cid:c.id,devices:devs},noMirror(devs),{lock:NO.lock,lockval:NO.lockval,prio:NO.prio,appt:NO.terminMode==='termin'?NO.appt:'',due:NO.due,notes:NO.notes,technikerId:NO.technikerId,sig:NO.sig||o.sig,sigConsents:NO.sigConsents||o.sigConsents||null,sigVia:NO.sigVia||o.sigVia||''});}save();toast('Auftrag gespeichert');NO=null;go('auftraege');return;}
   const nr=nextOrderNr();
-  const o=Object.assign({id:uid('o'),nr,cid:c.id,devices:devs,lock:NO.lock,lockval:NO.lockval,status:'offen',prio:NO.prio,created:today(),due:NO.due,appt:NO.terminMode==='termin'?NO.appt:'',notes:NO.notes,readyAt:'',sig:NO.sig||'',sigConsents:NO.sigConsents||null,sigVia:NO.sigVia||'',source:'',technikerId:NO.technikerId},noMirror(devs));
+  const o=Object.assign({id:uid('o'),nr,cid:c.id,devices:devs,lock:NO.lock,lockval:NO.lockval,status:'offen',prio:NO.prio,created:today(),due:NO.due,appt:NO.terminMode==='termin'?NO.appt:'',notes:NO.notes,readyAt:'',sig:NO.sig||'',sigConsents:NO.sigConsents||null,sigVia:NO.sigVia||'',source:(NO.herkunft?'vorab':''),herkunft:NO.herkunft||'',via:NO.reqVia||'',technikerId:NO.technikerId},noMirror(devs));
   if(NO.diagPhoto)o.photos=[NO.diagPhoto];
   S.ord.unshift(o); const rc=S.rules.find(x=>x.id==='r_confirm'); if(rc&&rc.on&&c.mail)logMail(o,rc,'automatisch (Anlage)');
   S.drafts=(S.drafts||[]).filter(x=>x.id!==NO.draftId); save();
@@ -1577,7 +1577,7 @@ views.angebote=function(){
   const angenommen=quotes.filter(q=>q.status==='angenommen').length;
   const openSum=quotes.filter(q=>q.status==='offen').reduce((s,q)=>s+oTotal(q),0);
   m.innerHTML=`<div class="between"><div><h1 class="h1">Angebote</h1><p class="sub">Kostenvoranschläge & Website-Anfragen</p></div>
-     <button class="btn pri" onclick="newQuote()">Neues Angebot</button></div>
+     <div class="row"><button class="btn" onclick="intakeImport()">Anfragen abrufen</button><button class="btn" onclick="intakeSendDialog()">📲 Vorab-Link senden</button><button class="btn pri" onclick="newQuote()">Neues Angebot</button></div></div>
    <div class="grid g4" style="margin-top:16px">
      <div class="card kpi"><div class="n">${reqs.length}</div><div class="l">Neue Anfragen</div><div class="t">von der Website</div></div>
      <div class="card kpi"><div class="n">${offen}</div><div class="l">Offene Angebote</div><div class="t">beim Kunden</div></div>
@@ -1586,7 +1586,7 @@ views.angebote=function(){
    </div>
    ${reqs.length?`<div class="card" style="margin-top:16px"><div class="between"><b>Anfragen von der Website</b><span class="pill soft"><span class="d"></span>${reqs.length} neu</span></div>
      <p class="muted" style="font-size:13px;margin:4px 0 12px">Rückruf-/Angebotsanfragen über deine Website. „Angebot erstellen" öffnet das Formular mit vorausgefüllten Daten.</p>
-     ${reqs.map(r=>`<div class="listitem"><div class="avatar out">${initials(r.name)}</div><div style="flex:1;min-width:0"><b>${esc(r.name)}</b> <span class="tag">${esc(r.contact||'Rückruf')}</span><div class="muted" style="font-size:12px">${esc([r.brand,r.model].filter(Boolean).join(' '))} · ${esc(r.issue||'')}${r.problem?' · '+esc(r.problem):''} · ${esc(r.tel)}${r.besttime?' · '+esc(r.besttime):''}</div></div>
+     ${reqs.map(r=>`<div class="listitem"><div class="avatar out">${initials(r.name)}</div><div style="flex:1;min-width:0"><b>${esc(r.name)}</b> ${r.source==='vorab'?`<span class="tag" style="border-color:#16a34a;color:#0e7a3c">Vorab · ${esc(HERKUNFT_LABEL[r.herkunft]||r.herkunft||'Online')}${r.via?(' ('+esc(r.via.toUpperCase())+')'):''}</span>`:`<span class="tag">${esc(r.contact||'Rückruf')}</span>`}<div class="muted" style="font-size:12px">${esc([r.brand,r.model].filter(Boolean).join(' '))} · ${esc(r.issue||'')}${r.problem?' · '+esc(r.problem):''} · ${esc(r.tel)}${r.besttime?' · '+esc(r.besttime):''}</div></div>
        <button class="btn sm pri" onclick="requestToQuote('${r.id}')">Angebot erstellen</button><button class="btn sm" onclick="requestToOrder('${r.id}')">Auftrag anlegen</button><button class="btn sm gho" onclick="dismissRequest('${r.id}')">Erledigt</button></div>`).join('')}
    </div>`:''}
    <div class="card" style="margin-top:16px;padding:0;overflow:auto"><table>
@@ -1639,13 +1639,58 @@ function requestToQuote(id){const r=(S.requests||[]).find(x=>x.id===id);if(!r)re
     notes:r.problem?('Anfrage: '+r.problem):''});
 }
 function requestToOrder(id){const r=(S.requests||[]).find(x=>x.id===id);if(!r)return;const nm=(r.name||'').split(' ');
-  closeAll(); NO=blankForm(); NO.draftId=uid('dr'); NO.fromRequest=id;
+  closeAll(); NO=blankForm(); NO.draftId=uid('dr'); NO.fromRequest=id; NO.herkunft=r.herkunft||''; NO.reqVia=r.via||'';
   NO.vorname=nm.slice(0,-1).join(' ')||nm[0]||''; NO.nachname=nm.length>1?nm[nm.length-1]:''; NO.tel=r.tel||'+49 '; NO.mail=r.mail||'';
   NO.devices=[{typ:r.type||'Smartphone',brand:(catBrands().includes(r.brand)?r.brand:''),model:(r.model&&r.model!=='Anderes Modell'?r.model:''),imei:'',fach:'',ref:'',reparatur:(catRepairs().indexOf(r.issue)>=0?r.issue:''),price:'',qual:(catQuals()[0]||'Original'),warranty:6}];
-  NO.notes=r.problem?('Anfrage: '+r.problem):''; current='neworder'; renderNewOrder(); window.scrollTo(0,0);
+  NO.notes=(r.issue&&catRepairs().indexOf(r.issue)<0?('Anliegen: '+r.issue+'\n'):'')+(r.problem?('Anfrage: '+r.problem):''); current='neworder'; renderNewOrder(); window.scrollTo(0,0);
 }
 function dismissRequest(id){S.requests=(S.requests||[]).filter(x=>x.id!==id);save();if(current==='angebote')views.angebote();paintIcons();refreshBadges();toast('Anfrage erledigt');}
 function pullRequests(){let arr=[];try{arr=JSON.parse(localStorage.getItem('reparado_requests')||'[]');}catch(e){}if(!arr.length)return 0;S.requests=S.requests||[];arr.forEach(r=>{S.requests.unshift(Object.assign({id:uid('rq')},r,{ts:r.ts?(typeof r.ts==='number'?new Date(r.ts).toISOString():r.ts):new Date().toISOString()}));});localStorage.removeItem('reparado_requests');save();return arr.length;}
+/* ---- P14/P15: digitale Vorab-Auftragsannahme per Kundenlink (SMS/E-Mail/QR) ---- */
+const HERKUNFT_LABEL={telefon:'Telefon',email:'E-Mail',online:'Online/Direkt',vorab:'Vorab',website:'Website'};
+let __ikHerk='telefon';
+function intakeSendDialog(){
+  if(DB.backend!=='server'){ openModal(`<div class="dhead"><b style="flex:1">Vorab-Auftrag senden</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div><div class="dbody"><div class="note">Diese Funktion braucht die Server-Anbindung (im Demo-Modus nicht aktiv).</div></div>`); return; }
+  __ikHerk='telefon';
+  openModal(`<div class="dhead"><b style="flex:1">Vorab-Auftrag an Kunden senden</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+   <div class="dbody">
+     <p class="muted" style="font-size:13px">Der Kunde füllt seine Daten selbst aus (Gerät, Fehler, Kontakt). Vor Ort geht die Annahme dann schneller.</p>
+     <label class="f">Wie kam der Kunde auf Sie? (Herkunft)</label>
+     <div class="row" id="ik_herk">${[['telefon','Telefon'],['email','E-Mail'],['online','Online/Direkt']].map((h,i)=>`<label class="chip ${i===0?'on':''}" style="cursor:pointer"><input type="radio" name="ik_h" value="${h[0]}" ${i===0?'checked':''} style="display:none" onchange="ikHerk(this)">${h[1]}</label>`).join('')}</div>
+     <label class="f" style="margin-top:12px">Formular bereitstellen per</label>
+     <div class="row"><button class="btn" onclick="intakeCreate('qr')">QR-Code</button><button class="btn" onclick="intakeCreate('email')">E-Mail</button><button class="btn" onclick="intakeCreate('sms')">SMS</button></div>
+     <div id="ik_out" style="margin-top:12px"></div>
+   </div>`);
+}
+function ikHerk(el){__ikHerk=el.value; document.querySelectorAll('#ik_herk .chip').forEach(c=>c.classList.toggle('on',c.querySelector('input').checked));}
+function intakeCreate(via){
+  const out=document.getElementById('ik_out'); if(out)out.innerHTML='<span class="muted">Link wird erstellt…</span>';
+  fetch(API+'/api/intake/create',{method:'POST',headers:DB._hdr(),body:JSON.stringify({herkunft:__ikHerk,workshopName:SHOP.name,workshopTel:SHOP.phone})})
+   .then(r=>r.json()).then(res=>{
+     if(!res.token)throw new Error(res.error||'Fehler beim Erstellen');
+     const url=location.origin+'/intake.html?t='+res.token;
+     S._intakeVia=S._intakeVia||{}; S._intakeVia[res.token]=via; save();
+     if(via==='qr'){ out.innerHTML=`<div style="text-align:center"><div style="display:flex;justify-content:center;margin:8px 0">${RQR.svg(url,{cell:5,margin:4})}</div><div class="mono" style="font-size:12px;word-break:break-all">${esc(url)}</div><div class="muted" style="font-size:12px;margin-top:6px">Kunde scannt vor Ort oder Sie zeigen den Code am Bildschirm.</div></div>`; }
+     else if(via==='email'){ out.innerHTML=`<label class="f">E-Mail des Kunden</label><div class="row"><input class="in" id="ik_mail" type="email" placeholder="kunde@example.de"><button class="btn pri" onclick="intakeMail('${res.token}')">Senden</button></div><div class="muted" style="font-size:12px;margin-top:6px;word-break:break-all">Link: ${esc(url)}</div><div id="ik_mailres"></div>`; }
+     else { out.innerHTML=`<div class="note">SMS-Versand läuft über Ihren SMS-Anbieter. Kopieren Sie den Link und senden Sie ihn per SMS an die Kundennummer:</div><div class="mono" style="font-size:12px;word-break:break-all;margin-top:6px;padding:8px;background:var(--soft);border-radius:8px">${esc(url)}</div><button class="btn sm" style="margin-top:6px" onclick="(navigator.clipboard&&navigator.clipboard.writeText('${url}'));toast('Link kopiert')">Link kopieren</button>`; }
+   }).catch(e=>{ if(out)out.innerHTML='<div class="err" style="background:#fdecea;color:#8a1c13;border:1px solid #f5c6c2;border-radius:8px;padding:10px">'+esc(e.message||'Fehler')+'</div>'; });
+}
+function intakeMail(token){ const el=document.getElementById('ik_mail'); const to=el?el.value.trim():''; if(!to){toast('Bitte E-Mail eingeben');return;} const url=location.origin+'/intake.html?t='+token;
+  const rb=document.getElementById('ik_mailres'); if(rb)rb.innerHTML='<span class="muted" style="font-size:13px">Wird gesendet…</span>';
+  fetch(API+'/api/mail/send',{method:'POST',headers:DB._hdr(),body:JSON.stringify({to:to,subject:'Reparatur vorab anmelden – '+SHOP.name,body:'Guten Tag,\n\nbitte melden Sie Ihre Reparatur vorab über diesen Link an – so geht die Annahme vor Ort schneller:\n'+url+'\n\nVielen Dank,\nIhr Team von '+SHOP.name})})
+   .then(r=>r.json()).then(res=>{ if(rb)rb.innerHTML='<div class="muted" style="font-size:13px;margin-top:6px">'+(res.sent?'✓ E-Mail an den Kunden gesendet':('ℹ '+esc(res.note||'nicht gesendet')))+'</div>'; }).catch(()=>{ if(rb)rb.innerHTML='<div class="muted" style="font-size:13px;margin-top:6px">Senden fehlgeschlagen</div>'; }); }
+function intakeImport(silent){
+  if(DB.backend!=='server')return;
+  fetch(API+'/api/intake/pending',{headers:DB._hdr()}).then(r=>r.json()).then(res=>{
+    if(!res||!res.items||!res.items.length)return;
+    const toks=[]; S.requests=S.requests||[]; S._intakeVia=S._intakeVia||{};
+    res.items.forEach(it=>{ const d=it.data||{}; toks.push(it.token);
+      S.requests.unshift({id:uid('rq'),name:d.name||'',tel:d.tel||'',mail:d.mail||'',type:d.type||'Smartphone',brand:d.brand||'',model:d.model||'',issue:d.issue||'',ts:(d.at)||new Date().toISOString(),source:'vorab',herkunft:it.herkunft||'online',via:S._intakeVia[it.token]||''}); });
+    fetch(API+'/api/intake/consume',{method:'POST',headers:DB._hdr(),body:JSON.stringify({tokens:toks})}).catch(()=>{});
+    save(); refreshBadges&&refreshBadges(); if(current==='angebote'||current==='dashboard')(views[current]||function(){})(); paintIcons();
+    if(!silent)toast(res.items.length+' neue Vorab-Anfrage'+(res.items.length>1?'n':''));
+  }).catch(()=>{});
+}
 /* ---- Bewertungs-Booster (L6): Feedback von der Statusseite ---- */
 function pullFeedback(){let arr=[];try{arr=JSON.parse(localStorage.getItem('reparado_feedback')||'[]');}catch(e){}if(!arr.length)return 0;S.feedback=S.feedback||[];arr.forEach(f=>{S.feedback.unshift(Object.assign({id:uid('fb')},f,{ts:f.ts?(typeof f.ts==='number'?new Date(f.ts).toISOString():f.ts):new Date().toISOString()}));});localStorage.removeItem('reparado_feedback');save();return arr.length;}
 function dismissFb(id){S.feedback=(S.feedback||[]).filter(f=>f.id!==id);save();views.dashboard();paintIcons();toast('Erledigt');}
@@ -3903,6 +3948,7 @@ paintIcons();
 function bootApp(){ensureWorkshop(); ensureMaster(); applyMaster(); ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); ensureInv(); ensureProc(); ensureTrade(); ensureShip(); ensureContracts(); ensureInsurers(); ensureIntegrations(); const n=pullBookings(); const nq=pullRequests(); pullFeedback(); pullWarranty(); go('dashboard'); applyNavRole(); if(!curUser())showLogin();
   if(nq) setTimeout(()=>toast(nq+' neue Website-Anfrage'+(nq>1?'n':'')),900);
   if(n) setTimeout(()=>toast(n+' neue Online-Buchung'+(n>1?'en':'')+' übernommen'),500);
+  if(DB.backend==='server'){ setTimeout(()=>intakeImport(false),1500); if(!window.__intakePoll)window.__intakePoll=setInterval(()=>intakeImport(false),90000); }
 }
 /* Frischer, komplett leerer Zustand für ein neu registriertes Konto (keine Demo-Daten). */
 function blankState(){ return {v:11, __clean:true, cust:[], ord:[], parts:[], orders:[], sold:[], counter:1000, rules:defaultRules(), sales:[], cash:{connected:''}, mailLog:[], calls:[], phone:defaultPhone(), users:[{id:'u1',name:'Inhaber',role:'inhaber',pin:'1234'}], userId:'u1', insurance:defaultInsurance(), wgLeads:[], drafts:[], quotes:[], requests:[], quoteCounter:1000, feedback:[], reactDone:[]}; }
@@ -3943,7 +3989,7 @@ function startApp(){
   } else { bootApp(); }
 }
 startApp();
-window.addEventListener('focus',()=>{const n=pullBookings(); const nq=pullRequests(); const nf=pullFeedback(); if(n||nq||nf){if(current!=='neworder')go(current);if(n)toast(n+' neue Online-Buchung'+(n>1?'en':'')+' übernommen');else if(nq)toast(nq+' neue Website-Anfrage'+(nq>1?'n':''));else if(nf)toast(nf+' neue Kundenbewertung'+(nf>1?'en':''));}});
+window.addEventListener('focus',()=>{const n=pullBookings(); const nq=pullRequests(); const nf=pullFeedback(); if(n||nq||nf){if(current!=='neworder')go(current);if(n)toast(n+' neue Online-Buchung'+(n>1?'en':'')+' übernommen');else if(nq)toast(nq+' neue Website-Anfrage'+(nq>1?'n':''));else if(nf)toast(nf+' neue Kundenbewertung'+(nf>1?'en':''));} if(DB.backend==='server'&&current!=='neworder')intakeImport(false);});
 </script>
 </body>
 </html>
