@@ -518,13 +518,16 @@ const STATUS = {
   abgeholt:{lbl:'Abgeschlossen', cls:'soft'},
 };
 const STFLOW=['offen','bearbeitung','warten','fertig','abgeholt'];
-const STATUS_COLOR={offen:'#6b7280',bearbeitung:'#d99a00',warten:'#e2681c',fertig:'#0e7a3c',abgeholt:'#64748b'};
+/* P11: klar unterscheidbares Leitsystem (Doc: Rot=offen, Gelb=Bearbeitung, Grün=fertig, Hellgrün=abgeschlossen); in Einstellungen anpassbar */
+const STATUS_COLOR={offen:'#dc2626',bearbeitung:'#e0a000',warten:'#7c3aed',fertig:'#16a34a',abgeholt:'#65a30d'};
 /* ---- Status (selbst konfigurierbar): Modell + Helfer + Auto-Nachricht + CRUD ---- */
 function ensureStatuses(){ if(!S.statuses){
     S.statuses=STFLOW.map(k=>({key:k,label:STATUS[k].lbl,color:STATUS_COLOR[k]||'#6b7280',active:true,sys:true,email:(k==='fertig'),sms:false,
       tpl:(k==='fertig'?'Guten Tag {kunde}, Ihr {geraet} ist abholbereit. Auftrag {auftrag}, Endbetrag {preis}. Öffnungszeiten: {oeffnung}. Status verfolgen: {tracking}':'')}));
     save();
-  } return S.statuses; }
+  }
+  if(!S._stColMig){ const oldC={offen:'#6b7280',bearbeitung:'#d99a00',warten:'#e2681c',fertig:'#0e7a3c',abgeholt:'#64748b'}; let ch=false; S.statuses.forEach(s=>{ if(s.sys&&oldC[s.key]&&String(s.color||'').toLowerCase()===oldC[s.key]&&STATUS_COLOR[s.key]){ s.color=STATUS_COLOR[s.key]; ch=true; } }); S._stColMig=1; if(ch)save(); }
+  return S.statuses; }
 function statusList(){return ensureStatuses();}
 function statusDef(k){const l=ensureStatuses();return l.find(s=>s.key===k)||l[0]||{key:k,label:k,color:'#6b7280'};}
 function statusLabel(k){return statusDef(k).label;}
@@ -607,6 +610,28 @@ const PLAN_LBL={basic:'Basic',plus:'Plus',pro:'Pro'};
 function ensureMaster(){ if(!S.master){ S.master={name:'Meine Werkstatt',street:'',zip:'',city:'',phone:'',email:'',google:'',hours:'Mo–Fr 9–18 Uhr, Sa 9–13 Uhr',warranty:6}; save(); } return S.master; }
 function applyMaster(){ const m=ensureMaster(); ['name','street','zip','city','phone','email','google','hours','warranty'].forEach(k=>{ if(m[k]!==undefined&&m[k]!==null) SHOP[k]=m[k]; }); if(S.workshop) S.workshop.name=m.name; }
 function masterSet(k,v){ const m=ensureMaster(); m[k]=v; if(k==='name'&&S.workshop)S.workshop.name=v; applyMaster(); save(); }
+/* ---- P10: Öffnungszeiten pro Wochentag (bis 2 Zeiträume) ---- */
+const WDAYS=['Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'];
+const WDAYS_S=['Mo','Di','Mi','Do','Fr','Sa','So'];
+function ensureHours(){ const m=ensureMaster(); if(!Array.isArray(m.hoursData)){
+    m.hoursData=[0,1,2,3,4,5,6].map(i=>({closed:(i===6),
+      r1:{on:true,from:(i<=4?'09:00':(i===5?'09:00':'')),to:(i<=4?'18:00':(i===5?'13:00':''))},
+      r2:{on:false,from:'',to:''}}));
+    syncHoursString(); save();
+  } return m.hoursData; }
+function syncHoursString(){ const m=ensureMaster(); const hd=m.hoursData||[]; const parts=hd.map((d,i)=>{ if(d.closed)return null; const seg=[]; if(d.r1&&d.r1.on&&d.r1.from&&d.r1.to)seg.push(d.r1.from+'–'+d.r1.to); if(d.r2&&d.r2.on&&d.r2.from&&d.r2.to)seg.push(d.r2.from+'–'+d.r2.to); if(!seg.length)return null; return WDAYS_S[i]+' '+seg.join(', '); }).filter(Boolean).join(' · '); m.hours=parts||'Nach Vereinbarung'; SHOP.hours=m.hours; }
+function hoursSet(i,path,val,rerender){ const hd=ensureHours(); const d=hd[i]; if(path==='closed'){d.closed=!!val;} else { const p=path.split('.'); d[p[0]][p[1]]=(p[1]==='on'?!!val:val); if(p[1]==='on'&&val){ if(p[0]==='r2'&&!d.r2.from){d.r2.from='14:00';d.r2.to='18:00';} } } syncHoursString(); applyMaster(); save(); if(rerender)views.einstellungen(); }
+function hoursEditorHTML(){ const hd=ensureHours();
+  return `<div class="card" style="margin-top:16px"><b>Öffnungszeiten</b><p class="muted" style="font-size:13px;margin:4px 0 10px">Pro Wochentag – bis zu zwei Zeiträume (z. B. mit Mittagspause). Erscheint auf Belegen und im Kundenportal.</p>
+   ${hd.map((d,i)=>`<div style="padding:9px 0;border-top:1px solid var(--line)">
+     <div class="between" style="flex-wrap:wrap;gap:8px"><b style="min-width:96px">${WDAYS[i]}</b>
+       <label class="chip ${d.closed?'on':''}" style="cursor:pointer;font-size:12px"><input type="checkbox" ${d.closed?'checked':''} onchange="hoursSet(${i},'closed',this.checked,true)" style="display:none">Geschlossen</label></div>
+     ${d.closed?'':`<div class="row" style="gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap"><span class="muted" style="font-size:12px;min-width:82px">Vormittag</span><span class="muted" style="font-size:12px">Von</span><input class="in" style="max-width:120px" type="time" value="${esc(d.r1.from||'')}" onchange="hoursSet(${i},'r1.from',this.value)"><span class="muted" style="font-size:12px">Bis</span><input class="in" style="max-width:120px" type="time" value="${esc(d.r1.to||'')}" onchange="hoursSet(${i},'r1.to',this.value)"></div>
+       ${d.r2.on?`<div class="row" style="gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap"><span class="muted" style="font-size:12px;min-width:82px">Nachmittag</span><span class="muted" style="font-size:12px">Von</span><input class="in" style="max-width:120px" type="time" value="${esc(d.r2.from||'')}" onchange="hoursSet(${i},'r2.from',this.value)"><span class="muted" style="font-size:12px">Bis</span><input class="in" style="max-width:120px" type="time" value="${esc(d.r2.to||'')}" onchange="hoursSet(${i},'r2.to',this.value)"><button class="btn sm gho" onclick="hoursSet(${i},'r2.on',false,true)">− entfernen</button></div>`
+        :`<button class="btn sm gho" style="margin-top:6px" onclick="hoursSet(${i},'r2.on',true,true)">+ Zweiter Zeitraum (Nachmittag)</button>`}`}
+   </div>`).join('')}
+   <div class="muted" style="font-size:12px;margin-top:10px;padding-top:8px;border-top:1px solid var(--line)">Zusammenfassung: <b>${esc(ensureMaster().hours||'—')}</b></div>
+  </div>`; }
 /* Hardware/Drucker (Repender-Punkt) – simuliert. QZ Tray = Browser-Druckbrücke für Etiketten/Bons. */
 function ensureHardware(){ if(!S.hardware){S.hardware={qz:false,scanner:true,labelName:'',labelOn:false,receiptName:'',receiptOn:false};save();} return S.hardware; }
 function hwSet(k,v){const h=ensureHardware();h[k]=v;save();views.einstellungen();paintIcons();}
@@ -795,7 +820,7 @@ function aufSelCount(){return Object.keys(aufSel).filter(k=>aufSel[k]).length;}
 function aufToggleSel(id){aufSel[id]=!aufSel[id];views.auftraege();paintIcons();}
 function aufSelAll(ids,on){ids.forEach(id=>aufSel[id]=on);views.auftraege();paintIcons();}
 function sortOrders(list){const l=list.slice();if(aufSort==='neu')l.sort((a,b)=>(b.created||'').localeCompare(a.created||'')||String(b.nr).localeCompare(String(a.nr)));else if(aufSort==='alt')l.sort((a,b)=>(a.created||'').localeCompare(b.created||'')||String(a.nr).localeCompare(String(b.nr)));else if(aufSort==='preis')l.sort((a,b)=>oTotal(b)-oTotal(a));else if(aufSort==='faellig')l.sort((a,b)=>(a.due||'zzzz').localeCompare(b.due||'zzzz'));return l;}
-function setStatusRow(id,s){const o=S.ord.find(x=>x.id===id);if(!o)return;o.status=s;if(s==='fertig'&&!o.readyAt)o.readyAt=today();if(s==='abgeholt')o.pickedAt=today();save();const def=statusDef(s);const notified=!!(def&&(def.email||def.sms||def.wa));if(notified)statusNotify(o,def);toast('Status: '+statusLabel(s)+(notified?' · Kunde benachrichtigt':''));views.auftraege();paintIcons();refreshBadges();}
+function setStatusRow(id,s){const o=S.ord.find(x=>x.id===id);if(!o)return;o.status=s;if(s==='fertig'&&!o.readyAt)o.readyAt=today();if(s==='abgeholt')o.pickedAt=today();save();const def=statusDef(s);const notified=!!(def&&(def.email||def.sms||def.wa));if(notified)statusNotify(o,def);toast('Status: '+statusLabel(s)+(notified?' · Kunde benachrichtigt':''));views.auftraege();paintIcons();refreshBadges();if(s==='warten')setTimeout(function(){openPartWaitDialog(id);},120);}
 function archiveOrder(id){const o=S.ord.find(x=>x.id===id);if(o){o.archived=true;save();closeAll();toast('Auftrag archiviert');views.auftraege();paintIcons();refreshBadges();}}
 function trashOrder(id){const o=S.ord.find(x=>x.id===id);if(o){o.trashed=true;save();closeAll();toast('In den Papierkorb verschoben');views.auftraege();paintIcons();refreshBadges();}}
 function restoreOrder(id){const o=S.ord.find(x=>x.id===id);if(o){o.trashed=false;o.archived=false;save();toast('Wiederhergestellt');views.auftraege();paintIcons();refreshBadges();}}
@@ -858,7 +883,7 @@ views.auftraege=function(){
      <button class="btn sm gho" onclick="aufSel={};views.auftraege();paintIcons()">Auswahl aufheben</button></div></div>`:''}
    ${(aufView==='aktiv'&&aufLayout==='board')?kanBoard():`<div class="card" style="padding:0;overflow:auto">
     <table><thead><tr><th style="width:34px"><input type="checkbox" ${allSel?'checked':''} onclick="aufSelAll(${idsArr},this.checked)"></th><th>Nr.</th><th>Kunde</th><th>Gerät</th><th>Fehler</th><th>Preis</th><th>Status</th><th>Fällig</th><th></th></tr></thead>
-    <tbody>${list.length?list.map(o=>`<tr>
+    <tbody>${list.length?list.map(o=>`<tr style="box-shadow:inset 4px 0 0 ${statusColor(o.status)}">
       <td onclick="event.stopPropagation()"><input type="checkbox" ${aufSel[o.id]?'checked':''} onclick="aufToggleSel('${o.id}')"></td>
       <td onclick="openOrder('${o.id}')" style="cursor:pointer"><b>${o.nr}</b>${o.source==='online'?' <span class="tag">Online</span>':''}${o.source==='wertgarantie'?' <span class="tag">WG</span>':''}</td>
       <td onclick="openOrder('${o.id}')" style="cursor:pointer">${esc(cust(o.cid).name)}</td>
@@ -888,6 +913,7 @@ function openOrder(id){
          <div class="muted" style="font-size:13px">${esc(c.adr)}</div></div>
          <div class="avatar" style="width:44px;height:44px">${initials(c.name)}</div></div>
      </div>
+     ${partWaitBox(o)}
      <div class="grid g2" style="margin-top:14px">
        <div style="grid-column:1/-1"><label class="f">Gerät${oDevices(o).length>1?'e ('+oDevices(o).length+')':''} &amp; Reparatur</label>
          ${oDevices(o).map((d,di)=>{const ll=lockLabel(d);const ps=devPositions(d);const meta=[d.imei?'IMEI '+esc(d.imei):'',d.fach?esc(d.fach):'',ll?'🔒 '+esc(ll):'',d.technikerId?'👤 '+esc(techName(d.technikerId)):''].filter(Boolean).join(' · ');return `<div style="padding:8px 0;border-bottom:1px solid var(--line)"><div class="between"><b style="min-width:0">Gerät ${di+1}: ${esc(d.brand)} ${esc(d.model)}</b><b class="mono">${eur(devTotal(d))}</b></div>${meta?`<div class="muted" style="font-size:12px;margin-top:2px">${meta}</div>`:''}${ps.map(p=>`<div class="between" style="font-size:13px;padding:4px 0 0"><span class="muted">${esc(p.reparatur)}${p.qual?' · '+esc(p.qual):''}</span><span class="mono">${eur(p.price)}</span></div>`).join('')}</div>`;}).join('')}
@@ -949,7 +975,41 @@ function setStatus(id,s){
   if(notified) statusNotify(o,def);
   toast('Status: '+statusLabel(s)+(notified?' · Kunde benachrichtigt':''));
   openOrder(id); (views[current]||views.dashboard)(); paintIcons(); refreshBadges();
+  if(s==='warten') setTimeout(function(){openPartWaitDialog(id);},120);
 }
+/* ---- P12: „Warten auf Ersatzteil" – Bestellinfo je Auftrag/Gerät ---- */
+const PART_SUPPLIERS=['Faro line','Foneday','ASWO','Mobileparts'];
+function partWaitBox(o){ const pw=o.partWaits||[]; if(!pw.length)return '';
+  return `<div style="margin-top:14px;border:1px solid #f0c68a;background:#fff7ec;border-radius:12px;padding:12px">
+    <div class="between"><b style="color:#b45309">⏳ Warten auf Ersatzteil</b><button class="btn sm gho" onclick="openPartWaitDialog('${o.id}')">+ Bestellung</button></div>
+    ${pw.map((w,idx)=>`<div style="margin-top:8px;padding-top:8px;${idx>0?'border-top:1px dashed #f0c68a':''}">
+      <div style="font-size:13px"><b>${esc(w.part||'Ersatzteil')}</b>${w.supplier?' · Lieferant: '+esc(w.supplier):''}${(w.deviceIdx!=null&&oDevices(o)[w.deviceIdx])?' · '+esc((oDevices(o)[w.deviceIdx].brand||'')+' '+(oDevices(o)[w.deviceIdx].model||'')):''}</div>
+      ${w.note?`<div class="muted" style="font-size:12px;margin-top:3px;white-space:pre-wrap">📝 ${esc(w.note)}</div>`:''}
+      <div class="muted" style="font-size:11px;margin-top:3px">notiert ${esc(w.at||'')}${w.by?(' · '+esc(w.by)):''} <button class="btn sm gho" style="padding:1px 8px" onclick="removePartWait('${o.id}',${idx})">entfernen</button></div>
+    </div>`).join('')}
+  </div>`; }
+function openPartWaitDialog(id){ const o=S.ord.find(x=>x.id===id); if(!o)return; const devs=oDevices(o);
+  openModal(`<div class="dhead"><b style="flex:1">Ersatzteil-Bestellung</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+   <div class="dbody">
+     <p class="muted" style="font-size:13px">Auftrag ${esc(o.nr)} · festhalten, was wo bestellt wurde und was nach Lieferung zu tun ist.</p>
+     ${devs.length>1?`<label class="f" style="margin-top:8px">Gerät</label><select class="in" id="pw_dev">${devs.map((d,i)=>`<option value="${i}">Gerät ${i+1}: ${esc(d.brand)} ${esc(d.model)}</option>`).join('')}</select>`:'<input type="hidden" id="pw_dev" value="0">'}
+     <label class="f" style="margin-top:10px">Lieferant</label>
+     <input class="in" id="pw_sup" list="pw_suppliers" placeholder="z. B. Foneday">
+     <datalist id="pw_suppliers">${PART_SUPPLIERS.map(s=>`<option value="${esc(s)}"></option>`).join('')}</datalist>
+     <label class="f" style="margin-top:10px">Bestelltes Ersatzteil</label>
+     <input class="in" id="pw_part" placeholder="z. B. iPhone 13 Display (Original)">
+     <label class="f" style="margin-top:10px">Techniker-Info / interne Notiz</label>
+     <textarea class="in" id="pw_note" rows="3" placeholder="z. B. Farbe schwarz, nach Lieferung Kalibrierung nötig, Kunde vorab informieren…"></textarea>
+     <div class="row" style="margin-top:14px;justify-content:flex-end;gap:8px"><button class="btn gho" onclick="closeAll()">Abbrechen</button><button class="btn pri" onclick="savePartWait('${id}')">Speichern</button></div>
+   </div>`);
+  setTimeout(function(){const e=document.getElementById('pw_sup');if(e)e.focus();},40);
+}
+function savePartWait(id){ const o=S.ord.find(x=>x.id===id); if(!o)return; const g=x=>{const e=document.getElementById(x);return e?e.value.trim():'';};
+  const part=g('pw_part'); const sup=g('pw_sup'); if(!part&&!sup){toast('Bitte Lieferant oder Ersatzteil angeben');return;}
+  o.partWaits=o.partWaits||[]; o.partWaits.push({deviceIdx:+g('pw_dev')||0,supplier:sup,part:part,note:g('pw_note'),at:fmtDate(today()),by:(curUser()&&curUser().name)||''});
+  if(o.status!=='warten')o.status='warten'; save(); closeAll(); openOrder(id); toast('Ersatzteil-Bestellung vermerkt');
+}
+function removePartWait(id,idx){ const o=S.ord.find(x=>x.id===id); if(!o||!o.partWaits)return; o.partWaits.splice(idx,1); save(); openOrder(id); }
 
 function sendReminderFor(id){
   const o=S.ord.find(x=>x.id===id);
@@ -2808,12 +2868,12 @@ views.einstellungen=function(){
          <div><label class="f">Straße &amp; Nr.</label><input class="in" value="${esc(m.street)}" placeholder="Musterstraße 1" onchange="masterSet('street',this.value)"></div>
          <div class="grid g2" style="gap:8px"><div><label class="f">PLZ</label><input class="in" value="${esc(m.zip)}" placeholder="12345" onchange="masterSet('zip',this.value)"></div><div><label class="f">Ort</label><input class="in" value="${esc(m.city)}" placeholder="Musterstadt" onchange="masterSet('city',this.value)"></div></div>
          <div><label class="f">E-Mail</label><input class="in" value="${esc(m.email)}" placeholder="info@werkstatt.de" onchange="masterSet('email',this.value)"></div>
-         <div><label class="f">Öffnungszeiten</label><input class="in" value="${esc(m.hours)}" onchange="masterSet('hours',this.value)"></div>
          <div><label class="f">Garantie auf Reparaturen (Monate)</label><input class="in" type="number" value="${m.warranty}" onchange="masterSet('warranty',+this.value||6)"></div>
          <div><label class="f">Google-Bewertungs-Link</label><input class="in" value="${esc(m.google)}" placeholder="g.page/deine-werkstatt/review" onchange="masterSet('google',this.value)"></div>
        </div>`;})()}
        <label class="f" style="margin-top:12px">Logo (auf Belegen, Angeboten, Etiketten)</label>
        <div class="row" style="align-items:center;gap:12px">${(ensureSettings().logo)?`<img src="${ensureSettings().logo}" style="height:44px;max-width:150px;object-fit:contain;border:1px solid var(--line);border-radius:8px;background:#fff;padding:3px">`:'<span class="muted" style="font-size:13px">Kein Logo</span>'}<label class="btn sm" style="cursor:pointer">${ensureSettings().logo?'Logo ändern':'Logo hochladen'}<input type="file" accept="image/*" style="display:none" onchange="logoUpload(this)"></label>${ensureSettings().logo?`<button class="btn sm gho" onclick="logoClear()">Entfernen</button>`:''}</div>
+       ${hoursEditorHTML()}
        <button class="btn pri" style="margin-top:12px" onclick="toast('Stammdaten gespeichert')">Speichern</button>
      </div>
      <div class="card"><b>Kasse anbinden</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Kartenzahlung und TSE-konforme Belege – verbinden Sie Ihr vorhandenes Terminal.</p>
