@@ -543,7 +543,8 @@ function oDevices(o){ if(o&&o.devices&&o.devices.length) return o.devices; retur
 function oTotal(o){ return oDevices(o).reduce((s,d)=>s+(+d.price||0),0); }
 function oDevLabel(o){ return oDevices(o).map(d=>[d.brand,d.model].filter(Boolean).join(' ')).filter(Boolean).join(' + ')||'—'; }
 function oIssueLabel(o){ return oDevices(o).map(d=>d.reparatur).filter(Boolean).join(' · '); }
-function posRows(o){ return oDevices(o).map(d=>`<tr><td>${esc(d.brand)} ${esc(d.model)} — ${esc(d.reparatur)} (${esc(d.qual)})</td><td style="text-align:right" class="mono">${eur(d.price)}</td></tr>`).join(''); }
+function posRows(o){ return oDevices(o).map(d=>`<tr><td>${esc(d.brand)} ${esc(d.model)} — ${esc(d.reparatur)} (${esc(d.qual)})${(+d.price>0)?`<div style="font-size:11px;color:#666">darin ${MWST_RATE} % MwSt: ${eur(vatOf(d.price))}</div>`:''}</td><td style="text-align:right" class="mono">${eur(d.price)}</td></tr>`).join(''); }
+function totVatLine(o){const b=oTotal(o);if(!(b>0))return '';return `<div class="between" style="font-size:13px;color:#555;margin-top:3px"><span>Netto</span><span class="mono">${eur(netOf(b))}</span></div><div class="between" style="font-size:13px;color:#555"><span>darin enthaltene MwSt. (${MWST_RATE} %)</span><span class="mono">${eur(vatOf(b))}</span></div>`;}
 /* Techniker (Mitarbeiter) sehen nur ihnen zugewiesene + noch nicht zugewiesene Aufträge */
 function visRole(){ if(curRole()==='inhaber') return S.ord; const u=S.userId; return S.ord.filter(o=>!o.technikerId||o.technikerId===u); }
 function visibleOrders(){ return visRole().filter(o=>!o.trashed&&!o.archived); } /* operativer Standard */
@@ -565,6 +566,13 @@ function orderMarginPct(o){const rev=oTotal(o);return rev>0?Math.round(orderMarg
 function nextOrderNr(){ return (ensureSettings().orderPrefix||'REP-')+(S.counter++); }
 function nextQuoteNr(){ S.quoteCounter=(S.quoteCounter||1000); return (ensureSettings().quotePrefix||'AN-')+(S.quoteCounter++); }
 function eur(n){return '€ '+Number(n||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2});}
+/* MwSt-Helfer (P3): enthaltene MwSt aus Bruttobetrag */
+const MWST_RATE=19;
+function vatOf(brutto,rate){rate=(rate==null?MWST_RATE:rate);const b=+brutto||0;return b-b/(1+rate/100);}
+function netOf(brutto,rate){rate=(rate==null?MWST_RATE:rate);const b=+brutto||0;return b/(1+rate/100);}
+function vatHint(brutto,rate){rate=(rate==null?MWST_RATE:rate);const b=+brutto||0;if(!(b>0))return '';return 'Brutto '+eur(b)+' · darin '+rate+' % MwSt: '+eur(vatOf(b,rate))+' · Netto '+eur(netOf(b,rate));}
+/* Fehlerbeschreibung on-the-fly in den Katalog lernen (P2) */
+function catLearnRepair(name){name=(name||'').trim();if(!name)return;const c=ensureCat();if(c.repairs.indexOf(name)<0){c.repairs.push(name);save();}}
 function initials(n){return (n||'?').split(' ').map(x=>x[0]).slice(0,2).join('').toUpperCase();}
 function today(){return new Date().toISOString().slice(0,10);}
 function daysBetween(a,b){return Math.round((new Date(b)-new Date(a))/864e5);}
@@ -879,7 +887,7 @@ function openOrder(id){
      <div class="grid g2" style="margin-top:14px">
        <div style="grid-column:1/-1"><label class="f">Gerät${oDevices(o).length>1?'e ('+oDevices(o).length+')':''} &amp; Reparatur</label>
          ${oDevices(o).map(d=>`<div class="between" style="padding:7px 0;border-bottom:1px solid var(--line)"><div style="min-width:0"><b>${esc(d.brand)} ${esc(d.model)}</b><div class="muted" style="font-size:13px">${esc(d.reparatur)} · ${esc(d.qual)}${d.imei?' · IMEI '+esc(d.imei):''}${d.fach?' · '+esc(d.fach):''}</div></div><b class="mono">${eur(d.price)}</b></div>`).join('')}
-         <div class="between" style="padding:9px 0"><b>Gesamt</b><b style="font-size:18px">${eur(oTotal(o))}</b></div></div>
+         <div class="between" style="padding:9px 0"><b>Gesamt (inkl. MwSt.)</b><b style="font-size:18px">${eur(oTotal(o))}</b></div>${(oTotal(o)>0)?`<div class="between" style="font-size:12px;color:var(--ink2)"><span>Netto ${eur(netOf(oTotal(o)))}</span><span>darin ${MWST_RATE} % MwSt: ${eur(vatOf(oTotal(o)))}</span></div>`:''}</div>
        <div><label class="f">Priorität</label><div style="font-weight:700">${esc(o.prio)}</div></div>
        <div><label class="f">Termin / Fällig</label><div style="font-weight:700">${o.appt?'Termin '+fmtDate(o.appt)+' · ':''}Fällig ${fmtDate(o.due)}</div></div>
        <div><label class="f">Garantie</label><div style="font-weight:700">${o.warranty} Monate${warrUntil?' · bis '+fmtDate(warrUntil):' (ab Abholung)'}</div></div>
@@ -1029,7 +1037,8 @@ let _noT=null; function noSaveDraftDebounced(){clearTimeout(_noT);_noT=setTimeou
 function noAutosave(){noCollect();noSaveDraft();}
 function noBrandChange(i){noCollect();NO.devices[i].model='';renderNewOrder();}
 function noModelPick(i){noCollect();const d=NO.devices[i];if(d.brand&&d.model){const t=catModelType(d.brand,d.model);if(t)d.typ=t;}if(d.brand&&d.reparatur){const p=priceFor(d.brand,d.model,d.reparatur);if(p!=='')d.price=p;}renderNewOrder();}
-function noPrice(i){noCollect();const d=NO.devices[i];if(d.brand&&d.reparatur){const p=priceFor(d.brand,d.model,d.reparatur);if(p!==''){const e=document.getElementById('dev'+i+'_price');if(e)e.value=p;d.price=p;}}noSaveDraft();}
+function noPrice(i){noCollect();const d=NO.devices[i];if(d.brand&&d.reparatur){const p=priceFor(d.brand,d.model,d.reparatur);if(p!==''){const e=document.getElementById('dev'+i+'_price');if(e)e.value=p;d.price=p;}}noVat(i);noSaveDraft();}
+function noVat(i){const e=document.getElementById('dev'+i+'_price');const h=document.getElementById('dev'+i+'_vathint');if(!e||!h)return;h.textContent=vatHint(+e.value||0);}
 function noQuickPick(i){const v=(document.getElementById('dev'+i+'_search').value||'').trim();if(!v)return;noCollect();const brand=catBrands().find(b=>v.toLowerCase().startsWith(b.toLowerCase()));const d=NO.devices[i];if(brand){d.brand=brand;const rest=v.slice(brand.length).trim();const mm=catModelNames(brand).find(x=>x.toLowerCase()===rest.toLowerCase());d.model=mm||rest;if(d.model){const t=catModelType(brand,d.model);if(t)d.typ=t;}}else{d.model=v;}if(d.brand&&d.reparatur){const p=priceFor(d.brand,d.model,d.reparatur);if(p!=='')d.price=p;}renderNewOrder();}
 function noAddDevice(){noCollect();NO.devices.push(blankDevice());renderNewOrder();}
 function noRemoveDevice(i){noCollect();NO.devices.splice(i,1);renderNewOrder();}
@@ -1090,7 +1099,7 @@ function noFinalize(){ noCollect();
   S.drafts=(S.drafts||[]).filter(x=>x.id!==NO.draftId); save();
   toast('Auftrag '+nr+' angelegt'+(devs.length>1?(' · '+devs.length+' Geräte'):'')); NO=null; go('auftraege');
 }
-function noBuildDevices(){ return NO.devices.filter(d=>d.reparatur&&(d.brand||d.model)).map(d=>({typ:d.typ,brand:d.brand,model:d.model,imei:d.imei,fach:d.fach,ref:d.ref,reparatur:d.reparatur,qual:d.qual,price:+d.price||0,warranty:+d.warranty||6})); }
+function noBuildDevices(){ const built=NO.devices.filter(d=>d.reparatur&&(d.brand||d.model)).map(d=>({typ:d.typ,brand:d.brand,model:d.model,imei:d.imei,fach:d.fach,ref:d.ref,reparatur:d.reparatur,qual:d.qual,price:+d.price||0,warranty:+d.warranty||6})); built.forEach(d=>catLearnRepair(d.reparatur)); return built; }
 function noMirror(devs){ const f=devs[0]||{}; return {devtyp:f.typ||'Smartphone',brand:f.brand||'',model:f.model||'',imei:f.imei||'',fach:f.fach||'',ref:f.ref||'',qual:f.qual||'Original',warranty:f.warranty||6,issue:devs.map(d=>d.reparatur).filter(Boolean).join(' · '),price:devs.reduce((s,d)=>s+(+d.price||0),0)}; }
 function noDevBlock(d,i){
   const brands=catBrands();
@@ -1114,10 +1123,11 @@ function noDevBlock(d,i){
       <div><label class="f">Referenznummer</label><input class="in" id="dev${i}_ref" value="${esc(d.ref)}" placeholder="Kundenreferenz / Auftragsnr."></div>
     </div>
     <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin-top:10px">
-      <div><label class="f">Reparaturart *</label><input class="in" id="dev${i}_reparatur" list="allRepairs" value="${esc(d.reparatur)}" placeholder="Tippen zum Suchen oder Auswählen…" onchange="noPrice(${i})"></div>
-      <div><label class="f">Preis (€)</label><input class="in" id="dev${i}_price" type="number" value="${d.price!==''?d.price:''}" placeholder="0.00"></div>
+      <div><label class="f">Fehler / Reparaturart *</label><input class="in" id="dev${i}_reparatur" list="allRepairs" value="${esc(d.reparatur)}" placeholder="Standardfehler wählen oder neuen eingeben…" onchange="noPrice(${i})"><div class="muted" style="font-size:11px;margin-top:3px">Nicht in der Liste? Einfach eintippen – wird automatisch gespeichert.</div></div>
+      <div><label class="f">Preis (€, brutto)</label><input class="in" id="dev${i}_price" type="number" step="0.01" value="${d.price!==''?d.price:''}" placeholder="0.00" oninput="noVat(${i})"></div>
       <div><label class="f">Qualität</label><select class="in" id="dev${i}_qual">${catQuals().map(q=>`<option ${d.qual===q?'selected':''}>${esc(q)}</option>`).join('')}</select></div>
     </div>
+    <div id="dev${i}_vathint" class="muted" style="font-size:12px;margin-top:6px">${vatHint(d.price)}</div>
     <div class="grid g2" style="margin-top:10px"><div><label class="f">Garantie (Monate)</label><select class="in" id="dev${i}_warranty">${[6,12,24,0].map(w=>`<option ${(+d.warranty)===w?'selected':''}>${w}</option>`).join('')}</select></div></div>
   </div>`;
 }
@@ -1241,7 +1251,7 @@ function openQuote(id){ const q=(S.quotes||[]).find(x=>x.id===id); if(!q)return;
    <div class="dbody">
      <div class="card" style="background:var(--soft);border:0"><div class="between"><div><div style="font-weight:800;font-size:16px">${esc(c.name)}</div><div class="muted" style="font-size:13px">${esc(c.tel)}${c.mail?' · '+esc(c.mail):''}</div></div><div class="avatar" style="width:44px;height:44px">${initials(c.name)}</div></div></div>
      <div class="grid g2" style="margin-top:14px">
-       <div style="grid-column:1/-1"><label class="f">Positionen</label>${oDevices(q).map(d=>`<div class="between" style="padding:7px 0;border-bottom:1px solid var(--line)"><div><b>${esc(d.brand)} ${esc(d.model)}</b><div class="muted" style="font-size:13px">${esc(d.reparatur)} · ${esc(d.qual)}</div></div><b class="mono">${eur(d.price)}</b></div>`).join('')}<div class="between" style="padding:9px 0"><b>Gesamt</b><b style="font-size:18px">${eur(oTotal(q))}</b></div></div>
+       <div style="grid-column:1/-1"><label class="f">Positionen</label>${oDevices(q).map(d=>`<div class="between" style="padding:7px 0;border-bottom:1px solid var(--line)"><div><b>${esc(d.brand)} ${esc(d.model)}</b><div class="muted" style="font-size:13px">${esc(d.reparatur)} · ${esc(d.qual)}</div></div><b class="mono">${eur(d.price)}</b></div>`).join('')}<div class="between" style="padding:9px 0"><b>Gesamt (inkl. MwSt.)</b><b style="font-size:18px">${eur(oTotal(q))}</b></div>${(oTotal(q)>0)?`<div class="between" style="font-size:12px;color:var(--ink2)"><span>Netto ${eur(netOf(oTotal(q)))}</span><span>darin ${MWST_RATE} % MwSt: ${eur(vatOf(oTotal(q)))}</span></div>`:''}</div>
        <div><label class="f">Status</label><div>${qBadge(qExpired(q)?'abgelaufen':q.status)}</div></div>
        <div><label class="f">Gültig bis</label><div style="font-weight:700">${fmtDate(q.validUntil)}</div></div>
      </div>
@@ -1269,7 +1279,7 @@ function printQuote(id){const q=(S.quotes||[]).find(x=>x.id===id);if(!q)return;c
   printHTML('Angebot '+q.nr, shopHead()+`<h2>Angebot / Kostenvoranschlag</h2><div class="muted">Angebot ${q.nr} · ${fmtDate(q.created)}</div>
     <div class="box" style="margin-top:12px"><b>${esc(c.name)}</b><br><span class="muted">${esc(c.adr)}</span></div>
     <table><thead><tr><th>Leistung</th><th style="text-align:right">Preis</th></tr></thead><tbody>${posRows(q)}</tbody></table>
-    <div class="tot"><span>Gesamt (inkl. MwSt.)</span><span>${eur(oTotal(q))}</span></div>
+    <div class="tot"><span>Gesamt (inkl. MwSt.)</span><span>${eur(oTotal(q))}</span></div>${totVatLine(q)}
     <div class="foot">Unverbindliches Angebot, gültig bis ${fmtDate(q.validUntil)}. Der endgültige Preis kann nach genauer Prüfung des Geräts abweichen; wir informieren Sie vor Ausführung.<br>${SHOP.name} · ${SHOP.street}, ${SHOP.zip} ${SHOP.city}</div>`);
 }
 function requestToQuote(id){const r=(S.requests||[]).find(x=>x.id===id);if(!r)return;const nm=(r.name||'').split(' ');
@@ -1337,7 +1347,7 @@ function printReceipt(id){const o=S.ord.find(x=>x.id===id);const c=cust(o.cid);
     <div class="box" style="margin-top:12px"><b>${esc(c.name)}</b><br><span class="muted">${esc(c.adr)}</span></div>
     <table><thead><tr><th>Position</th><th style="text-align:right">Betrag</th></tr></thead>
     <tbody>${posRows(o)}</tbody></table>
-    <div class="tot"><span>Gesamt</span><span>${eur(oTotal(o))}</span></div>
+    <div class="tot"><span>Gesamt (inkl. MwSt.)</span><span>${eur(oTotal(o))}</span></div>${totVatLine(o)}
     <div class="foot">Preis inkl. gesetzlicher MwSt. · Garantie: ${o.warranty} Monate auf die durchgeführte Reparatur.<br>Vielen Dank für Ihren Auftrag bei ${SHOP.name}.</div>
     ${ensureSettings().agb?`<div style="margin-top:14px;padding-top:10px;border-top:1px solid #ddd;font-size:11px;color:#666;line-height:1.5">${esc(ensureSettings().agb)}</div>`:''}`);
   }
@@ -1407,7 +1417,7 @@ function printKVA(id){const o=S.ord.find(x=>x.id===id);const c=cust(o.cid);
     <div class="box" style="margin-top:12px"><b>${esc(c.name)}</b><br><span class="muted">${esc(c.adr)}</span></div>
     <table><thead><tr><th>Leistung</th><th style="text-align:right">Preis</th></tr></thead>
     <tbody>${posRows(o)}</tbody></table>
-    <div class="tot"><span>Voraussichtlich</span><span>${eur(oTotal(o))}</span></div>
+    <div class="tot"><span>Voraussichtlich (inkl. MwSt.)</span><span>${eur(oTotal(o))}</span></div>${totVatLine(o)}
     <div class="foot">Unverbindlicher Kostenvoranschlag, gültig 14 Tage. Der endgültige Preis kann nach genauer Prüfung abweichen; wir informieren Sie vor Ausführung.<br>${SHOP.name}</div>`);
   }
 
@@ -2189,8 +2199,8 @@ const CATALOG={
   Sonstige:[],
 };
 const REPTYPES=['Displaytausch','Akkutausch','Ladebuchse','Kameraglas','Backcover','Software'];
-const BASEPRICE={Displaytausch:129,Akkutausch:59,Ladebuchse:69,Kameraglas:39,Backcover:79,Software:49,'Backcover / Rückglas':79,'Rückkamera':89,'Frontkamera':69,'Hörmuschel (Ohrlautsprecher)':49,'Lautsprecher':49,'Mikrofon':49,'Power-Button':45,'Lautstärke-Taste':45,'Wasserschaden-Behandlung':79,'Datenrettung':99,'SIM-Kartenleser':55,'Vibrationsmotor':45,'Diagnose':0};
-const REPAIRS=['Displaytausch','Akkutausch','Ladebuchse','Rückkamera','Frontkamera','Kameraglas','Backcover / Rückglas','Hörmuschel (Ohrlautsprecher)','Lautsprecher','Mikrofon','Power-Button','Lautstärke-Taste','Wasserschaden-Behandlung','Datenrettung','SIM-Kartenleser','Vibrationsmotor','Software','Diagnose'];
+const BASEPRICE={Displaytausch:129,Akkutausch:59,Ladebuchse:69,Kameraglas:39,Backcover:79,Software:49,'Backcover / Rückglas':79,'Rückkamera':89,'Frontkamera':69,'Hörmuschel (Ohrlautsprecher)':49,'Lautsprecher':49,'Mikrofon':49,'Power-Button':45,'Lautstärke-Taste':45,'Wasserschaden-Behandlung':79,'Datenrettung':99,'SIM-Kartenleser':55,'Vibrationsmotor':45,'Diagnose':0,'Gerät ohne Funktion':0,'Displayglas (nur Glas)':89,'Face ID / Touch ID':79,'Netzwerk / Antenne':69,'Reinigung / Wartung':29};
+const REPAIRS=['Displaytausch','Displayglas (nur Glas)','Akkutausch','Ladebuchse','Rückkamera','Frontkamera','Kameraglas','Backcover / Rückglas','Hörmuschel (Ohrlautsprecher)','Lautsprecher','Mikrofon','Power-Button','Lautstärke-Taste','Face ID / Touch ID','Wasserschaden-Behandlung','Datenrettung','SIM-Kartenleser','Vibrationsmotor','Netzwerk / Antenne','Reinigung / Wartung','Gerät ohne Funktion','Software','Diagnose'];
 const GERAETETYPEN=['Smartphone','Tablet','Smartwatch','Laptop','Konsole','E-Scooter','Kopfhörer','Sonstiges'];
 const PRIOS=['Standard','Express','Versand','Kostenvoranschlag (KVA)'];
 let priceBrand='Apple';
@@ -2198,7 +2208,11 @@ let priceBrand='Apple';
 function ensureCat(){ if(!S.cat){
     const models={}; Object.keys(CATALOG).forEach(b=>{models[b]=CATALOG[b].map(nm=>({name:nm,type:(/iPad/.test(nm)?'Tablet':'Smartphone'),img:''}));});
     S.cat={types:GERAETETYPEN.slice(),brands:Object.keys(CATALOG),models,repairs:REPAIRS.slice(),base:Object.assign({},BASEPRICE),quals:['Original','Kopie'],brandMul:{Apple:1.2,Samsung:1.12},prices:{}}; save();
-  } const c=S.cat; if(!c.quals)c.quals=['Original','Kopie']; if(!c.prices)c.prices={}; if(!c.types)c.types=GERAETETYPEN.slice(); return c; }
+  } const c=S.cat; if(!c.quals)c.quals=['Original','Kopie']; if(!c.prices)c.prices={}; if(!c.types)c.types=GERAETETYPEN.slice();
+  if(!c.repairs)c.repairs=REPAIRS.slice();
+  /* P2: neue Standardfehler in bestehende Kataloge nachziehen (einmalig je Fehler) */
+  if(!c._repMig){let ch=false;REPAIRS.forEach(r=>{if(c.repairs.indexOf(r)<0){c.repairs.push(r);ch=true;}if(c.base[r]===undefined&&BASEPRICE[r]!==undefined){c.base[r]=BASEPRICE[r];ch=true;}});c._repMig=1;if(ch)save();}
+  return c; }
 function qa(s){return String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
 function catBrands(){return ensureCat().brands;}
 function catModels(brand){return (ensureCat().models[brand]||[]);}
