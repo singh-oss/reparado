@@ -312,6 +312,11 @@ const DB = {
       .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, d:d}; }); })
       .then(function(res){ if(res.ok && res.d.token){ self._setSession(res.d); return res.d; }
         throw new Error((res.d && res.d.error) || 'Registrierung fehlgeschlagen'); }); },
+  requestReset(email){ if(!CFG) return Promise.reject(new Error('Keine Server-Config'));
+    return fetch(API+'/api/auth/reset', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email:email})}).then(function(r){return r.json();}); },
+  confirmReset(token,pw){ if(!CFG) return Promise.reject(new Error('Keine Server-Config'));
+    return fetch(API+'/api/auth/reset/confirm', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({token:token,password:pw})})
+      .then(function(r){ return r.json().then(function(d){ if(!r.ok||d.error) throw new Error(d.error||'Fehler'); return d; }); }); },
   restoreSession(){ try{ const t=localStorage.getItem('reparado_token'); if(t){ this.token=t; return true; } }catch(e){} return false; },
   logoutServer(){ this.token=null; try{localStorage.removeItem('reparado_token');}catch(e){} }
 };
@@ -4011,24 +4016,41 @@ function bootApp(){ensureWorkshop(); ensureMaster(); applyMaster(); ensureAcct()
 function blankState(){ return {v:11, __clean:true, cust:[], ord:[], parts:[], orders:[], sold:[], counter:1000, rules:defaultRules(), sales:[], cash:{connected:''}, mailLog:[], calls:[], phone:defaultPhone(), users:[{id:'u1',name:'Inhaber',role:'inhaber',pin:'1234'}], userId:'u1', insurance:defaultInsurance(), wgLeads:[], drafts:[], quotes:[], requests:[], quoteCounter:1000, feedback:[], reactDone:[]}; }
 function finishServerBoot(hadState){ const ov=document.getElementById('sbLogin'); if(ov)ov.remove(); if(!hadState){ try{ localStorage.setItem(KEY, JSON.stringify(blankState())); }catch(e){} } S=load(); bootApp(); }
 /* Server-Modus: Anmeldung / Selbst-Registrierung an der echten Datenbank (nur mit config.js) */
-let _sbMode='login';
-function sbSwitch(m){ _sbMode=m; serverLoginOverlay(); }
+let _sbMode='login'; let _sbResetToken=''; let _sbMsg='';
+function sbSwitch(m){ _sbMode=m; _sbMsg=''; serverLoginOverlay(); }
 function serverLoginOverlay(err){
   let ov=document.getElementById('sbLogin'); if(!ov){ov=document.createElement('div');ov.id='sbLogin';ov.style.cssText='position:fixed;inset:0;z-index:9999;background:#0f2318;display:grid;place-items:center;padding:20px;overflow:auto';document.body.appendChild(ov);}
-  const signup=_sbMode==='signup';
+  const signup=_sbMode==='signup', forgot=_sbMode==='forgot', reset=_sbMode==='reset';
   const inp='width:100%;padding:11px;border:1px solid #eaedeb;border-radius:10px;margin:4px 0 12px';
-  ov.innerHTML=`<div style="background:#fff;border-radius:16px;padding:28px;max-width:390px;width:100%;font-family:Inter,sans-serif">
-     <div style="display:flex;gap:10px;align-items:center;margin-bottom:4px"><span style="width:30px;height:30px;border-radius:9px;background:#0e7a3c;color:#fff;display:grid;place-items:center;font-weight:800">V</span><b style="font-size:18px">Velqio</b></div>
-     <div style="color:#5f6b64;font-size:13px;margin-bottom:16px">${signup?'Neue Werkstatt anlegen – kostenlos testen':'Anmeldung an dein Werkstatt-Konto'}</div>
-     ${signup?`<label style="font-size:12px;font-weight:700;color:#5f6b64">Werkstatt-Name</label><input id="sbWs" style="${inp}" placeholder="z. B. Handy Klinik Musterstadt">`:''}
+  const sub=signup?'Neue Werkstatt anlegen – kostenlos testen':forgot?'Passwort zurücksetzen':reset?'Neues Passwort vergeben':'Anmeldung an dein Werkstatt-Konto';
+  let btn, fields;
+  if(reset){
+    fields=`<label style="font-size:12px;font-weight:700;color:#5f6b64">Neues Passwort</label><input id="sbPw" type="password" style="${inp}" placeholder="mind. 6 Zeichen">`;
+    btn=`<button onclick="sbDoReset()" style="width:100%;padding:12px;border:0;border-radius:10px;background:#0e7a3c;color:#fff;font-weight:700;cursor:pointer">Passwort speichern</button>`;
+  } else if(forgot){
+    fields=`<div style="color:#5f6b64;font-size:13px;margin-bottom:10px">Gib deine E-Mail ein – wir senden dir einen Link zum Zurücksetzen.</div><label style="font-size:12px;font-weight:700;color:#5f6b64">E-Mail</label><input id="sbEmail" type="email" style="${inp}" placeholder="werkstatt@mail.de">`;
+    btn=`<button onclick="sbDoForgot()" style="width:100%;padding:12px;border:0;border-radius:10px;background:#0e7a3c;color:#fff;font-weight:700;cursor:pointer">Link senden</button>`;
+  } else {
+    fields=`${signup?`<label style="font-size:12px;font-weight:700;color:#5f6b64">Werkstatt-Name</label><input id="sbWs" style="${inp}" placeholder="z. B. Handy Klinik Musterstadt">`:''}
      <label style="font-size:12px;font-weight:700;color:#5f6b64">E-Mail</label><input id="sbEmail" type="email" style="${inp}" placeholder="werkstatt@mail.de">
      <label style="font-size:12px;font-weight:700;color:#5f6b64">Passwort</label><input id="sbPw" type="password" style="${inp}" placeholder="${signup?'mind. 6 Zeichen':'••••••'}">
+     ${signup?'':`<div style="text-align:right;margin:-6px 0 12px"><a onclick="sbSwitch('forgot')" style="color:#0e7a3c;font-size:12px;font-weight:700;cursor:pointer">Passwort vergessen?</a></div>`}`;
+    btn=`<button onclick="${signup?'sbDoSignup()':'sbDoLogin()'}" style="width:100%;padding:12px;border:0;border-radius:10px;background:#0e7a3c;color:#fff;font-weight:700;cursor:pointer">${signup?'Konto anlegen &amp; starten':'Anmelden'}</button>`;
+  }
+  const backLink=(forgot||reset)?`<div style="text-align:center;margin-top:14px;font-size:13px;color:#5f6b64"><a onclick="sbSwitch('login')" style="color:#0e7a3c;font-weight:700;cursor:pointer">← Zurück zur Anmeldung</a></div>`
+    :`<div style="text-align:center;margin-top:14px;font-size:13px;color:#5f6b64">${signup?`Schon registriert? <a onclick="sbSwitch('login')" style="color:#0e7a3c;font-weight:700;cursor:pointer">Anmelden</a>`:`Noch kein Konto? <a onclick="sbSwitch('signup')" style="color:#0e7a3c;font-weight:700;cursor:pointer">Werkstatt anlegen</a>`}</div>`;
+  ov.innerHTML=`<div style="background:#fff;border-radius:16px;padding:28px;max-width:390px;width:100%;font-family:Inter,sans-serif">
+     <div style="display:flex;gap:10px;align-items:center;margin-bottom:4px"><span style="width:30px;height:30px;border-radius:9px;background:#0e7a3c;color:#fff;display:grid;place-items:center;font-weight:800">V</span><b style="font-size:18px">Velqio</b></div>
+     <div style="color:#5f6b64;font-size:13px;margin-bottom:16px">${sub}</div>
+     ${_sbMsg?`<div style="background:#eaf4ee;color:#0e7a3c;border-radius:8px;padding:10px;font-size:13px;margin-bottom:12px">${esc(_sbMsg)}</div>`:''}
+     ${fields}
      ${err?`<div style="color:#c0392b;font-size:13px;margin-bottom:10px">${esc(err)}</div>`:''}
-     <button onclick="${signup?'sbDoSignup()':'sbDoLogin()'}" style="width:100%;padding:12px;border:0;border-radius:10px;background:#0e7a3c;color:#fff;font-weight:700;cursor:pointer">${signup?'Konto anlegen &amp; starten':'Anmelden'}</button>
-     <div style="text-align:center;margin-top:14px;font-size:13px;color:#5f6b64">${signup?`Schon registriert? <a onclick="sbSwitch('login')" style="color:#0e7a3c;font-weight:700;cursor:pointer">Anmelden</a>`:`Noch kein Konto? <a onclick="sbSwitch('signup')" style="color:#0e7a3c;font-weight:700;cursor:pointer">Werkstatt anlegen</a>`}</div>
+     ${btn}
+     ${backLink}
      <div style="color:#8a938d;font-size:11px;margin-top:12px;text-align:center">Gesicherte Verbindung · Daten in der EU</div>
    </div>`;
-  const pw=document.getElementById('sbPw'); if(pw)pw.onkeydown=e=>{if(e.key==='Enter'){signup?sbDoSignup():sbDoLogin();}};
+  const pw=document.getElementById('sbPw'); if(pw)pw.onkeydown=e=>{if(e.key==='Enter'){reset?sbDoReset():signup?sbDoSignup():sbDoLogin();}};
+  const em=document.getElementById('sbEmail'); if(em&&forgot)em.onkeydown=e=>{if(e.key==='Enter')sbDoForgot();};
 }
 function sbDoLogin(){const em=(document.getElementById('sbEmail')||{}).value||'';const pw=(document.getElementById('sbPw')||{}).value||'';
   if(!em||!pw){serverLoginOverlay('Bitte E-Mail und Passwort eingeben.');return;}
@@ -4039,8 +4061,18 @@ function sbDoSignup(){const ws=(document.getElementById('sbWs')||{}).value||'';c
   if(!em||!pw){serverLoginOverlay('Bitte E-Mail und Passwort angeben.');return;}
   DB.signup(ws.trim(),em.trim(),pw).then(()=>{ finishServerBoot(false); try{masterSet('name',ws.trim());}catch(e){} }).catch(e=>serverLoginOverlay(e.message||'Registrierung fehlgeschlagen.'));
 }
+function sbDoForgot(){const em=(document.getElementById('sbEmail')||{}).value||'';
+  if(!em.trim()){serverLoginOverlay('Bitte E-Mail eingeben.');return;}
+  DB.requestReset(em.trim()).then(()=>{_sbMode='login';_sbMsg='Falls ein Konto mit dieser E-Mail existiert, haben wir dir einen Link zum Zurücksetzen geschickt. Bitte prüfe dein Postfach.';serverLoginOverlay();}).catch(()=>{_sbMode='login';_sbMsg='Falls ein Konto existiert, ist der Link unterwegs.';serverLoginOverlay();});
+}
+function sbDoReset(){const pw=(document.getElementById('sbPw')||{}).value||'';
+  if(pw.length<6){serverLoginOverlay('Passwort mind. 6 Zeichen.');return;}
+  DB.confirmReset(_sbResetToken,pw).then(()=>{ try{const u=new URL(location.href);u.searchParams.delete('reset');history.replaceState(null,'',u.pathname+u.search);}catch(e){} _sbResetToken='';_sbMode='login';_sbMsg='Passwort geändert. Bitte melde dich mit dem neuen Passwort an.';serverLoginOverlay(); }).catch(e=>serverLoginOverlay(e.message||'Zurücksetzen fehlgeschlagen.'));
+}
 function startApp(){
   if(DB.backend==='server'){
+    var rt=''; try{ rt=new URLSearchParams(location.search).get('reset')||''; }catch(e){}
+    if(rt){ _sbResetToken=rt; _sbMode='reset'; serverLoginOverlay(); return; }
     if(DB.restoreSession()){ DB.hydrate().then(had=>finishServerBoot(had)).catch(()=>serverLoginOverlay('Bitte erneut anmelden.')); }
     else { serverLoginOverlay(); }
   } else { bootApp(); }

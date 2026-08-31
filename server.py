@@ -119,6 +119,18 @@ def verify_token(token):
     except Exception:
         return None
 
+def make_reset_token(user_id):
+    payload = {"uid": user_id, "typ": "reset", "exp": int(time.time()) + 3600}  # 1 Stunde
+    body = _b64u(json.dumps(payload, separators=(",", ":")).encode())
+    sig = _b64u(hmac.new(SECRET, body.encode(), hashlib.sha256).digest())
+    return body + "." + sig
+
+def verify_reset_token(token):
+    p = verify_token(token)
+    if not p or p.get("typ") != "reset":
+        return None
+    return p
+
 def uid(prefix="id"):
     return prefix + "_" + base64.b32encode(os.urandom(8)).decode().rstrip("=").lower()
 
@@ -317,6 +329,40 @@ class H(BaseHTTPRequestHandler):
                 return self._send(409, {"error": "Diese E-Mail ist bereits registriert"})
             token = make_token(usr, wid)
             return self._send(200, {"token": token, "workshopId": wid, "name": uname, "role": "inhaber"})
+
+        if self.path == "/api/auth/reset":
+            # Passwort-Reset anfordern: schickt Link per E-Mail. Antwort immer generisch (kein Konto-Leak).
+            email = (body.get("email") or "").strip().lower()
+            if email:
+                with db() as c:
+                    u = c.execute("SELECT id,workshop_id FROM users WHERE email=?", (email,)).fetchone()
+                if u:
+                    tok = make_reset_token(u["id"])
+                    base = str(_cfg("APP_BASE_URL", "https://velqio.de")).rstrip("/")
+                    link = base + "/app.html?reset=" + tok
+                    txt = ("Hallo,\n\ndu hast das Zuruecksetzen deines Velqio-Passworts angefordert.\n"
+                           "Ueber diesen Link kannst du innerhalb von 1 Stunde ein neues Passwort vergeben:\n\n"
+                           + link + "\n\nWenn du das nicht warst, ignoriere diese E-Mail einfach.\n\nDein Velqio-Team")
+                    try:
+                        send_mail(u["workshop_id"], email, "Velqio - Passwort zuruecksetzen", txt)
+                    except Exception:
+                        pass
+            return self._send(200, {"ok": True})
+
+        if self.path == "/api/auth/reset/confirm":
+            tok = body.get("token") or ""
+            pw = body.get("password") or ""
+            if len(pw) < 6:
+                return self._send(400, {"error": "Passwort mind. 6 Zeichen"})
+            p = verify_reset_token(tok)
+            if not p:
+                return self._send(400, {"error": "Link ungueltig oder abgelaufen. Bitte neu anfordern."})
+            ph, salt = hash_pw(pw)
+            with _lock, db() as c:
+                cur = c.execute("UPDATE users SET pw_hash=?, pw_salt=? WHERE id=?", (ph, salt, p["uid"]))
+                if cur.rowcount == 0:
+                    return self._send(400, {"error": "Konto nicht gefunden"})
+            return self._send(200, {"ok": True})
 
         if self.path == "/api/state":
             p = self._auth()
