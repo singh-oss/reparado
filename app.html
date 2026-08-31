@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reparado · Werkstatt-Software</title>
+<title>Velqio · Werkstatt-Software</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -182,7 +182,7 @@
 <body>
 <div class="app">
   <aside class="side" id="side">
-    <div class="brand"><span class="dot">R</span> Reparado</div>
+    <div class="brand"><span class="dot">V</span> Velqio</div>
     <div class="nav" id="nav">
       <a data-view="dashboard" class="active"><span class="ic" data-ic="grid"></span> Übersicht</a>
       <a data-view="anrufe"><span class="ic" data-ic="phone"></span> Empfang <span class="badge" id="bg-call">0</span></a>
@@ -226,7 +226,7 @@
 </div>
 
 <div id="loginScreen"><div class="loginbox">
-  <div class="loginbrand"><span class="dot">R</span> Reparado</div>
+  <div class="loginbrand"><span class="dot">V</span> Velqio</div>
   <div class="muted" style="margin-bottom:20px" id="loginWs">Anmeldung</div>
   <div id="loginStep"></div>
   <div class="loginhint">Demo-PINs · Geschäftsführung <b>1234</b> · Mitarbeiter <b>0000</b></div>
@@ -277,7 +277,7 @@ const KEY='reparado_v1';
 /* ===== Datenschicht =====
    EINZIGE Stelle für Persistenz. localStorage ist immer der lokale Live-Cache
    (offline-fähig, schnell). Ist eine Server-Config vorhanden (window.REPARADO_CONFIG
-   mit apiUrl, siehe config.js), läuft der Server-Modus gegen das Reparado-Backend:
+   mit apiUrl, siehe config.js), läuft der Server-Modus gegen das Velqio-Backend:
    beim Start wird der geteilte Stand geladen (hydrate), jede Änderung zurückgeschrieben
    (_push, gebündelt). Der Server leitet die Werkstatt aus dem Login-Token ab.
    Ohne Config = reiner Lokal-Modus, App verhält sich exakt wie bisher. */
@@ -485,7 +485,7 @@ function defaultRules(){
    {id:'w_daily', who:'werkstatt', on:true, ch:'E-Mail', trigger:'taeglich', when:'werktags 08:00',
     name:'Tagesüberblick', desc:'Termine heute, abholbereite Geräte und offene Freigaben.',
     subj:'Ihr Tagesüberblick',
-    body:'Guten Morgen,\n\nheute im Überblick:\n\nTermine heute: {n_termine}\nAbholbereite Geräte: {n_fertig}\nWartet auf Ersatzteil: {n_warten}\nÜberfällige Aufträge: {n_ueberfaellig}\n\nDie Details finden Sie in Reparado.'},
+    body:'Guten Morgen,\n\nheute im Überblick:\n\nTermine heute: {n_termine}\nAbholbereite Geräte: {n_fertig}\nWartet auf Ersatzteil: {n_warten}\nÜberfällige Aufträge: {n_ueberfaellig}\n\nDie Details finden Sie in Velqio.'},
    {id:'w_part', who:'werkstatt', on:true, ch:'E-Mail', trigger:'teil_geliefert', when:'sofort',
     name:'Ersatzteil eingetroffen', desc:'Sobald eine Bestellung als geliefert markiert wird.',
     subj:'Ersatzteil eingetroffen',
@@ -1898,7 +1898,7 @@ function calICS(){ const pad=n=>String(n).padStart(2,'0'); const now=new Date();
   const stamp=now.getUTCFullYear()+pad(now.getUTCMonth()+1)+pad(now.getUTCDate())+'T'+pad(now.getUTCHours())+pad(now.getUTCMinutes())+pad(now.getUTCSeconds())+'Z';
   const ev=visibleOrders().filter(o=>o.appt).map(o=>{const c=cust(o.cid);const d=o.appt.replace(/-/g,'');const nx=new Date(o.appt+'T00:00:00');nx.setDate(nx.getDate()+1);const dn=nx.getFullYear()+pad(nx.getMonth()+1)+pad(nx.getDate());
     return ['BEGIN:VEVENT','UID:'+o.id+'@reparado','DTSTAMP:'+stamp,'DTSTART;VALUE=DATE:'+d,'DTEND;VALUE=DATE:'+dn,'SUMMARY:Termin: '+(c.name||'Kunde')+' · '+oDevLabel(o),'DESCRIPTION:Auftrag '+o.nr+' · '+oIssueLabel(o),'END:VEVENT'].join('\r\n');});
-  return ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Reparado//Werkstatt//DE','CALSCALE:GREGORIAN','X-WR-CALNAME:'+ensureWorkshop().name+' Termine',...ev,'END:VCALENDAR'].join('\r\n');
+  return ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Velqio//Werkstatt//DE','CALSCALE:GREGORIAN','X-WR-CALNAME:'+ensureWorkshop().name+' Termine',...ev,'END:VCALENDAR'].join('\r\n');
 }
 function downloadICS(){const ics=calICS();const blob=new Blob([ics],{type:'text/calendar'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='reparado-termine.ics';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},100);toast('Kalender exportiert (.ics) – in jeden Kalender importierbar');}
 function calSubscribeUrl(){return widgetBase()+'/kalender/'+ensureWorkshop().slug+'.ics';}
@@ -2567,7 +2567,7 @@ views.versand=function(){
    ${section('🔧 Im Haus & in Reparatur',inhouse,'Kein Gerät im Haus.')}
    ${section('📤 Rückversand unterwegs',outgoing,'Keine Rücksendungen unterwegs.')}
    ${done.length?section('✅ Zugestellt',done,''):''}
-   <div class="note" style="margin-top:14px">Prototyp: Labels und Sendungsverfolgung sind simuliert. Für den Echtbetrieb bindet Reparado die Versand-API (DHL/DPD/GLS) an – Tracking-Updates kommen dann automatisch, der Ablauf bleibt identisch.</div>`;
+   <div class="note" style="margin-top:14px">Prototyp: Labels und Sendungsverfolgung sind simuliert. Für den Echtbetrieb bindet Velqio die Versand-API (DHL/DPD/GLS) an – Tracking-Updates kommen dann automatisch, der Ablauf bleibt identisch.</div>`;
 };
 /* ============================ ANKAUF/VERKAUF ============================ */
 views.ankauf=function(){
@@ -3746,8 +3746,8 @@ function downloadWpPlugin(){
   const w=ensureWidget();
   const php='<?php\n'
    +'/*\n'
-   +'Plugin Name: Reparado Buchung & Anfrage\n'
-   +'Description: Bindet das Reparado Buchungs- und Anfrage-Widget per Shortcode ein. Nutzung: [reparado] oder [reparado typ="anfrage"].\n'
+   +'Plugin Name: Velqio Buchung & Anfrage\n'
+   +'Description: Bindet das Velqio Buchungs- und Anfrage-Widget per Shortcode ein. Nutzung: [reparado] oder [reparado typ="anfrage"].\n'
    +'Version: 1.0.0\n'
    +'Author: '+SHOP.name+'\n'
    +'*/\n'
@@ -3861,7 +3861,7 @@ views.anrufe=function(){
        <td><span class="tag">${INTENTS[c.intent].lbl}</span></td>
        <td>${esc(c.result)}${c.task?(c.done?' <span class="pill soft"><span class="d"></span>erledigt</span>':' <span class="pill dash"><span class="d"></span>offen</span>'):''}</td>
      </tr>`).join('')||'<tr><td colspan="5"><div class="empty">Keine Gespräche in diesem Filter</div></td></tr>'}</tbody></table></div>
-   <div class="note" style="margin-top:14px">Prototyp: Gespräche werden simuliert. Die KI beantwortet aus echten Reparado-Daten (Status, Preise, Lagerbestand, Öffnungszeiten), bucht Termine und legt Rückruf-Aufgaben an – am Telefon <b>und</b> per WhatsApp. Außerhalb der Öffnungszeiten übernimmt sie automatisch. Konfiguration in <b>Einstellungen → KI-Empfangskraft</b>.</div>`;
+   <div class="note" style="margin-top:14px">Prototyp: Gespräche werden simuliert. Die KI beantwortet aus echten Velqio-Daten (Status, Preise, Lagerbestand, Öffnungszeiten), bucht Termine und legt Rückruf-Aufgaben an – am Telefon <b>und</b> per WhatsApp. Außerhalb der Öffnungszeiten übernimmt sie automatisch. Konfiguration in <b>Einstellungen → KI-Empfangskraft</b>.</div>`;
 };
 function callDone(id){const c=S.calls.find(x=>x.id===id);if(c){c.done=true;save();views.anrufe();paintIcons();refreshBadges();toast('Als erledigt markiert');}}
 function callBubbles(tr,channel){const other=channel==='whatsapp'?'Kunde':'Anrufer';return tr.map(t=>`<div class="cb ${t.who==='ki'?'ki':'anr'}"><div class="lbl">${t.who==='ki'?'KI-Empfangskraft':other}</div>${esc(t.text)}</div>`).join('');}
@@ -4018,7 +4018,7 @@ function serverLoginOverlay(err){
   const signup=_sbMode==='signup';
   const inp='width:100%;padding:11px;border:1px solid #eaedeb;border-radius:10px;margin:4px 0 12px';
   ov.innerHTML=`<div style="background:#fff;border-radius:16px;padding:28px;max-width:390px;width:100%;font-family:Inter,sans-serif">
-     <div style="display:flex;gap:10px;align-items:center;margin-bottom:4px"><span style="width:30px;height:30px;border-radius:9px;background:#0e7a3c;color:#fff;display:grid;place-items:center;font-weight:800">R</span><b style="font-size:18px">Reparado</b></div>
+     <div style="display:flex;gap:10px;align-items:center;margin-bottom:4px"><span style="width:30px;height:30px;border-radius:9px;background:#0e7a3c;color:#fff;display:grid;place-items:center;font-weight:800">V</span><b style="font-size:18px">Velqio</b></div>
      <div style="color:#5f6b64;font-size:13px;margin-bottom:16px">${signup?'Neue Werkstatt anlegen – kostenlos testen':'Anmeldung an dein Werkstatt-Konto'}</div>
      ${signup?`<label style="font-size:12px;font-weight:700;color:#5f6b64">Werkstatt-Name</label><input id="sbWs" style="${inp}" placeholder="z. B. Handy Klinik Musterstadt">`:''}
      <label style="font-size:12px;font-weight:700;color:#5f6b64">E-Mail</label><input id="sbEmail" type="email" style="${inp}" placeholder="werkstatt@mail.de">
