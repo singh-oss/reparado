@@ -1828,18 +1828,54 @@ function orderPortalUrl(o){ return o.portalToken ? (location.origin+'/status.htm
 function receiptQRBlock(o){ const url=orderPortalUrl(o);
   return `<div style="margin-top:16px;padding-top:12px;border-top:1px solid #ddd;display:flex;gap:14px;align-items:center"><div style="flex:none">${RQR.svg(url,{cell:3,margin:2})}</div><div style="font-size:12px;color:#444"><b>Auftrag online verfolgen</b><br>QR-Code scannen: aktueller Reparaturstatus, Kostenvoranschlag & direkte Nachricht an uns.</div></div>`; }
 function printReceipt(id){const o=S.ord.find(x=>x.id===id); if(!o)return; const c=cust(o.cid);
-  /* V4-1: sicherstellen, dass ein Portal-Token existiert, damit der QR zuverlässig auf JEDEM Beleg erscheint */
+  /* V4-1: Portal-Token vor Druck sichern, damit der QR zuverlässig erscheint */
   if(DB.backend==='server' && !o.portalToken){ portalSync(o, function(){ printReceipt(id); }); return; }
-  printHTML('Beleg '+o.nr, shopHead()+`<h2>Beleg / Quittung</h2><div class="muted">Auftrag ${o.nr} · ${fmtDate(o.created)}</div>
-    <div class="box" style="margin-top:12px"><b>${esc(c.name)}</b><br><span class="muted">${esc(c.adr)}</span></div>
-    ${devDetailRows(o)}
-    <table style="margin-top:10px"><thead><tr><th>Position</th><th style="text-align:right">Betrag</th></tr></thead>
-    <tbody>${posRows(o)}</tbody></table>
-    <div class="tot"><span>Gesamt (inkl. MwSt.)</span><span>${eur(oTotal(o))}</span></div>${totVatLine(o)}
-    ${sigBlock(o)}
-    ${receiptQRBlock(o)}
-    <div class="foot">Preis inkl. gesetzlicher MwSt. · Garantie: ${o.warranty} Monate auf die durchgeführte Reparatur.<br>Vielen Dank für Ihren Auftrag bei ${SHOP.name}.</div>
-    ${ensureSettings().agb?`<div style="margin-top:14px;padding-top:10px;border-top:1px solid #ddd;font-size:11px;color:#666;line-height:1.5">${esc(ensureSettings().agb)}</div>`:''}`);
+  const w=ensureWorkshop(); const logo=(S.settings&&S.settings.logo)||''; const total=oTotal(o);
+  const bankLine=[w.bankName,w.iban?('IBAN '+w.iban):'',w.bic?('BIC '+w.bic):''].filter(Boolean).join(' · ');
+  const taxLine=[w.taxNr?('StNr '+w.taxNr):'',w.ustId?('USt-IdNr '+w.ustId):''].filter(Boolean).join(' · ');
+  const st=`<style>
+   .rcpt,.rcpt *{color:#1f2937 !important;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif}
+   .rcpt{max-width:540px;margin:0 auto;font-size:13px;line-height:1.45}
+   .rc-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:2px solid #0e7a3c;padding-bottom:12px}
+   .rc-co{font-weight:800;font-size:16px}.rc-co-sub{color:#6b7280 !important;font-size:11px;line-height:1.55}
+   .rc-code{text-align:right;flex:none}.rc-code .lbl{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#6b7280 !important}
+   .rc-code .no{font-weight:900;font-size:20px;letter-spacing:-.5px;color:#0e7a3c !important}
+   .rc-title{font-size:15px;font-weight:800;margin:14px 0 8px}
+   .rc-grid{display:flex;gap:12px}.rc-grid>div{flex:1;min-width:0}
+   .rc-box{border:1px solid #e3e8e4;border-radius:10px;padding:10px 12px}
+   .rc-lbl{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#6b7280 !important;margin-bottom:4px;font-weight:700}
+   .rc-tbl{width:100%;border-collapse:collapse;margin-top:8px}
+   .rc-tbl td,.rc-tbl th{text-align:left;padding:6px 4px;border-bottom:1px solid #eee;font-size:12px}
+   .rc-tbl th{font-size:10px;text-transform:uppercase;color:#6b7280 !important}
+   .rc-price{display:flex;justify-content:flex-end;gap:20px;align-items:baseline;border-top:2px solid #0e7a3c;margin-top:8px;padding-top:8px}
+   .rc-price .big{font-size:20px;font-weight:900}.rc-sub{color:#6b7280 !important;font-size:11px}
+   .rc-bottom{display:flex;gap:16px;margin-top:16px;align-items:stretch}
+   .rc-qr{flex:none;text-align:center}.rc-sign{flex:1;border:1px solid #e3e8e4;border-radius:10px;padding:10px}
+   .rc-terms{font-size:10px;color:#6b7280 !important;line-height:1.55;margin-top:14px;border-top:1px solid #eee;padding-top:8px}
+   .rc-foot{font-size:10px;color:#6b7280 !important;line-height:1.7;margin-top:8px;border-top:1px solid #eee;padding-top:8px;text-align:center}
+   @media print{.rcpt{max-width:none}}
+  </style>`;
+  printHTML('Beleg '+o.nr, st+`<div class="rcpt">
+   <div class="rc-head">
+     <div>${logo?`<img src="${logo}" style="max-height:50px;max-width:150px;object-fit:contain;display:block;margin-bottom:6px">`:''}<div class="rc-co">${esc(SHOP.name)}</div><div class="rc-co-sub">${esc(SHOP.street||'')}${(SHOP.zip||SHOP.city)?'<br>'+esc(((SHOP.zip||'')+' '+(SHOP.city||'')).trim()):''}${SHOP.phone?'<br>'+esc(SHOP.phone):''}${SHOP.email?' · '+esc(SHOP.email):''}</div></div>
+     <div class="rc-code"><div class="lbl">Auftrag</div><div class="no">${esc(o.nr)}</div><div style="margin-top:5px;display:flex;justify-content:flex-end">${RQR.svg(o.nr,{cell:2,margin:1})}</div><div class="rc-co-sub" style="margin-top:3px">${fmtDate(o.created)}</div></div>
+   </div>
+   <div class="rc-title">Reparaturauftrag / Kundenbeleg</div>
+   <div class="rc-grid">
+     <div class="rc-box"><div class="rc-lbl">Kunde</div><b>${esc(c.name)}</b>${c.adr?'<br>'+esc(c.adr):''}${c.tel?'<br>'+esc(c.tel):''}${c.mail?'<br>'+esc(c.mail):''}</div>
+     <div class="rc-box"><div class="rc-lbl">Auftragsdaten</div>Angenommen: ${fmtDate(o.created)}<br>Status: ${esc(statusLabel(o.status))}${(o.technikerId&&techName(o.technikerId))?'<br>Techniker: '+esc(techName(o.technikerId)):''}${o.due?'<br>Voraussichtlich fertig: '+fmtDate(o.due):''}</div>
+   </div>
+   <div class="rc-box" style="margin-top:10px"><div class="rc-lbl">Gerät &amp; Reparatur</div>${devDetailRows(o)}
+     <table class="rc-tbl"><thead><tr><th>Position</th><th style="text-align:right">Betrag</th></tr></thead><tbody>${posRows(o)}</tbody></table>
+     <div class="rc-price"><div class="rc-sub">Netto ${eur(netOf(total))} · darin ${MWST_RATE} % MwSt ${eur(vatOf(total))}</div><div><span class="rc-sub">Gesamt (inkl. MwSt.)</span> <span class="big">${eur(total)}</span></div></div>
+   </div>
+   <div class="rc-bottom">
+     <div class="rc-qr">${RQR.svg(orderPortalUrl(o),{cell:3,margin:1})}<div style="font-size:11px;font-weight:800;margin-top:4px">Auftrag online verfolgen</div><div style="font-size:9px;color:#6b7280">QR scannen: Status &amp; Nachrichten</div></div>
+     <div class="rc-sign"><div class="rc-lbl">Unterschrift des Kunden</div>${o.sig?`<div style="font-size:10px;color:#6b7280;margin-bottom:4px">${o.sigConsents?'☑ AGB &amp; Datensicherungs-Hinweis bestätigt':'Auftrag bestätigt'}</div><img src="${o.sig}" style="height:50px;max-width:100%;border-bottom:1px solid #999"><div style="font-size:9px;color:#9ca3af;margin-top:2px">Digital unterschrieben${o.sigVia==='qr'?' (per QR)':''} · ${fmtDate(o.created)}</div>`:`<div style="height:50px;border-bottom:1px solid #999;margin-top:18px"></div><div style="font-size:9px;color:#9ca3af;margin-top:2px">Ort, Datum, Unterschrift</div>`}</div>
+   </div>
+   <div class="rc-terms">Preis inkl. gesetzlicher MwSt. · Garantie: ${o.warranty} Monate auf die durchgeführte Reparatur. Es gelten unsere AGB; für Datenverlust wird keine Haftung übernommen (bitte vorher sichern). Datenschutz: ${location.host}/datenschutz.html</div>
+   <div class="rc-foot">${esc(SHOP.name)}${SHOP.street?' · '+esc(SHOP.street):''}${(SHOP.zip||SHOP.city)?' · '+esc(((SHOP.zip||'')+' '+(SHOP.city||'')).trim()):''}${taxLine?' · '+esc(taxLine):''}${bankLine?'<br>Bankverbindung: '+esc(bankLine):''}</div>
+  </div>`);
   }
 /* ---- V4-2: automatische Auftragsbestätigung per E-Mail ---- */
 function orderConfirmBody(o){ const c=cust(o.cid);
@@ -3081,8 +3117,11 @@ views.einstellungen=function(){
      <div class="grid g2" style="margin-top:12px"><div><label class="f">Werkstatt-Name</label><input class="in" value="${esc(ensureMaster().name)}" onchange="masterSet('name',this.value.trim());views.einstellungen();paintIcons()"></div>
        <div><label class="f">Login-E-Mail</label><input class="in" value="${esc(w.email||'')}" placeholder="werkstatt@mail.de" onchange="wsSet('email',this.value)"></div>
        <div><label class="f">Steuernummer</label><input class="in" value="${esc(w.taxNr||'')}" placeholder="12/345/67890" onchange="wsSet('taxNr',this.value)"></div>
-       <div><label class="f">USt-IdNr (für E-Rechnung)</label><input class="in" value="${esc(w.ustId||'')}" placeholder="DE123456789" onchange="wsSet('ustId',this.value)"></div></div>
-     <div class="note" style="margin-top:10px">Dieser Account trennt Ihre Daten von anderen Werkstätten (Mandantentrennung). Aktuell lokal auf diesem Gerät – beim Live-Schalten wird daraus ein echter Online-Login, ohne dass sich für Sie etwas ändert.</div>
+       <div><label class="f">USt-IdNr (für E-Rechnung)</label><input class="in" value="${esc(w.ustId||'')}" placeholder="DE123456789" onchange="wsSet('ustId',this.value)"></div>
+       <div><label class="f">Bank / Kontoinhaber</label><input class="in" value="${esc(w.bankName||'')}" placeholder="Musterbank · Inhaber" onchange="wsSet('bankName',this.value)"></div>
+       <div><label class="f">IBAN</label><input class="in" value="${esc(w.iban||'')}" placeholder="DE00 0000 0000 0000 0000 00" onchange="wsSet('iban',this.value)"></div>
+       <div><label class="f">BIC</label><input class="in" value="${esc(w.bic||'')}" placeholder="XXXXDEXXXXX" onchange="wsSet('bic',this.value)"></div></div>
+     <div class="note" style="margin-top:10px">Diese Angaben (inkl. Bankverbindung) erscheinen im Fußbereich des Kundenbelegs. Dieser Account trennt Ihre Daten von anderen Werkstätten (Mandantentrennung). Aktuell lokal auf diesem Gerät – beim Live-Schalten wird daraus ein echter Online-Login, ohne dass sich für Sie etwas ändert.</div>
    </div>`;})()}
    <div class="grid g2" style="margin-top:16px">
      <div class="card"><b>Stammdaten</b><p class="muted" style="font-size:13px;margin:4px 0 10px">Diese Angaben erscheinen auf Belegen, Angeboten, Etiketten &amp; im Status-Portal. Trage die Daten deiner Werkstatt ein – sie werden automatisch gespeichert.</p>
