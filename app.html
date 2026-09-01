@@ -971,6 +971,7 @@ function openOrder(id){
          <div class="avatar" style="width:44px;height:44px">${initials(c.name)}</div></div>
      </div>
      ${partWaitBox(o)}
+     ${confirmStatusBox(o)}
      <div class="grid g2" style="margin-top:14px">
        <div style="grid-column:1/-1"><label class="f">Gerät${oDevices(o).length>1?'e ('+oDevices(o).length+')':''} &amp; Reparatur</label>
          ${oDevices(o).map((d,di)=>{const ll=lockLabel(d);const ps=devPositions(d);const meta=[d.imei?'IMEI '+esc(d.imei):'',d.fach?esc(d.fach):'',ll?'🔒 '+esc(ll):'',d.technikerId?'👤 '+esc(techName(d.technikerId)):''].filter(Boolean).join(' · ');return `<div style="padding:8px 0;border-bottom:1px solid var(--line)"><div class="between"><b style="min-width:0">Gerät ${di+1}: ${esc(d.brand)} ${esc(d.model)}</b><b class="mono">${eur(devTotal(d))}</b></div>${meta?`<div class="muted" style="font-size:12px;margin-top:2px">${meta}</div>`:''}${ps.map(p=>`<div class="between" style="font-size:13px;padding:4px 0 0"><span class="muted">${esc(p.reparatur)}${p.qual?' · '+esc(p.qual):''}</span><span class="mono">${eur(p.price)}</span></div>`).join('')}</div>`;}).join('')}
@@ -1439,7 +1440,7 @@ function noFinalize(){ noCollect();
   const nr=nextOrderNr();
   const o=Object.assign({id:uid('o'),nr,cid:c.id,devices:devs,lock:NO.lock,lockval:NO.lockval,status:'offen',prio:NO.prio,created:today(),due:NO.due,appt:NO.terminMode==='termin'?NO.appt:'',notes:NO.notes,readyAt:'',sig:NO.sig||'',sigConsents:NO.sigConsents||null,sigVia:NO.sigVia||'',source:(NO.herkunft?'vorab':''),herkunft:NO.herkunft||'',via:NO.reqVia||'',technikerId:NO.technikerId},noMirror(devs));
   if(NO.diagPhoto)o.photos=[NO.diagPhoto];
-  S.ord.unshift(o); const rc=S.rules.find(x=>x.id==='r_confirm'); if(rc&&rc.on&&c.mail)logMail(o,rc,'automatisch (Anlage)');
+  S.ord.unshift(o); sendOrderConfirmation(o,{silent:false}); /* V4-2: automatische Auftragsbestätigung */
   S.drafts=(S.drafts||[]).filter(x=>x.id!==NO.draftId); save();
   const wasSigned=!!o.sig; toast('Auftrag '+nr+' angelegt'+(devs.length>1?(' · '+devs.length+' Geräte'):'')); NO=null; go('auftraege');
   if(wasSigned)setTimeout(function(){printReceipt(o.id);},150); /* P8: nach Abschluss direkt Druckvorschau */
@@ -1808,7 +1809,12 @@ function sigBlock(o){ if(!o.sig)return '';
     <img src="${o.sig}" style="height:64px;margin-top:4px;border-bottom:1px solid #999;max-width:280px"/>
     <div style="font-size:11px;color:#888;margin-top:2px">Digital unterschrieben${o.sigVia==='qr'?' (per QR-Code auf dem Kundengerät)':''} · ${fmtDate(o.created)}</div></div>`;
 }
-function printReceipt(id){const o=S.ord.find(x=>x.id===id);const c=cust(o.cid);
+function orderPortalUrl(o){ return o.portalToken ? (location.origin+'/status.html?t='+o.portalToken) : (location.origin+'/status.html?nr='+encodeURIComponent(o.nr)); }
+function receiptQRBlock(o){ const url=orderPortalUrl(o);
+  return `<div style="margin-top:16px;padding-top:12px;border-top:1px solid #ddd;display:flex;gap:14px;align-items:center"><div style="flex:none">${RQR.svg(url,{cell:3,margin:2})}</div><div style="font-size:12px;color:#444"><b>Auftrag online verfolgen</b><br>QR-Code scannen: aktueller Reparaturstatus, Kostenvoranschlag & direkte Nachricht an uns.</div></div>`; }
+function printReceipt(id){const o=S.ord.find(x=>x.id===id); if(!o)return; const c=cust(o.cid);
+  /* V4-1: sicherstellen, dass ein Portal-Token existiert, damit der QR zuverlässig auf JEDEM Beleg erscheint */
+  if(DB.backend==='server' && !o.portalToken){ portalSync(o, function(){ printReceipt(id); }); return; }
   printHTML('Beleg '+o.nr, shopHead()+`<h2>Beleg / Quittung</h2><div class="muted">Auftrag ${o.nr} · ${fmtDate(o.created)}</div>
     <div class="box" style="margin-top:12px"><b>${esc(c.name)}</b><br><span class="muted">${esc(c.adr)}</span></div>
     ${devDetailRows(o)}
@@ -1816,10 +1822,37 @@ function printReceipt(id){const o=S.ord.find(x=>x.id===id);const c=cust(o.cid);
     <tbody>${posRows(o)}</tbody></table>
     <div class="tot"><span>Gesamt (inkl. MwSt.)</span><span>${eur(oTotal(o))}</span></div>${totVatLine(o)}
     ${sigBlock(o)}
-    ${o.portalToken?`<div style="margin-top:16px;padding-top:12px;border-top:1px solid #ddd;display:flex;gap:14px;align-items:center"><div style="flex:none">${RQR.svg(location.origin+'/status.html?t='+o.portalToken,{cell:3,margin:2})}</div><div style="font-size:12px;color:#444"><b>Auftrag online verfolgen</b><br>Scannen Sie diesen Code mit dem Smartphone: aktueller Reparaturstatus, Kostenvoranschlag und direkte Nachricht an uns.</div></div>`:''}
+    ${receiptQRBlock(o)}
     <div class="foot">Preis inkl. gesetzlicher MwSt. · Garantie: ${o.warranty} Monate auf die durchgeführte Reparatur.<br>Vielen Dank für Ihren Auftrag bei ${SHOP.name}.</div>
     ${ensureSettings().agb?`<div style="margin-top:14px;padding-top:10px;border-top:1px solid #ddd;font-size:11px;color:#666;line-height:1.5">${esc(ensureSettings().agb)}</div>`:''}`);
   }
+/* ---- V4-2: automatische Auftragsbestätigung per E-Mail ---- */
+function orderConfirmBody(o){ const c=cust(o.cid);
+  const devs=oDevices(o).map((d,i)=>{ const pos=devPositions(d).map(p=>'   • '+p.reparatur+(p.qual?' ('+p.qual+')':'')+': '+eur(p.price)).join('\n');
+    return 'Gerät '+(i+1)+': '+[d.brand,d.model].filter(Boolean).join(' ')+(d.imei?' · IMEI '+d.imei:'')+'\n'+pos; }).join('\n');
+  return 'Guten Tag '+(c.name||'')+',\n\n'
+    +'vielen Dank – wir haben Ihr Gerät zur Reparatur angenommen. Hier Ihre Auftragsbestätigung zur Kontrolle:\n\n'
+    +'Auftragsnummer: '+o.nr+'\n'
+    +'Datum der Annahme: '+fmtDate(o.created)+'\n'
+    +'Kunde: '+(c.name||'')+(c.tel?' · '+c.tel:'')+'\n'
+    +(o.technikerId&&techName(o.technikerId)?('Techniker: '+techName(o.technikerId)+'\n'):'')
+    +'\n'+devs+'\n\n'
+    +'Gesamtbetrag (inkl. MwSt.): '+eur(oTotal(o))+'\n\n'
+    +'Ihren aktuellen Reparaturstatus, Kostenvoranschläge und Nachrichten sehen Sie jederzeit hier:\n'+orderPortalUrl(o)+'\n\n'
+    +'Freundliche Grüße\n'+SHOP.name+(SHOP.phone?(' · '+SHOP.phone):''); }
+function sendOrderConfirmation(o, opts){ opts=opts||{}; if(!o)return; const c=cust(o.cid);
+  if(!c.mail){ o.confirmSent=false; o.confirmFailed=true; o.confirmNote='Keine Kunden-E-Mail hinterlegt'; o.confirmAt=new Date().toISOString(); save(); return; }
+  if(DB.backend!=='server'){ o.confirmSent=true; o.confirmFailed=false; o.confirmAt=new Date().toISOString(); o.confirmNote='Demo – protokolliert (kein echter Versand)'; if(S.mailLog)S.mailLog.unshift({t:o.confirmAt,to:c.name,ch:'E-Mail',rule:'Auftragsbestätigung',subj:'Auftragsbestätigung '+o.nr,how:'automatisch'}); save(); return; }
+  const doSend=function(){ fetch(API+'/api/mail/send',{method:'POST',headers:DB._hdr(),body:JSON.stringify({to:c.mail,subject:'Auftragsbestätigung '+o.nr+' · '+SHOP.name,body:orderConfirmBody(o)})})
+    .then(r=>r.json()).then(res=>{ const ok=res.sent===true; o.confirmSent=ok; o.confirmFailed=!ok; o.confirmAt=new Date().toISOString(); o.confirmNote=ok?'gesendet an '+c.mail:(res.note||'nicht versendet');
+      if(S.mailLog)S.mailLog.unshift({t:o.confirmAt,to:c.name,ch:'E-Mail',rule:'Auftragsbestätigung',subj:'Auftragsbestätigung '+o.nr,how:'automatisch'+(ok?'':' – FEHLGESCHLAGEN')}); save();
+      if(!opts.silent){ toast(ok?'✓ Auftragsbestätigung gesendet':'⚠ Bestätigung NICHT versendet: '+(res.note||'')); if(current==='auftraege')views.auftraege(); paintIcons(); } })
+    .catch(()=>{ o.confirmSent=false; o.confirmFailed=true; o.confirmAt=new Date().toISOString(); o.confirmNote='Versandfehler (Verbindung)'; save(); if(!opts.silent)toast('⚠ Bestätigung konnte nicht gesendet werden'); }); };
+  if(!o.portalToken){ portalSync(o, doSend); } else { doSend(); } }
+function resendConfirm(id){ const o=S.ord.find(x=>x.id===id); if(!o)return; toast('Sende Auftragsbestätigung…'); sendOrderConfirmation(o,{silent:false}); setTimeout(()=>openOrder(id),600); }
+function confirmStatusBox(o){ if(!o.confirmAt&&!o.confirmFailed)return '';
+  if(o.confirmFailed) return `<div style="margin-top:12px;border:1px solid #f0c68a;background:#fff7ec;border-radius:10px;padding:10px"><div class="between"><b style="color:#b45309">⚠ Auftragsbestätigung nicht versendet</b><button class="btn sm" onclick="resendConfirm('${o.id}')">Erneut senden</button></div><div class="muted" style="font-size:12px;margin-top:2px">${esc(o.confirmNote||'')}</div></div>`;
+  return `<div class="muted" style="font-size:12px;margin-top:10px">✓ Auftragsbestätigung ${esc(o.confirmNote||'gesendet')} · ${o.confirmAt?fmtDate(o.confirmAt):''} <button class="btn sm gho" style="padding:1px 8px" onclick="resendConfirm('${o.id}')">erneut senden</button></div>`; }
 /* E-Rechnung (Repender-Punkt): EN16931 CII-XML (= XRechnung-Syntax / ZUGFeRD-Kern) aus einem Auftrag */
 function r2(n){return Math.round((+n||0)*100)/100;}
 function xesc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
