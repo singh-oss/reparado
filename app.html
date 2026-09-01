@@ -1808,13 +1808,44 @@ function printDocFrame(){const f=document.getElementById('docframe'); if(f&&f.co
 function shopHead(){const lg=(S.settings&&S.settings.logo)?`<img src="${S.settings.logo}" style="height:46px;max-width:180px;object-fit:contain;margin-bottom:6px"><br>`:'';return `<div class="hd"><div>${lg}<div class="n">${SHOP.name}</div><div class="muted">${SHOP.street} · ${SHOP.zip} ${SHOP.city}<br>${SHOP.phone} · ${SHOP.email}</div></div><div class="muted" style="text-align:right">${fmtDate(today())}</div></div>`;}
 function logoUpload(input){const f=input.files&&input.files[0];if(!f)return;imgToDataURL(f,300,0.85,function(url){ensureSettings().logo=url;save();views.einstellungen();paintIcons();toast('Logo gespeichert');});}
 function logoClear(){ensureSettings().logo='';save();views.einstellungen();paintIcons();}
-function printLabel(id){const o=S.ord.find(x=>x.id===id);const c=cust(o.cid);
-  printHTML('Etikett '+o.nr, `<div class="label"><div class="muted">${SHOP.name}</div><div class="big">${o.nr}</div><div class="bc"></div>
-    <div class="lrow"><b>Kunde:</b> ${esc(c.name)}</div><div class="lrow"><b>Telefon:</b> ${esc(c.tel)}</div>
-    <div class="lrow"><b>Gerät:</b> ${esc(oDevLabel(o))}</div><div class="lrow"><b>Fehler:</b> ${esc(oIssueLabel(o))}</div>
-    <div class="lrow"><b>Angenommen:</b> ${fmtDate(o.created)}</div>${o.imei?`<div class="lrow"><b>IMEI:</b> ${esc(o.imei)}</div>`:''}
-    <div class="lrow" style="margin-top:8px;color:#555">reparado.de/status/${o.nr}</div></div>`);
-  }
+/* ---- V4-5: Etikettendruck einstellbar (Größe/Ränder/Inhalte/Vorlagen/Vorschau/Testdruck) ---- */
+function ensureLabelCfg(){ if(!S.labelCfg){S.labelCfg={w:62,h:29,mt:2,mb:2,ml:2,mr:2,fs:9,qrSize:18,showNr:true,showKunde:true,showTel:false,showGeraet:true,showFehler:true,showImei:false,showQR:true,showStandort:false};save();} return S.labelCfg; }
+function ensureLabelTpls(){ if(!Array.isArray(S.labelTemplates))S.labelTemplates=[]; return S.labelTemplates; }
+function labelStyle(cfg,forPrint){ return (forPrint?`@page{size:${cfg.w}mm ${cfg.h}mm;margin:0}`:'')+`*{box-sizing:border-box;font-family:-apple-system,Segoe UI,Arial,sans-serif;color:#000;margin:0}body{margin:0}.lbl{width:${cfg.w}mm;height:${cfg.h}mm;padding:${cfg.mt}mm ${cfg.mr}mm ${cfg.mb}mm ${cfg.ml}mm;overflow:hidden;font-size:${cfg.fs}px;line-height:1.25;position:relative;background:#fff}.lnr{font-weight:900;font-size:${Math.round(cfg.fs*1.7)}px;letter-spacing:-.5px}.lco{font-size:${Math.round(cfg.fs*.85)}px;color:#444}.lr{font-size:${cfg.fs}px}.lqr{position:absolute;top:${cfg.mt}mm;right:${cfg.mr}mm}.lqr svg{width:${cfg.qrSize}mm;height:${cfg.qrSize}mm;display:block}`; }
+function labelContent(o,cfg,c){ c=c||o.__c||cust(o.cid); const d0=oDevices(o)[0]||{}; const rows=[];
+  if(cfg.showKunde)rows.push('<div class="lr"><b>Kunde:</b> '+esc(c.name||'')+'</div>');
+  if(cfg.showTel)rows.push('<div class="lr"><b>Tel:</b> '+esc(c.tel||'')+'</div>');
+  if(cfg.showGeraet)rows.push('<div class="lr"><b>Gerät:</b> '+esc(oDevLabel(o))+'</div>');
+  if(cfg.showFehler)rows.push('<div class="lr"><b>Fehler:</b> '+esc(oIssueLabel(o))+'</div>');
+  if(cfg.showImei&&d0.imei)rows.push('<div class="lr"><b>IMEI:</b> '+esc(d0.imei)+'</div>');
+  if(cfg.showStandort&&(o.standort||o.b2b))rows.push('<div class="lr"><b>Standort:</b> '+esc(o.standort||o.b2b)+'</div>');
+  const qr=cfg.showQR?('<div class="lqr">'+RQR.svg(o.__sample?('AUFTRAG '+o.nr):orderPortalUrl(o),{cell:1,margin:0})+'</div>'):'';
+  return '<div class="lbl"><div class="lco">'+esc(SHOP.name)+'</div>'+(cfg.showNr?'<div class="lnr">'+esc(o.nr)+'</div>':'')+qr+rows.join('')+'</div>'; }
+function printLabel(id){const o=S.ord.find(x=>x.id===id);if(!o)return;const cfg=ensureLabelCfg();printHTML('Etikett '+o.nr,'<style>'+labelStyle(cfg,true)+'</style>'+labelContent(o,cfg));}
+function labelSampleOrder(){return {nr:'REP-0000',created:today(),__sample:true,__c:{name:'Max Mustermann',tel:'+49 170 000000'},devices:[{brand:'Apple',model:'iPhone 15',imei:'350000000000000',reparatur:'Displaytausch',price:129,positions:[{reparatur:'Displaytausch',qual:'Original',price:129}]}]};}
+function testPrintLabel(){const cfg=ensureLabelCfg();const o=labelSampleOrder();printHTML('Test-Etikett','<style>'+labelStyle(cfg,true)+'</style>'+labelContent(o,cfg,o.__c));}
+function labelSet(k,v){const cfg=ensureLabelCfg();cfg[k]=v;save();renderLabelPanel();}
+function labelSetNum(k,v){labelSet(k,Math.max(0,+v||0));}
+function labelSaveTpl(){const n=(prompt('Name der Vorlage (z. B. „Brother 62×29"):')||'').trim();if(!n)return;const t=ensureLabelTpls();const cfg=JSON.parse(JSON.stringify(ensureLabelCfg()));const ex=t.find(x=>x.name===n);if(ex)ex.cfg=cfg;else t.push({name:n,cfg});save();renderLabelPanel();toast('Vorlage gespeichert');}
+function labelLoadTpl(n){const t=ensureLabelTpls().find(x=>x.name===n);if(!t)return;S.labelCfg=JSON.parse(JSON.stringify(t.cfg));save();renderLabelPanel();toast('Vorlage geladen: '+n);}
+function labelDelTpl(n){S.labelTemplates=ensureLabelTpls().filter(x=>x.name!==n);save();renderLabelPanel();}
+function renderLabelPanel(){const el=document.getElementById('labelPanel');if(el)el.innerHTML=labelPanelInner();}
+function labelPanelInner(){const cfg=ensureLabelCfg();const tpls=ensureLabelTpls();
+  const num=(lbl,k,step)=>`<div><label class="f">${lbl}</label><input class="in" type="number" step="${step||1}" value="${cfg[k]}" onchange="labelSetNum('${k}',this.value)"></div>`;
+  const chk=(lbl,k)=>`<label class="chip ${cfg[k]?'on':''}" style="cursor:pointer;font-size:12px"><input type="checkbox" ${cfg[k]?'checked':''} onchange="labelSet('${k}',this.checked)" style="display:none">${lbl}</label>`;
+  const prevHtml='<style>'+labelStyle(cfg,false)+'</style>'+labelContent(labelSampleOrder(),cfg,labelSampleOrder().__c);
+  const prev='<iframe style="width:'+(cfg.w*3.78+2)+'px;height:'+(cfg.h*3.78+2)+'px;border:1px solid #ccc;border-radius:6px;background:#fff" src="data:text/html;charset=utf-8,'+encodeURIComponent(prevHtml)+'"></iframe>';
+  return `<div class="grid g2"><div><label class="f">Etikett-Breite (mm)</label><input class="in" type="number" value="${cfg.w}" onchange="labelSetNum('w',this.value)"></div><div><label class="f">Höhe (mm)</label><input class="in" type="number" value="${cfg.h}" onchange="labelSetNum('h',this.value)"></div></div>
+   <label class="f" style="margin-top:10px">Ränder (mm) – oben / unten / links / rechts</label>
+   <div class="row" style="gap:8px">${num('oben','mt')}${num('unten','mb')}${num('links','ml')}${num('rechts','mr')}</div>
+   <div class="grid g2" style="margin-top:10px">${num('Schriftgröße (px)','fs')}${num('QR-Größe (mm)','qrSize')}</div>
+   <label class="f" style="margin-top:12px">Inhalte auf dem Etikett</label>
+   <div class="row" style="flex-wrap:wrap;gap:6px">${chk('Auftragsnr.','showNr')}${chk('Kunde','showKunde')}${chk('Telefon','showTel')}${chk('Gerät','showGeraet')}${chk('Fehler','showFehler')}${chk('IMEI','showImei')}${chk('QR-Code','showQR')}${chk('Standort','showStandort')}</div>
+   <label class="f" style="margin-top:12px">Vorschau (Originalgröße)</label>
+   <div style="padding:10px;background:var(--soft);border-radius:10px;display:inline-block">${prev}</div>
+   <div class="row" style="margin-top:12px;gap:8px;flex-wrap:wrap"><button class="btn sm pri" onclick="testPrintLabel()">🖨️ Testdruck</button><button class="btn sm" onclick="labelSaveTpl()">Als Vorlage speichern</button>${tpls.length?`<select class="in" style="max-width:200px" onchange="if(this.value)labelLoadTpl(this.value)"><option value="">Vorlage laden…</option>${tpls.map(t=>`<option value="${esc(t.name)}">${esc(t.name)}</option>`).join('')}</select>`:''}</div>
+   ${tpls.length?`<div class="muted" style="font-size:12px;margin-top:6px">Vorlagen: ${tpls.map(t=>`${esc(t.name)} <a onclick="labelDelTpl('${qa(t.name)}')" style="color:#c0392b;cursor:pointer">✕</a>`).join(' · ')}</div>`:''}`; }
+function labelSettingsCard(){ return `<div class="card" style="margin-top:16px"><b>🏷️ Etikettendruck</b><p class="muted" style="font-size:13px;margin:4px 0 10px">Etikettengröße, Ränder, Inhalte und Vorlagen einstellen. Vorschau in Originalgröße; Testdruck ohne echten Auftrag.</p><div id="labelPanel">${labelPanelInner()}</div></div>`; }
 function devDetailRows(o){ return oDevices(o).map((d,i)=>{const meta=[d.imei?'IMEI/SN: '+esc(d.imei):'',d.fach?'Fach: '+esc(d.fach):'',lockLabel(d)?'Sperre: '+esc(lockLabel(d)):'',(d.technikerId&&techName(d.technikerId))?'Techniker: '+esc(techName(d.technikerId)):''].filter(Boolean).join(' · ');return meta?`<div style="font-size:11px;color:#666;margin-top:2px"><b>Gerät ${i+1} (${esc(d.brand)} ${esc(d.model)}):</b> ${meta}</div>`:'';}).join(''); }
 function sigBlock(o){ if(!o.sig)return '';
   const conf=o.sigConsents?'☑ AGB gelesen &amp; akzeptiert &nbsp;&nbsp; ☑ Hinweis zur Datensicherung bestätigt':'Der Kunde hat den Auftrag bestätigt.';
@@ -3139,6 +3170,7 @@ views.einstellungen=function(){
        ${hoursEditorHTML()}
        <button class="btn pri" style="margin-top:12px" onclick="toast('Stammdaten gespeichert')">Speichern</button>
      </div>
+     ${labelSettingsCard()}
      <div class="card"><b>Kasse anbinden</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Kartenzahlung und TSE-konforme Belege – verbinden Sie Ihr vorhandenes Terminal.</p>
        ${[['SumUp','SU','Kartenterminal & Belege'],['Zettle by PayPal','ZE','Terminal & Kasse'],['HelloCash','HC','Registrierkasse / TSE'],['orderbird','OB','Kassensystem']].map(p=>`
          <div class="integ" style="margin-bottom:10px"><div class="lg">${p[1]}</div>
