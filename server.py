@@ -186,6 +186,22 @@ def _ai_rewrite(key, raw, kind):
     parts = res.get("content") or []
     return "".join(b.get("text", "") for b in parts if b.get("type") == "text").strip() or raw
 
+# ---------- Geo (Adress-/Straßen-Autovervollständigung via OpenPLZ) ----------
+_GEO_CACHE = {}
+def _geo_fetch(url):
+    import urllib.request
+    now = time.time()
+    hit = _GEO_CACHE.get(url)
+    if hit and hit[0] > now:
+        return hit[1]
+    req = urllib.request.Request(url, headers={"User-Agent": "Velqio/1.0 (Werkstatt-Software)", "Accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=8) as r:
+        data = json.loads(r.read().decode())
+    if len(_GEO_CACHE) > 2000:
+        _GEO_CACHE.clear()
+    _GEO_CACHE[url] = (now + 86400, data)  # 1 Tag Cache
+    return data
+
 # ---------- HTTP ----------
 class H(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
@@ -228,6 +244,36 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/api/health":
             return self._send(200, {"ok": True, "service": "reparado"})
+        if self.path.startswith("/api/geo/plz"):
+            q = parse_qs(urlparse(self.path).query); plz = (q.get("plz") or [""])[0]
+            if not (plz.isdigit() and len(plz) == 5):
+                return self._send(400, {"error": "ungueltige PLZ"})
+            try:
+                data = _geo_fetch("https://openplzapi.org/de/Localities?postalCode=" + plz)
+                seen = set(); cities = []
+                for x in (data or []):
+                    n = x.get("name")
+                    if n and n not in seen:
+                        seen.add(n); cities.append(n)
+                return self._send(200, {"ok": True, "cities": cities})
+            except Exception:
+                return self._send(200, {"ok": True, "cities": []})
+        if self.path.startswith("/api/geo/streets"):
+            from urllib.parse import quote
+            q = parse_qs(urlparse(self.path).query)
+            plz = (q.get("plz") or [""])[0]; name = (q.get("q") or q.get("name") or [""])[0].strip()
+            if not (plz.isdigit() and len(plz) == 5) or len(name) < 2:
+                return self._send(200, {"ok": True, "streets": []})
+            try:
+                data = _geo_fetch("https://openplzapi.org/de/Streets?postalCode=" + plz + "&name=" + quote(name))
+                seen = set(); sts = []
+                for x in (data or []):
+                    n = x.get("name")
+                    if n and n not in seen:
+                        seen.add(n); sts.append(n)
+                return self._send(200, {"ok": True, "streets": sts[:12]})
+            except Exception:
+                return self._send(200, {"ok": True, "streets": []})
         if self.path == "/api/state":
             p = self._auth()
             if not p:

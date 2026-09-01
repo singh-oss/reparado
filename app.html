@@ -1189,6 +1189,10 @@ function noBrandChange(i){noCollect();NO.devices[i].model='';renderNewOrder();}
 function noModelPick(i){noCollect();const d=NO.devices[i];if(d.brand&&d.model){const t=catModelType(d.brand,d.model);if(t)d.typ=t;}const p0=(d.positions&&d.positions[0]);if(p0&&d.brand&&p0.reparatur){const pr=priceFor(d.brand,d.model,p0.reparatur);if(pr!=='')p0.price=pr;}renderNewOrder();}
 function noPrice(i){noCollect();const d=NO.devices[i];if(d.brand&&d.reparatur){const p=priceFor(d.brand,d.model,d.reparatur);if(p!==''){const e=document.getElementById('dev'+i+'_price');if(e)e.value=p;d.price=p;}}noVat(i);noSaveDraft();}
 function noVat(i){const e=document.getElementById('dev'+i+'_price');const h=document.getElementById('dev'+i+'_vathint');if(!e||!h)return;h.textContent=vatHint(+e.value||0);}
+/* ---- V4-4: Adress-/Straßen-Autovervollständigung (Server-Proxy → OpenPLZ) ---- */
+let __geoPlzT=null,__geoStrT=null;
+function geoPlz(v){ v=(v||'').replace(/\D/g,'').slice(0,5); if(v.length!==5||DB.backend!=='server')return; clearTimeout(__geoPlzT); __geoPlzT=setTimeout(function(){ fetch(API+'/api/geo/plz?plz='+v).then(r=>r.json()).then(res=>{ var cs=res.cities||[]; if(!cs.length)return; var st=document.getElementById('no_stadt'), dl=document.getElementById('no_stadt_list'); if(dl)dl.innerHTML=cs.map(c=>'<option value="'+esc(c)+'"></option>').join(''); if(st&&(!st.value.trim()||cs.length===1)){ st.value=cs[0]; if(typeof NO!=='undefined'&&NO)NO.stadt=cs[0]; } }).catch(()=>{}); },350); }
+function geoStreet(v){ v=(v||'').trim(); if(DB.backend!=='server'||v.length<3)return; var plz=((document.getElementById('no_plz')||{}).value||'').replace(/\D/g,''); if(plz.length!==5)return; clearTimeout(__geoStrT); __geoStrT=setTimeout(function(){ fetch(API+'/api/geo/streets?plz='+plz+'&q='+encodeURIComponent(v)).then(r=>r.json()).then(res=>{ var dl=document.getElementById('no_adr_list'); if(dl)dl.innerHTML=(res.streets||[]).map(s=>'<option value="'+esc(s)+' "></option>').join(''); }).catch(()=>{}); },300); }
 /* ---- P4: Positions-Block je Gerät ---- */
 function noPosBlock(i,j,p,n){
   return `<div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:8px;background:var(--soft)">
@@ -1540,9 +1544,9 @@ function renderNewOrder(){
        <div><label class="f">Nachname *</label><input class="in" id="no_nachname" value="${esc(c.nachname)}"></div>
        <div><label class="f">Telefon *</label><input class="in" id="no_tel" value="${esc(c.tel)}"></div>
        <div><label class="f">E-Mail</label><input class="in" id="no_mail" value="${esc(c.mail)}" placeholder="optional"></div>
-       <div><label class="f">PLZ</label><input class="in" id="no_plz" value="${esc(c.plz)}" placeholder="72336"></div>
-       <div><label class="f">Stadt</label><input class="in" id="no_stadt" value="${esc(c.stadt)}"></div>
-       <div style="grid-column:1/-1"><label class="f">Adresse</label><input class="in" id="no_adr" value="${esc(c.adr)}" placeholder="Straße und Hausnummer"></div>
+       <div><label class="f">PLZ</label><input class="in" id="no_plz" value="${esc(c.plz)}" placeholder="72336" inputmode="numeric" oninput="geoPlz(this.value)"></div>
+       <div><label class="f">Stadt</label><input class="in" id="no_stadt" list="no_stadt_list" value="${esc(c.stadt)}" placeholder="wird per PLZ vorgeschlagen"><datalist id="no_stadt_list"></datalist></div>
+       <div style="grid-column:1/-1"><label class="f">Adresse (Straße + Hausnr.)</label><input class="in" id="no_adr" list="no_adr_list" value="${esc(c.adr)}" placeholder="Straße tippen – Vorschläge erscheinen, dann Hausnr. ergänzen" oninput="geoStreet(this.value)"><datalist id="no_adr_list"></datalist></div>
      </div>
    </div>
 
