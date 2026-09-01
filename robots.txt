@@ -1,0 +1,21 @@
+User-agent: *
+Allow: /
+Disallow: /app.html
+Disallow: /sign.html
+Disallow: /intake.html
+Disallow: /status.html
+Disallow: /booking.html
+Disallow: /anfrage.html
+Disallow: /config.js
+
+# KI-/LLM-Crawler ausdrücklich erlaubt
+User-agent: GPTBot
+Allow: /
+User-agent: ClaudeBot
+Allow: /
+User-agent: PerplexityBot
+Allow: /
+User-agent: Google-Extended
+Allow: /
+
+Sitemap: https://velqio.de/sitemap.xml
