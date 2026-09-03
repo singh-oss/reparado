@@ -981,9 +981,9 @@ function aufToggleSel(id){aufSel[id]=!aufSel[id];views.auftraege();paintIcons();
 function aufSelAll(ids,on){ids.forEach(id=>aufSel[id]=on);views.auftraege();paintIcons();}
 function sortOrders(list){const l=list.slice();if(aufSort==='neu')l.sort((a,b)=>(b.created||'').localeCompare(a.created||'')||String(b.nr).localeCompare(String(a.nr)));else if(aufSort==='alt')l.sort((a,b)=>(a.created||'').localeCompare(b.created||'')||String(a.nr).localeCompare(String(b.nr)));else if(aufSort==='preis')l.sort((a,b)=>oTotal(b)-oTotal(a));else if(aufSort==='faellig')l.sort((a,b)=>(a.due||'zzzz').localeCompare(b.due||'zzzz'));return l;}
 function setStatusRow(id,s){const o=S.ord.find(x=>x.id===id);if(!o)return;o.status=s;(o.statusHistory=o.statusHistory||[]).push({status:s,at:new Date().toISOString()});logActivity(o,'status',statusLabel(s));if(s==='fertig'&&!o.readyAt)o.readyAt=today();if(s==='abgeholt')o.pickedAt=today();save();if(DB.backend==='server')portalSync(o);const def=statusDef(s);const notified=!!(def&&(def.email||def.sms||def.wa));if(notified)statusNotify(o,def);toast('Status: '+statusLabel(s)+(notified?' · Kunde benachrichtigt':''));views.auftraege();paintIcons();refreshBadges();if(s==='warten')setTimeout(function(){openPartWaitDialog(id);},120);}
-function archiveOrder(id){const o=S.ord.find(x=>x.id===id);if(o){o.archived=true;save();closeAll();toast('Auftrag archiviert');views.auftraege();paintIcons();refreshBadges();}}
-function trashOrder(id){const o=S.ord.find(x=>x.id===id);if(o){o.trashed=true;save();closeAll();toast('In den Papierkorb verschoben');views.auftraege();paintIcons();refreshBadges();}}
-function restoreOrder(id){const o=S.ord.find(x=>x.id===id);if(o){o.trashed=false;o.archived=false;save();toast('Wiederhergestellt');views.auftraege();paintIcons();refreshBadges();}}
+function archiveOrder(id){const o=S.ord.find(x=>x.id===id);if(o){o.archived=true;logActivity(o,'archive','');save();closeAll();toast('Auftrag archiviert');views.auftraege();paintIcons();refreshBadges();}}
+function trashOrder(id){const o=S.ord.find(x=>x.id===id);if(o){o.trashed=true;logActivity(o,'trash','');save();closeAll();toast('In den Papierkorb verschoben');views.auftraege();paintIcons();refreshBadges();}}
+function restoreOrder(id){const o=S.ord.find(x=>x.id===id);if(o){o.trashed=false;o.archived=false;logActivity(o,'restore','');save();toast('Wiederhergestellt');views.auftraege();paintIcons();refreshBadges();}}
 function deleteOrderPerm(id){if(!confirm('Auftrag endgültig löschen? Das kann nicht rückgängig gemacht werden.'))return;S.ord=S.ord.filter(x=>x.id!==id);delete aufSel[id];save();toast('Endgültig gelöscht');views.auftraege();paintIcons();refreshBadges();}
 function aufBulk(action){const ids=Object.keys(aufSel).filter(k=>aufSel[k]);if(!ids.length)return;
   if(action==='archive'){ids.forEach(id=>{const o=S.ord.find(x=>x.id===id);if(o)o.archived=true;});toast(ids.length+' archiviert');}
@@ -1060,17 +1060,19 @@ views.auftraege=function(){
 /* ===== Welle 2 (#6): Ersteller/Filiale + Aktivitätsprotokoll ===== */
 function curUserName(){ const u=curUser(); return u?u.name:'Inhaber'; }
 function curBranch(){ try{ return (ensureMaster().name)||(typeof SHOP!=='undefined'&&SHOP.name)||''; }catch(e){ return (typeof SHOP!=='undefined'&&SHOP.name)||''; } }
-function actId(){ return 'ac'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
-function logActivity(o,action,detail){ if(!o)return; o.activity=Array.isArray(o.activity)?o.activity:[]; o.activity.push({id:actId(),at:new Date().toISOString(),uid:(S.userId||''),user:curUserName(),action:action,detail:detail||''}); if(o.activity.length>200)o.activity=o.activity.slice(-200); }
+let __actSeq=0;
+function actId(){ return 'ac'+Date.now().toString(36)+'-'+((typeof S!=='undefined'&&S.userId)||'x')+'-'+((__actSeq++).toString(36))+'-'+Math.random().toString(36).slice(2,6); }
+function logActivity(o,action,detail){ if(!o)return; o.activity=Array.isArray(o.activity)?o.activity:[]; o.activity.push({id:actId(),at:new Date().toISOString(),uid:(S.userId||''),user:curUserName(),action:action,detail:detail||''}); if(o.activity.length>300)o.activity=o.activity.slice(-300); }
 function stampOrderCreate(o){ if(!o)return; if(!o.createdAt)o.createdAt=o.created||new Date().toISOString(); if(!o.createdBy){o.createdBy=(S.userId||'');o.createdByName=curUserName();} if(!o.branch)o.branch=curBranch(); logActivity(o,'create','Auftrag angenommen'); }
 function fmtDateTime(iso){ try{ const d=new Date(iso); if(isNaN(d))return esc(String(iso||'')); return d.toLocaleDateString('de-DE')+' '+d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}); }catch(e){ return esc(String(iso||'')); } }
-const ACT_LBL={create:'Auftrag angenommen',status:'Status geändert',edit:'Bearbeitet',assign:'Techniker zugewiesen',part:'Ersatzteil-Info',mail:'Nachricht gesendet'};
+const ACT_LBL={create:'Auftrag angenommen',status:'Status geändert',edit:'Auftrag bearbeitet',assign:'Techniker zugewiesen',part:'Ersatzteil-Info',mail:'Nachricht an Kunde',archive:'Archiviert',trash:'In Papierkorb',restore:'Wiederhergestellt'};
+function actAt(a){ return a.sat||a.at; } /* server-Empfangszeit bevorzugt (manipulationssicher) */
 function activityBox(o){
   let acts=Array.isArray(o.activity)?o.activity.slice():[];
   if(!acts.length && Array.isArray(o.statusHistory)){ acts=o.statusHistory.map(h=>({at:h.at,user:'',action:'status',detail:statusLabel(h.status)})); }
-  acts.sort((a,b)=>String(a.at).localeCompare(String(b.at)));
+  acts.sort((a,b)=>String(actAt(a)).localeCompare(String(actAt(b))));
   const who=o.createdByName?esc(o.createdByName):'—';
-  const rows=acts.map(a=>{const lbl=ACT_LBL[a.action]||a.action;const d=a.detail?(' – '+esc(a.detail)):'';const u=a.user?(' · '+esc(a.user)):'';return `<div style="display:flex;gap:8px;font-size:12px;padding:3px 0;border-bottom:1px solid var(--line)"><span class="muted" style="flex:none;min-width:110px">${fmtDateTime(a.at)}</span><span style="min-width:0"><b>${esc(lbl)}</b>${d}${u}</span></div>`;}).join('');
+  const rows=acts.map(a=>{const lbl=ACT_LBL[a.action]||a.action;const d=a.detail?(' – '+esc(a.detail)):'';const u=a.user?(' · '+esc(a.user)):'';return `<div style="display:flex;gap:8px;font-size:12px;padding:3px 0;border-bottom:1px solid var(--line)"><span class="muted" style="flex:none;min-width:110px">${fmtDateTime(actAt(a))}</span><span style="min-width:0"><b>${esc(lbl)}</b>${d}${u}</span></div>`;}).join('');
   return `<div class="card" style="margin-top:14px"><b>🧾 Verlauf &amp; Zuständigkeit</b>
     <div class="grid g2" style="margin-top:8px">
       <div><label class="f">Angenommen von</label><div style="font-weight:700">${who}</div></div>
@@ -1568,7 +1570,7 @@ function noFinalize(){ noCollect();
   if(req.imei&&NO.devices.some(d=>(d.brand||d.model)&&!(d.imei||'').trim())){toast('Pflichtfeld: IMEI/Seriennummer je Gerät angeben');return;}
   if(req.sig&&!NO.sig){toast('Pflichtfeld: Unterschrift des Kunden erfassen');return;}
   const devs=noBuildDevices();
-  if(NO.editId){const o=S.ord.find(x=>x.id===NO.editId);if(o){Object.assign(o,{cid:c.id,devices:devs},noMirror(devs),{lock:NO.lock,lockval:NO.lockval,prio:NO.prio,appt:NO.terminMode==='termin'?NO.appt:'',due:NO.due,notes:NO.notes,technikerId:NO.technikerId,sig:NO.sig||o.sig,sigConsents:NO.sigConsents||o.sigConsents||null,sigVia:NO.sigVia||o.sigVia||''});}save();toast('Auftrag gespeichert');NO=null;go('auftraege');return;}
+  if(NO.editId){const o=S.ord.find(x=>x.id===NO.editId);if(o){const _oT=o.technikerId||'';const _oTot=oTotal(o);Object.assign(o,{cid:c.id,devices:devs},noMirror(devs),{lock:NO.lock,lockval:NO.lockval,prio:NO.prio,appt:NO.terminMode==='termin'?NO.appt:'',due:NO.due,notes:NO.notes,technikerId:NO.technikerId,sig:NO.sig||o.sig,sigConsents:NO.sigConsents||o.sigConsents||null,sigVia:NO.sigVia||o.sigVia||''});const _p=[];if(oTotal(o)!==_oTot)_p.push('Preis');if((o.technikerId||'')!==_oT)logActivity(o,'assign',o.technikerId?('an '+techName(o.technikerId)):'Zuweisung entfernt');logActivity(o,'edit',_p.length?_p.join(', '):'Auftragsdaten aktualisiert');}save();toast('Auftrag gespeichert');NO=null;go('auftraege');return;}
   const nr=nextOrderNr();
   const o=Object.assign({id:uid('o'),nr,cid:c.id,devices:devs,lock:NO.lock,lockval:NO.lockval,status:'offen',prio:NO.prio,created:today(),due:NO.due,appt:NO.terminMode==='termin'?NO.appt:'',notes:NO.notes,readyAt:'',sig:NO.sig||'',sigConsents:NO.sigConsents||null,sigVia:NO.sigVia||'',source:(NO.herkunft?'vorab':''),herkunft:NO.herkunft||'',via:NO.reqVia||'',technikerId:NO.technikerId},noMirror(devs));
   if(NO.diagPhoto)o.photos=[NO.diagPhoto];
@@ -1857,7 +1859,7 @@ function commTab(id,t){ const o=S.ord.find(x=>x.id===id); if(!o)return; o._commT
 function orderAddNote(id){ const o=S.ord.find(x=>x.id===id); const e=document.getElementById('cm_int_'+id); const v=e?e.value.trim():''; if(!v){toast('Bitte Notiz eingeben');return;} commLog(o,'out',true,v,'notiz'); save(); openOrder(id); toast('Interne Notiz gespeichert'); }
 function orderSendExternal(id){ const o=S.ord.find(x=>x.id===id); const e=document.getElementById('cm_ext_'+id); const v=e?e.value.trim():''; if(!v){toast('Bitte Nachricht eingeben');return;} _orderSendMsg(o,v,'nachricht','Nachricht Ihrer Werkstatt'); }
 function orderSendKVA(id){ const o=S.ord.find(x=>x.id===id); const e=document.getElementById('cm_ext_'+id); let v=e?e.value.trim():''; if(!v)v='Wir haben Ihr Gerät geprüft. Unser Kostenvoranschlag für die Reparatur beträgt '+eur(oTotal(o))+'. Bitte geben Sie uns kurz Bescheid, ob wir die Reparatur durchführen dürfen.'; o.kva={amount:oTotal(o),at:new Date().toISOString(),note:v}; _orderSendMsg(o,v,'kva','Kostenvoranschlag – '+SHOP.name); }
-function _orderSendMsg(o,text,kind,subject){ const c=cust(o.cid); commLog(o,'out',false,text,kind); save();
+function _orderSendMsg(o,text,kind,subject){ const c=cust(o.cid); commLog(o,'out',false,text,kind); logActivity(o,'mail',kind==='kva'?'Kostenvoranschlag gesendet':'Nachricht gesendet'); save();
   if(DB.backend==='server'&&c.mail){ fetch(API+'/api/mail/send',{method:'POST',headers:DB._hdr(),body:JSON.stringify({to:c.mail,subject:subject+' · '+o.nr,body:text+'\n\nStatus & Antwort: '+(o.portalToken?(location.origin+'/status.html?t='+o.portalToken):'—')+'\n\nIhr Team von '+SHOP.name})}).then(r=>r.json()).then(res=>{ toast(res.sent?'✓ An Kunden gesendet':'Protokolliert (E-Mail: '+(res.note||'—')+')'); }).catch(()=>toast('Gesendet (Protokoll)')); }
   else { S.mailLog&&S.mailLog.unshift({t:new Date().toISOString(),to:c.name,ch:'E-Mail',rule:kind==='kva'?'Kostenvoranschlag':'Kundennachricht',subj:subject,how:'manuell'}); toast(c.mail?'Nachricht protokolliert':'Keine Kunden-E-Mail – nur protokolliert'); }
   portalSync(o); const el=document.getElementById('cm_ext_'+o.id); if(el)el.value=''; openOrder(o.id); }
@@ -2045,6 +2047,7 @@ function sendOrderConfirmation(o, opts){ opts=opts||{}; if(!o)return; const c=cu
   if(DB.backend!=='server'){ o.confirmSent=true; o.confirmFailed=false; o.confirmAt=new Date().toISOString(); o.confirmNote='Demo – protokolliert (kein echter Versand)'; if(S.mailLog)S.mailLog.unshift({t:o.confirmAt,to:c.name,ch:'E-Mail',rule:'Auftragsbestätigung',subj:'Auftragsbestätigung '+o.nr,how:'automatisch'}); save(); return; }
   const doSend=function(){ fetch(API+'/api/mail/send',{method:'POST',headers:DB._hdr(),body:JSON.stringify({to:c.mail,subject:'Auftragsbestätigung '+o.nr+' · '+SHOP.name,body:orderConfirmBody(o)})})
     .then(r=>r.json()).then(res=>{ const ok=res.sent===true; o.confirmSent=ok; o.confirmFailed=!ok; o.confirmAt=new Date().toISOString(); o.confirmNote=ok?'gesendet an '+c.mail:(res.note||'nicht versendet');
+      if(ok)logActivity(o,'mail','Auftragsbestätigung gesendet');
       if(S.mailLog)S.mailLog.unshift({t:o.confirmAt,to:c.name,ch:'E-Mail',rule:'Auftragsbestätigung',subj:'Auftragsbestätigung '+o.nr,how:'automatisch'+(ok?'':' – FEHLGESCHLAGEN')}); save();
       if(!opts.silent){ toast(ok?'✓ Auftragsbestätigung gesendet':'⚠ Bestätigung NICHT versendet: '+(res.note||'')); if(current==='auftraege')views.auftraege(); paintIcons(); } })
     .catch(()=>{ o.confirmSent=false; o.confirmFailed=true; o.confirmAt=new Date().toISOString(); o.confirmNote='Versandfehler (Verbindung)'; save(); if(!opts.silent)toast('⚠ Bestätigung konnte nicht gesendet werden'); }); };

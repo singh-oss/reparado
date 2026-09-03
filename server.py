@@ -488,12 +488,17 @@ class H(BaseHTTPRequestHandler):
                             try: prev_act = (json.loads(prow["data"]) or {}).get("activity") or []
                             except Exception: prev_act = []
                         new_act = data.get("activity") if isinstance(data.get("activity"), list) else []
+                        srv_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
                         seen = set(); merged = []
                         for e in (list(prev_act) + list(new_act)):
                             if not isinstance(e, dict): continue
                             eid = e.get("id") or (str(e.get("at","")) + "|" + str(e.get("action","")))
                             if eid in seen: continue
                             seen.add(eid); merged.append(e)
+                        # server-Empfangszeit einmalig setzen (danach unveränderlich -> manipulationssicherer Anker)
+                        for e in merged:
+                            if isinstance(e, dict) and not e.get("sat"):
+                                e["sat"] = srv_iso
                         data["activity"] = merged
                         for e in new_act:
                             if not isinstance(e, dict): continue
@@ -503,7 +508,7 @@ class H(BaseHTTPRequestHandler):
                                 c.execute("""INSERT OR IGNORE INTO activity_log(workshop_id,order_id,entry_id,user_id,user_name,action,detail,at)
                                              VALUES(?,?,?,?,?,?,?,?)""",
                                           (p["wid"], rid, eid, str(e.get("uid","")), str(e.get("user","")),
-                                           str(e.get("action","")), str(e.get("detail","")), str(e.get("at",""))))
+                                           str(e.get("action","")), str(e.get("detail","")), (e.get("sat") or str(e.get("at","")))))
                             except Exception: pass
                     c.execute("""INSERT INTO sync_items(workshop_id,coll,id,data,updated_at,deleted) VALUES(?,?,?,?,?,?)
                                  ON CONFLICT(workshop_id,coll,id) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at, deleted=excluded.deleted""",
