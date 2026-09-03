@@ -336,18 +336,24 @@ const Sync={
   ensureArrays(){ SYNC_COLLS.forEach(function(k){ if(!Array.isArray(S[k])) S[k]=[]; }); },
   _snap(rec){ try{ return JSON.stringify(rec); }catch(e){ return ''; } },
   initShadow(fromCurrent){ const self=this; this.shadow={}; SYNC_COLLS.forEach(function(k){ self.shadow[k]={}; if(fromCurrent){ (S[k]||[]).forEach(function(r){ if(r&&r.id) self.shadow[k][r.id]=self._snap(r); }); } }); },
-  start(){ if(!this.active())return; this.ensureArrays(); this.initShadow(false); this.setState('online');
+  start(){ if(!this.active())return; this.ensureArrays(); this.initShadow(false); this.setState('online'); this._lpStop=false;
     const self=this;
-    this.pull(true).then(function(){ self.pushChanges(); }).catch(function(){}).then(function(){ if(!self._timer) self._timer=setInterval(function(){ self.pull(); }, 4000); });
+    this.pull({}).then(function(){ return self.pushChanges(); }).then(function(){ self.longPoll(); });
   },
-  pull(initial){ if(!this.active())return Promise.resolve(); const self=this;
-    return this._api('/api/sync/pull?since='+encodeURIComponent(this.since)).then(function(r){ return r.ok?r.json():null; }).then(function(d){
-      if(!d||!d.ok){ self.setState('offline'); return; }
+  pull(opts){ opts=opts||{}; if(!this.active())return Promise.resolve(false); const self=this;
+    const url='/api/sync/pull?since='+encodeURIComponent(this.since)+(opts.wait?'&wait=1':'');
+    return this._api(url).then(function(r){ return r.ok?r.json():null; }).then(function(d){
+      if(!d||!d.ok){ self.setState('offline'); return false; }
       if(self.state==='offline'||self.state==='') self.setState('online');
       let changed=false;
       (d.items||[]).forEach(function(it){ if(self._applyItem(it)) changed=true; if(it.updated_at>self.since) self.since=it.updated_at; });
       if(changed) self.rerender();
-    }).catch(function(){ self.setState('offline'); });
+      return changed;
+    }).catch(function(){ self.setState('offline'); return false; });
+  },
+  /* Long-Polling: Server hält die Anfrage bis zu einer Änderung -> Aufträge erscheinen nahezu sofort auf anderen PCs */
+  longPoll(){ if(!this.active()||this._lpStop)return; const self=this;
+    this.pull({wait:true}).then(function(changed){ const delay=self.state==='offline'?3000:(changed?50:300); setTimeout(function(){ self.longPoll(); }, delay); });
   },
   _applyItem(it){ const k=it.coll; if(SYNC_COLLS.indexOf(k)<0) return false; if(!Array.isArray(S[k])) S[k]=[];
     const arr=S[k]; const idx=arr.findIndex(function(x){ return x&&x.id===it.id; }); let changed=false;
@@ -643,8 +649,24 @@ function orderPartsCost(o){return ((o&&o.parts)||[]).reduce((s,p)=>s+(+p.ek||0)*
 function orderLaborCost(o){const rate=ensureSettings().hourlyRate||0;return Math.round((+((o&&o.laborMin)||0))/60*rate*100)/100;}
 function orderMargin(o){return oTotal(o)-orderPartsCost(o)-orderLaborCost(o);}
 function orderMarginPct(o){const rev=oTotal(o);return rev>0?Math.round(orderMargin(o)/rev*100):0;}
-function nextOrderNr(){ return (ensureSettings().orderPrefix||'REP-')+(S.counter++); }
-function nextQuoteNr(){ S.quoteCounter=(S.quoteCounter||1000); return (ensureSettings().quotePrefix||'AN-')+(S.quoteCounter++); }
+/* Welle 2 Restpunkt B: server-vergebene, kollisionsfreie Nummern (hi/lo-Block je PC) + lokaler Fallback (offline) */
+let __seq={ order:{cur:[],spare:[],loading:false}, quote:{cur:[],spare:[],loading:false} };
+function seqReserve(kind){ if(!(typeof Sync!=='undefined'&&Sync.active()))return; const p=__seq[kind]; if(p.loading||p.spare.length)return; p.loading=true;
+  const min=(kind==='order'?(S.counter||1000):(S.quoteCounter||1000));
+  fetch(API+'/api/seq/reserve',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+DB.token},body:JSON.stringify({kind:kind,count:10,min:min})})
+    .then(function(r){ return r.ok?r.json():null; })
+    .then(function(d){ p.loading=false; if(d&&d.ok){ for(var n=d.start;n<=d.end;n++)p.spare.push(n); } })
+    .catch(function(){ p.loading=false; }); }
+function seqNext(kind,prefix){ const p=__seq[kind];
+  if(typeof Sync!=='undefined'&&Sync.active()){
+    if(!p.cur.length && p.spare.length){ p.cur=p.spare; p.spare=[]; seqReserve(kind); }
+    if(p.cur.length){ const n=p.cur.shift(); if(p.cur.length<3)seqReserve(kind); if(kind==='order')S.counter=Math.max(S.counter||0,n+1); else S.quoteCounter=Math.max(S.quoteCounter||0,n+1); return prefix+n; }
+    seqReserve(kind); /* Bootstrap – diese eine Nummer noch lokal */
+  }
+  if(kind==='order'){ return prefix+(S.counter++); }
+  S.quoteCounter=(S.quoteCounter||1000); return prefix+(S.quoteCounter++); }
+function nextOrderNr(){ return seqNext('order', ensureSettings().orderPrefix||'REP-'); }
+function nextQuoteNr(){ return seqNext('quote', ensureSettings().quotePrefix||'AN-'); }
 function eur(n){return '€ '+Number(n||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2});}
 /* MwSt-Helfer (P3): enthaltene MwSt aus Bruttobetrag */
 const MWST_RATE=19;
@@ -4254,7 +4276,7 @@ function bootApp(){ensureWorkshop(); ensureMaster(); applyMaster(); ensureAcct()
 }
 /* Frischer, komplett leerer Zustand für ein neu registriertes Konto (keine Demo-Daten). */
 function blankState(){ return {v:11, __clean:true, cust:[], ord:[], parts:[], orders:[], sold:[], counter:1000, rules:defaultRules(), sales:[], cash:{connected:''}, mailLog:[], calls:[], phone:defaultPhone(), users:[{id:'u1',name:'Inhaber',role:'inhaber',pin:'1234'}], userId:'u1', insurance:defaultInsurance(), wgLeads:[], drafts:[], quotes:[], requests:[], quoteCounter:1000, feedback:[], reactDone:[]}; }
-function finishServerBoot(hadState){ const ov=document.getElementById('sbLogin'); if(ov)ov.remove(); if(!hadState){ try{ localStorage.setItem(KEY, JSON.stringify(blankState())); }catch(e){} } S=load(); if(DB.backend==='server' && typeof Sync!=='undefined'){ try{ Sync.ensureArrays(); }catch(e){} } bootApp(); if(DB.backend==='server' && typeof Sync!=='undefined'){ try{ Sync.start(); }catch(e){} } }
+function finishServerBoot(hadState){ const ov=document.getElementById('sbLogin'); if(ov)ov.remove(); if(!hadState){ try{ localStorage.setItem(KEY, JSON.stringify(blankState())); }catch(e){} } S=load(); if(DB.backend==='server' && typeof Sync!=='undefined'){ try{ Sync.ensureArrays(); }catch(e){} } bootApp(); if(DB.backend==='server' && typeof Sync!=='undefined'){ try{ Sync.start(); }catch(e){} try{ seqReserve('order'); seqReserve('quote'); }catch(e){} } }
 /* Server-Modus: Anmeldung / Selbst-Registrierung an der echten Datenbank (nur mit config.js) */
 let _sbMode='login'; let _sbResetToken=''; let _sbMsg='';
 function sbSwitch(m){ _sbMode=m; _sbMsg=''; serverLoginOverlay(); }

@@ -301,16 +301,25 @@ class H(BaseHTTPRequestHandler):
             q = parse_qs(urlparse(self.path).query)
             try: since = float((q.get("since") or ["0"])[0])
             except Exception: since = 0.0
-            now = time.time()
-            items = []
-            with db() as c:
-                rows = c.execute("SELECT coll,id,data,updated_at,deleted FROM sync_items WHERE workshop_id=? AND updated_at>? ORDER BY updated_at ASC",
-                                 (p["wid"], since)).fetchall()
-            for r in rows:
-                items.append({"coll": r["coll"], "id": r["id"],
-                              "data": (json.loads(r["data"]) if r["data"] else None),
-                              "updated_at": r["updated_at"], "deleted": bool(r["deleted"])})
-            return self._send(200, {"ok": True, "now": now, "items": items})
+            wait = (q.get("wait") or ["0"])[0] == "1"
+            def _fetch():
+                with db() as c:
+                    rr = c.execute("SELECT coll,id,data,updated_at,deleted FROM sync_items WHERE workshop_id=? AND updated_at>? ORDER BY updated_at ASC",
+                                   (p["wid"], since)).fetchall()
+                out = []
+                for r in rr:
+                    out.append({"coll": r["coll"], "id": r["id"],
+                                "data": (json.loads(r["data"]) if r["data"] else None),
+                                "updated_at": r["updated_at"], "deleted": bool(r["deleted"])})
+                return out
+            items = _fetch()
+            if wait and not items:
+                # Long-Polling: bis ~25s auf eine Änderung warten -> nahezu Echtzeit ohne WebSocket
+                deadline = time.time() + 25
+                while not items and time.time() < deadline:
+                    time.sleep(0.7)
+                    items = _fetch()
+            return self._send(200, {"ok": True, "now": time.time(), "items": items})
         if self.path.startswith("/api/sign/get"):
             # Öffentlich (Kunde ist nicht eingeloggt): Auftrags-Snapshot per Einmal-Token abrufen.
             q = parse_qs(urlparse(self.path).query)
@@ -501,6 +510,35 @@ class H(BaseHTTPRequestHandler):
                               (p["wid"], coll, rid, (json.dumps(data) if data is not None else None), ua, deleted))
                     saved.append({"coll": coll, "id": rid, "updated_at": ua})
             return self._send(200, {"ok": True, "now": time.time(), "saved": saved})
+
+        if self.path == "/api/seq/reserve":
+            # Atomare, kollisionsfreie Nummernvergabe pro Werkstatt (hi/lo-Block) -> keine Doppel-Auftragsnummern
+            p = self._auth()
+            if not p:
+                return self._send(401, {"error": "unauthorized"})
+            kind = str(body.get("kind") or "order")
+            if kind not in ("order", "quote"):
+                kind = "order"
+            try: count = int(body.get("count") or 5)
+            except Exception: count = 5
+            count = max(1, min(count, 100))
+            try: mn = int(body.get("min") or 0)
+            except Exception: mn = 0
+            key = "seq_" + kind
+            with _lock, db() as c:
+                row = c.execute("SELECT value FROM app_data WHERE workshop_id=? AND key=?", (p["wid"], key)).fetchone()
+                cur = 0
+                if row and row["value"]:
+                    try: cur = int(json.loads(row["value"]))
+                    except Exception: cur = 0
+                base = max(cur, mn)
+                start = base + 1
+                newv = base + count
+                ts = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+                c.execute("""INSERT INTO app_data(workshop_id,key,value,updated_at) VALUES(?,?,?,?)
+                             ON CONFLICT(workshop_id,key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at""",
+                          (p["wid"], key, json.dumps(newv), ts))
+            return self._send(200, {"ok": True, "start": start, "end": newv, "count": count})
 
         if self.path == "/api/sign/create":
             # Werkstatt (eingeloggt) legt eine Signatur-Session an -> Token für QR-Link.
