@@ -83,6 +83,15 @@ def init_db():
           id INTEGER PRIMARY KEY AUTOINCREMENT, token TEXT, workshop_id TEXT,
           order_id TEXT, text TEXT, at REAL, consumed INTEGER DEFAULT 0);
         CREATE UNIQUE INDEX IF NOT EXISTS ux_portal_ws_order ON portal_sessions(workshop_id, order_id);
+        CREATE TABLE IF NOT EXISTS sync_items(
+          workshop_id TEXT, coll TEXT, id TEXT, data TEXT,
+          updated_at REAL, deleted INTEGER DEFAULT 0,
+          PRIMARY KEY(workshop_id, coll, id));
+        CREATE INDEX IF NOT EXISTS ix_sync_ws_upd ON sync_items(workshop_id, updated_at);
+        CREATE TABLE IF NOT EXISTS activity_log(
+          id INTEGER PRIMARY KEY AUTOINCREMENT, workshop_id TEXT, order_id TEXT,
+          entry_id TEXT, user_id TEXT, user_name TEXT, action TEXT, detail TEXT, at TEXT);
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_activity_entry ON activity_log(workshop_id, entry_id);
         """)
 
 # ---------- Passwort & Token ----------
@@ -284,6 +293,24 @@ class H(BaseHTTPRequestHandler):
             if row:
                 return self._send(200, {"value": json.loads(row["value"]), "updated_at": row["updated_at"]})
             return self._send(200, {"value": None})
+        if self.path.startswith("/api/sync/pull"):
+            # Einzeldatensatz-Sync: geänderte Aufträge/Kunden/… seit <since> abholen (Mehrplatz + Live-Refresh)
+            p = self._auth()
+            if not p:
+                return self._send(401, {"error": "unauthorized"})
+            q = parse_qs(urlparse(self.path).query)
+            try: since = float((q.get("since") or ["0"])[0])
+            except Exception: since = 0.0
+            now = time.time()
+            items = []
+            with db() as c:
+                rows = c.execute("SELECT coll,id,data,updated_at,deleted FROM sync_items WHERE workshop_id=? AND updated_at>? ORDER BY updated_at ASC",
+                                 (p["wid"], since)).fetchall()
+            for r in rows:
+                items.append({"coll": r["coll"], "id": r["id"],
+                              "data": (json.loads(r["data"]) if r["data"] else None),
+                              "updated_at": r["updated_at"], "deleted": bool(r["deleted"])})
+            return self._send(200, {"ok": True, "now": now, "items": items})
         if self.path.startswith("/api/sign/get"):
             # Öffentlich (Kunde ist nicht eingeloggt): Auftrags-Snapshot per Einmal-Token abrufen.
             q = parse_qs(urlparse(self.path).query)
@@ -423,6 +450,57 @@ class H(BaseHTTPRequestHandler):
                              ON CONFLICT(workshop_id,key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at""",
                           (p["wid"], "reparado_v1", json.dumps(val), ts))
             return self._send(200, {"ok": True, "updated_at": ts})
+
+        if self.path == "/api/sync/push":
+            # Einzeldatensatz-Sync: Aufträge/Kunden/… einzeln upserten (kein Ganz-Paket-Überschreiben mehr)
+            p = self._auth()
+            if not p:
+                return self._send(401, {"error": "unauthorized"})
+            items = body.get("items") or []
+            if not isinstance(items, list):
+                return self._send(400, {"error": "items fehlt"})
+            saved = []
+            base = time.time()
+            with _lock, db() as c:
+                for i, it in enumerate(items[:3000]):
+                    coll = str(it.get("coll") or "")
+                    rid = str(it.get("id") or "")
+                    if not coll or not rid:
+                        continue
+                    deleted = 1 if it.get("deleted") else 0
+                    data = it.get("data")
+                    ua = base + i * 1e-6
+                    # Aktivitätsprotokoll append-only zusammenführen (Aufträge)
+                    if coll == "ord" and isinstance(data, dict):
+                        prev_act = []
+                        prow = c.execute("SELECT data FROM sync_items WHERE workshop_id=? AND coll='ord' AND id=?",
+                                         (p["wid"], rid)).fetchone()
+                        if prow and prow["data"]:
+                            try: prev_act = (json.loads(prow["data"]) or {}).get("activity") or []
+                            except Exception: prev_act = []
+                        new_act = data.get("activity") if isinstance(data.get("activity"), list) else []
+                        seen = set(); merged = []
+                        for e in (list(prev_act) + list(new_act)):
+                            if not isinstance(e, dict): continue
+                            eid = e.get("id") or (str(e.get("at","")) + "|" + str(e.get("action","")))
+                            if eid in seen: continue
+                            seen.add(eid); merged.append(e)
+                        data["activity"] = merged
+                        for e in new_act:
+                            if not isinstance(e, dict): continue
+                            eid = str(e.get("id") or "")
+                            if not eid: continue
+                            try:
+                                c.execute("""INSERT OR IGNORE INTO activity_log(workshop_id,order_id,entry_id,user_id,user_name,action,detail,at)
+                                             VALUES(?,?,?,?,?,?,?,?)""",
+                                          (p["wid"], rid, eid, str(e.get("uid","")), str(e.get("user","")),
+                                           str(e.get("action","")), str(e.get("detail","")), str(e.get("at",""))))
+                            except Exception: pass
+                    c.execute("""INSERT INTO sync_items(workshop_id,coll,id,data,updated_at,deleted) VALUES(?,?,?,?,?,?)
+                                 ON CONFLICT(workshop_id,coll,id) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at, deleted=excluded.deleted""",
+                              (p["wid"], coll, rid, (json.dumps(data) if data is not None else None), ua, deleted))
+                    saved.append({"coll": coll, "id": rid, "updated_at": ua})
+            return self._send(200, {"ok": True, "now": time.time(), "saved": saved})
 
         if self.path == "/api/sign/create":
             # Werkstatt (eingeloggt) legt eine Signatur-Session an -> Token für QR-Link.
