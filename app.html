@@ -743,7 +743,7 @@ function applyNavRole(){
 function renderSideUser(){const el=document.getElementById('sideUser');if(!el)return;const u=curUser();
   el.innerHTML=`<div class="row" style="min-width:0;gap:10px"><div class="avatar">${initials(u?u.name:'—')}</div><div style="min-width:0"><div style="font-weight:700;font-size:13px">${esc(u?u.name:'—')}</div><div class="muted" style="font-size:12px">${u?ROLE_LABEL[u.role]:''}</div></div></div><button class="btn sm gho" title="Abmelden / Benutzer wechseln" onclick="logout()"><span style="width:16px;height:16px">${ic('logout',16)}</span></button>`;
 }
-function logout(){S.userId=null;save();showLogin();}
+function logout(){S.userId=null;try{localStorage.removeItem('rep_user_dev');}catch(e){}save();showLogin();}
 let _loginPin='', _loginUser=null;
 function showLogin(){_loginUser=null;_loginPin='';const w=ensureWorkshop();const el=document.getElementById('loginWs');if(el)el.textContent='Anmeldung · '+(w.name||'Werkstatt');loginRenderUsers();document.getElementById('loginScreen').classList.add('show');}
 function hideLogin(){document.getElementById('loginScreen').classList.remove('show');}
@@ -756,7 +756,7 @@ function loginRenderPin(){const dots=[0,1,2,3].map(i=>`<i class="${i<_loginPin.l
 }
 function pinDigit(d){if(_loginPin.length>=4)return;_loginPin+=d;loginRenderPin();if(_loginPin.length===4)setTimeout(tryLogin,120);}
 function pinBack(){_loginPin=_loginPin.slice(0,-1);loginRenderPin();}
-function tryLogin(){if(_loginPin===_loginUser.pin){S.userId=_loginUser.id;save();hideLogin();applyNavRole();go('dashboard');toast('Angemeldet als '+_loginUser.name);}else{_loginPin='';loginRenderPin();toast('Falsche PIN');}}
+function tryLogin(){if(_loginPin===_loginUser.pin){S.userId=_loginUser.id;try{localStorage.setItem('rep_user_dev',S.userId);}catch(e){}save();hideLogin();applyNavRole();go('dashboard');toast('Angemeldet als '+_loginUser.name);}else{_loginPin='';loginRenderPin();toast('Falsche PIN');}}
 function addUser(){const name=prompt('Name des Mitarbeiters:');if(!name)return;const pin=((prompt('4-stellige PIN:','0000')||'0000').replace(/\D/g,'')+'0000').slice(0,4);S.users.push({id:uid('u'),name,role:'mitarbeiter',pin});save();views.einstellungen();paintIcons();toast('Mitarbeiter angelegt: '+name);}
 function removeUser(id){if(id===S.userId)return;const u=S.users.find(x=>x.id===id);if(!u)return;if(!confirm('Benutzer '+u.name+' entfernen?'))return;S.users=S.users.filter(x=>x.id!==id);save();views.einstellungen();paintIcons();toast('Benutzer entfernt');}
 function setUserRole(id,role){const u=S.users.find(x=>x.id===id);if(!u)return;if(u.role==='inhaber'&&role==='mitarbeiter'&&S.users.filter(x=>x.role==='inhaber').length<=1){toast('Mindestens eine Geschäftsführung nötig');views.einstellungen();return;}u.role=role;save();if(id===S.userId)applyNavRole();views.einstellungen();paintIcons();toast('Rolle geändert');}
@@ -4279,7 +4279,7 @@ function bootApp(){ensureWorkshop(); ensureMaster(); applyMaster(); ensureAcct()
 }
 /* Frischer, komplett leerer Zustand für ein neu registriertes Konto (keine Demo-Daten). */
 function blankState(){ return {v:11, __clean:true, cust:[], ord:[], parts:[], orders:[], sold:[], counter:1000, rules:defaultRules(), sales:[], cash:{connected:''}, mailLog:[], calls:[], phone:defaultPhone(), users:[{id:'u1',name:'Inhaber',role:'inhaber',pin:'1234'}], userId:'u1', insurance:defaultInsurance(), wgLeads:[], drafts:[], quotes:[], requests:[], quoteCounter:1000, feedback:[], reactDone:[]}; }
-function finishServerBoot(hadState){ const ov=document.getElementById('sbLogin'); if(ov)ov.remove(); if(!hadState){ try{ localStorage.setItem(KEY, JSON.stringify(blankState())); }catch(e){} } S=load(); if(DB.backend==='server' && typeof Sync!=='undefined'){ try{ Sync.ensureArrays(); }catch(e){} } bootApp(); if(DB.backend==='server' && typeof Sync!=='undefined'){ try{ Sync.start(); }catch(e){} try{ seqReserve('order'); seqReserve('quote'); }catch(e){} } }
+function finishServerBoot(hadState){ const ov=document.getElementById('sbLogin'); if(ov)ov.remove(); if(!hadState){ try{ localStorage.setItem(KEY, JSON.stringify(blankState())); }catch(e){} } S=load(); if(DB.backend==='server' && typeof Sync!=='undefined'){ try{ Sync.ensureArrays(); }catch(e){} } try{ const _du=localStorage.getItem('rep_user_dev'); if(_du && (S.users||[]).some(u=>u.id===_du)) S.userId=_du; }catch(e){} bootApp(); if(DB.backend==='server' && typeof Sync!=='undefined'){ try{ Sync.start(); }catch(e){} try{ seqReserve('order'); seqReserve('quote'); }catch(e){} } }
 /* Server-Modus: Anmeldung / Selbst-Registrierung an der echten Datenbank (nur mit config.js) */
 let _sbMode='login'; let _sbResetToken=''; let _sbMsg='';
 function sbSwitch(m){ _sbMode=m; _sbMsg=''; serverLoginOverlay(); }
