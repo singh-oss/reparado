@@ -47,11 +47,29 @@ SECRET = str(_cfg("SECRET_KEY", "dev-secret")).encode()
 _lock = threading.Lock()
 
 # ---------- Datenbank ----------
+class _DBCtx:
+    """Context-Manager: committet bei Erfolg, rollt bei Fehler zurück und SCHLIESST IMMER die Verbindung
+    (verhindert File-Descriptor-Leak unter Dauerlast wie Long-Polling)."""
+    def __enter__(self):
+        self.c = sqlite3.connect(DB_PATH, timeout=10)
+        self.c.row_factory = sqlite3.Row
+        self.c.execute("PRAGMA journal_mode=WAL")
+        return self.c
+    def __exit__(self, et, ev, tb):
+        try:
+            if et is None:
+                self.c.commit()
+            else:
+                self.c.rollback()
+        except Exception:
+            pass
+        finally:
+            try: self.c.close()
+            except Exception: pass
+        return False
+
 def db():
-    c = sqlite3.connect(DB_PATH, timeout=10)
-    c.row_factory = sqlite3.Row
-    c.execute("PRAGMA journal_mode=WAL")
-    return c
+    return _DBCtx()
 
 def init_db():
     with db() as c:
@@ -314,10 +332,10 @@ class H(BaseHTTPRequestHandler):
                 return out
             items = _fetch()
             if wait and not items:
-                # Long-Polling: bis ~25s auf eine Änderung warten -> nahezu Echtzeit ohne WebSocket
-                deadline = time.time() + 25
+                # Long-Polling: bis ~20s auf eine Änderung warten -> nahezu Echtzeit ohne WebSocket
+                deadline = time.time() + 20
                 while not items and time.time() < deadline:
-                    time.sleep(0.7)
+                    time.sleep(1.5)
                     items = _fetch()
             return self._send(200, {"ok": True, "now": time.time(), "items": items})
         if self.path.startswith("/api/sign/get"):
