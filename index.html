@@ -4413,6 +4413,7 @@ function serverLoginOverlay(err){
     fields=`${signup?`<label style="font-size:12px;font-weight:700;color:#5f6b64">Werkstatt-Name</label><input id="sbWs" style="${inp}" placeholder="z. B. Handy Klinik Musterstadt">`:''}
      <label style="font-size:12px;font-weight:700;color:#5f6b64">E-Mail</label><input id="sbEmail" type="email" style="${inp}" placeholder="werkstatt@mail.de">
      <label style="font-size:12px;font-weight:700;color:#5f6b64">Passwort</label><input id="sbPw" type="password" style="${inp}" placeholder="${signup?'mind. 6 Zeichen':'••••••'}">
+     ${signup?`<label style="display:flex;gap:9px;align-items:flex-start;margin:2px 0 12px;font-size:12px;color:#5f6b64;line-height:1.5;cursor:pointer"><input type="checkbox" id="sbConsent" style="margin-top:2px;flex:none;width:16px;height:16px">Ich akzeptiere die <a href="/nutzungsbedingungen.html" target="_blank" style="color:#0e7a3c;font-weight:700">Nutzungsbedingungen (AGB)</a> und den <a href="/avv.html" target="_blank" style="color:#0e7a3c;font-weight:700">Auftragsverarbeitungsvertrag (AVV)</a> und habe die <a href="/datenschutz.html" target="_blank" style="color:#0e7a3c;font-weight:700">Datenschutzerklärung</a> zur Kenntnis genommen.</label>`:''}
      ${signup?'':`<div style="text-align:right;margin:-6px 0 12px"><a onclick="sbSwitch('forgot')" style="color:#0e7a3c;font-size:12px;font-weight:700;cursor:pointer">Passwort vergessen?</a></div>`}`;
     btn=`<button onclick="${signup?'sbDoSignup()':'sbDoLogin()'}" style="width:100%;padding:12px;border:0;border-radius:10px;background:#0e7a3c;color:#fff;font-weight:700;cursor:pointer">${signup?'Konto anlegen &amp; starten':'Anmelden'}</button>`;
   }
@@ -4438,7 +4439,10 @@ function sbDoLogin(){const em=(document.getElementById('sbEmail')||{}).value||''
 function sbDoSignup(){const ws=(document.getElementById('sbWs')||{}).value||'';const em=(document.getElementById('sbEmail')||{}).value||'';const pw=(document.getElementById('sbPw')||{}).value||'';
   if(!ws.trim()){serverLoginOverlay('Bitte einen Werkstatt-Namen angeben.');return;}
   if(!em||!pw){serverLoginOverlay('Bitte E-Mail und Passwort angeben.');return;}
-  DB.signup(ws.trim(),em.trim(),pw).then(()=>{ finishServerBoot(false); try{masterSet('name',ws.trim());}catch(e){} }).catch(e=>serverLoginOverlay(e.message||'Registrierung fehlgeschlagen.'));
+  const consent=(document.getElementById('sbConsent')||{}).checked;
+  if(!consent){serverLoginOverlay('Bitte AGB und AVV akzeptieren, um fortzufahren.');return;}
+  const legal={acceptedAt:new Date().toISOString(),agb:'v1',avv:'v1',datenschutz:'v1',email:em.trim()};
+  DB.signup(ws.trim(),em.trim(),pw).then(()=>{ finishServerBoot(false); try{masterSet('name',ws.trim());}catch(e){} try{S.legal=legal;save();}catch(e){} }).catch(e=>serverLoginOverlay(e.message||'Registrierung fehlgeschlagen.'));
 }
 function sbDoForgot(){const em=(document.getElementById('sbEmail')||{}).value||'';
   if(!em.trim()){serverLoginOverlay('Bitte E-Mail eingeben.');return;}
