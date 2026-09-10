@@ -797,7 +797,7 @@ function dailyBriefing(){
   const fbn=(S.feedback||[]).filter(f=>f.rating<3).length; if(fbn)items.push({txt:fbn+' kritische Kundenstimme'+(fbn>1?'n':''),go:"go('dashboard')",lvl:'warn'});
   const req=(S.requests||[]).length; if(req)items.push({txt:req+' neue Website-Anfrage'+(req>1?'n':''),go:"go('angebote')",lvl:'info'});
   const react=(typeof reactivationOps==='function')?reactivationOps().length:0; if(react)items.push({txt:react+' Reaktivierungs-Chance'+(react>1?'n':''),go:"go('kunden')",lvl:'info'});
-  const heute=visibleOrders().filter(o=>o.appt===today()).length; if(heute)items.push({txt:heute+' Termin'+(heute>1?'e':'')+' heute',go:"go('kalender')",lvl:'info'});
+  const tHeute=(typeof termineToday==='function')?termineToday():[]; if(tHeute.length){const soon=(typeof termineSoon==='function')?termineSoon():[]; items.push({txt:tHeute.length+' Termin'+(tHeute.length>1?'e':'')+' heute'+(soon.length?(' · bald: '+soon[0].start+' Uhr '+((cust(soon[0].cid).name||'').split(' ')[0])):''),go:"go('kalender')",lvl:soon.length?'warn':'info'});}
   const wk=new Date();wk.setDate(wk.getDate()-7);const wkStr=wk.toISOString().slice(0,10);
   const doneW=S.ord.filter(o=>(o.status==='abgeholt'||o.status==='fertig')&&(o.pickedAt||o.readyAt||'')>=wkStr);
   const margeW=doneW.reduce((s,o)=>s+(typeof orderMargin==='function'?orderMargin(o):(+o.price||0)),0);
@@ -2220,6 +2220,7 @@ function renderTerminModal(){
    +'<div class="grid g2" style="margin-top:10px"><div><label class="f">Techniker/Mitarbeiter (optional)</label><select class="in" id="tn_tech"><option value="">— keiner —</option>'+techs.map(function(u){return '<option value="'+u.id+'" '+(TN.technikerId===u.id?'selected':'')+'>'+esc(u.name)+'</option>';}).join('')+'</select></div>'
    +'<div><label class="f">Grund / Terminart (optional)</label><input class="in" id="tn_reason" value="'+esc(TN.reason||'')+'" placeholder="z. B. Abgabe, Abholung, Beratung"></div></div>'
    +'<label class="f" style="margin-top:10px">Interne Notiz (optional)</label><textarea class="in" id="tn_note" rows="2">'+esc(TN.note||'')+'</textarea>'
+   +((c&&c.mail)?'<label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;cursor:pointer"><input type="checkbox" id="tn_confirm" '+(TN.confirm===false?'':'checked')+'> ✉️ Kunde per E-Mail über den Termin informieren <span class="muted">('+esc(c.mail)+')</span></label>':(c?'<div class="muted" style="font-size:11px;margin-top:10px">Keine Kunden-E-Mail hinterlegt – keine automatische Terminbestätigung möglich.</div>':''))
    +'<div class="row" style="justify-content:flex-end;margin-top:14px;gap:8px">'+(TN.id?'<button class="btn gho" onclick="tnDelete()" style="color:#b4231a">Termin löschen</button>':'')+'<button class="btn pri" onclick="tnSave()">Termin speichern</button></div>'
    +'</div>');
   var cq=document.getElementById('tn_cq'); if(cq&&TN.custQuery)tnSearch(TN.custQuery);
@@ -2231,7 +2232,9 @@ function tnSave(){ ensureTermine();
   var rec={ id:TN.id||('tm'+Date.now().toString(36)+Math.random().toString(36).slice(2,5)), date:TN.date, start:start, dur:+g('tn_dur')||TN.dur||30, cid:TN.cid, orderId:g('tn_order')||TN.orderId||'', technikerId:g('tn_tech')||'', reason:g('tn_reason')||'', note:g('tn_note')||'', branch:(typeof curBranch==='function'?curBranch():''), createdBy:(S.userId||''), createdByName:(typeof curUserName==='function'?curUserName():''), createdAt:new Date().toISOString() };
   var arr=ensureTermine(); var i=arr.findIndex(function(t){return t.id===rec.id;}); if(i>=0)arr[i]=rec; else arr.unshift(rec);
   if(rec.orderId){ var o=S.ord.find(function(x){return x.id===rec.orderId;}); if(o){ o.appt=rec.date; o.apptTime=rec.start; if(typeof logActivity==='function')logActivity(o,'edit','Termin '+fmtTermin(rec)); } }
-  save(); closeAll(); toast('Termin gespeichert: '+fmtTermin(rec));
+  var wantConf=!!(document.getElementById('tn_confirm')&&document.getElementById('tn_confirm').checked);
+  save(); closeAll();
+  if(wantConf){ sendTerminConfirm(rec); } else { toast('Termin gespeichert: '+fmtTermin(rec)); }
   if(current==='kalender')views.kalender(); else if(current==='dashboard')views.dashboard&&views.dashboard();
   var dr=document.getElementById('drawer'); if(rec.orderId&&dr&&dr.classList.contains('show'))openOrder(rec.orderId);
   paintIcons();
@@ -2242,6 +2245,14 @@ function terminBoxOrder(o){ var t=terminForOrder(o.id);
   return '<div class="card" style="margin-top:14px"><div class="between"><b>📅 Termin</b><button class="btn sm pri" onclick="terminModal('+(t?"{id:'"+t.id+"'}":"{cid:'"+o.cid+"',orderId:'"+o.id+"'}")+')">'+(t?'Termin ändern':'Termin vereinbaren')+'</button></div>'
     +(t?'<div style="margin-top:6px;font-weight:700">'+esc(fmtTermin(t))+'</div>'+(t.reason?'<div class="muted" style="font-size:12px">'+esc(t.reason)+'</div>':'')+(t.technikerId&&techName(t.technikerId)?'<div class="muted" style="font-size:12px">👤 '+esc(techName(t.technikerId))+'</div>':'')
        :'<div class="muted" style="font-size:13px;margin-top:6px">Noch kein Termin vereinbart.</div>')+'</div>'; }
+/* v11 #9 optional: bald anstehende Termine (interne Erinnerung) + Terminbestätigung per E-Mail */
+function termineSoon(){ var now=new Date(); var cur=now.getHours()*60+now.getMinutes(); return termineToday().filter(function(t){var m=_hhmm2min(t.start);return m!=null&&m>=cur-5&&m<=cur+90;}); }
+function sendTerminConfirm(rec){ if(DB.backend!=='server')return; var c=cust(rec.cid); if(!c||!c.mail)return;
+  var adr=[SHOP.street,((SHOP.zip||'')+' '+(SHOP.city||'')).trim()].filter(Boolean).join(', ');
+  var body='Guten Tag '+(c.name||'')+',\n\nwir bestätigen Ihren Termin bei '+SHOP.name+':\n\n  Datum: '+fmtDate(rec.date)+'\n  Uhrzeit: '+rec.start+' Uhr'+(rec.dur?(' (ca. '+rec.dur+' Min)'):'')+(rec.reason?('\n  Grund: '+rec.reason):'')+'\n'+(adr?('\nAdresse: '+adr):'')+(SHOP.phone?('\nTelefon: '+SHOP.phone):'')+'\n\nBitte sagen Sie uns kurz Bescheid, falls der Termin nicht passt.\n\nViele Grüße\n'+SHOP.name;
+  fetch(API+'/api/mail/send',{method:'POST',headers:DB._hdr(),body:JSON.stringify({to:c.mail,subject:'Terminbestätigung · '+fmtDate(rec.date)+' '+rec.start+' Uhr · '+SHOP.name,body:body})})
+    .then(function(r){return r.json();}).then(function(res){ toast(res.sent?'✓ Terminbestätigung an Kunden gesendet':'Termin gespeichert (E-Mail nicht gesendet: '+(res.note||'—')+')'); if(S.mailLog)S.mailLog.unshift({t:new Date().toISOString(),to:c.name,ch:'E-Mail',rule:'Terminbestätigung',subj:'Terminbestätigung '+fmtDate(rec.date)+' '+rec.start,how:'automatisch'+(res.sent?'':' – nicht gesendet')}); save(); })
+    .catch(function(){ toast('Termin gespeichert (Bestätigung nur protokolliert)'); }); }
 
 views.kalender=function(){
   const m=document.getElementById('main');
