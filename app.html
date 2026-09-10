@@ -328,7 +328,7 @@ const DB = {
 /* ===== Welle 2 (#1/#8): Einzeldatensatz-Sync – Mehrplatzbetrieb + Live-Refresh, verhindert Datenverlust =====
    Statt den ganzen Datenbestand zu überschreiben, werden Aufträge/Kunden/Angebote EINZELN
    ge-upsertet (kein „letzter gewinnt" mehr) und alle paar Sekunden zusammengeführt. */
-const SYNC_COLLS=['ord','cust','quotes'];
+const SYNC_COLLS=['ord','cust','quotes','termine'];
 const Sync={
   since:0, shadow:{}, _pt:null, _timer:null, _savedT:null, state:'',
   active(){ return DB.backend==='server' && !!DB.token; },
@@ -1110,6 +1110,7 @@ function openOrder(id){
        <div><label class="f">Garantie</label><div style="font-weight:700">${o.warranty} Monate${warrUntil?' · bis '+fmtDate(warrUntil):' (ab Abholung)'}</div></div>
        <div><label class="f">Annahme</label><div style="font-weight:700">${o.sig?'Unterschrieben':'Keine Unterschrift'}</div>${o.sig?`<img src="${o.sig}" alt="Unterschrift" style="height:40px;margin-top:4px;border:1px solid var(--line);border-radius:6px;background:#fff">`:''}</div>
      </div>
+     ${terminBoxOrder(o)}
      ${activityBox(o)}
      ${(o.fach||(o.lock&&o.lock!=='Keine')||o.ref||o.technikerId)?`<div class="grid g2" style="margin-top:14px">
        ${o.fach?`<div><label class="f">Lagerfach</label><div style="font-weight:700">${esc(o.fach)}</div></div>`:''}
@@ -2154,28 +2155,105 @@ function calSyncCard(){const cs=ensureCalSync();const anyConn=CAL_PROVIDERS.some
      <div class="muted" style="font-size:11px;margin-top:4px">Abo-Link (Live-Aktualisierung) wird mit dem Server scharfgeschaltet; der .ics-Export ist sofort nutzbar.</div>
    </div>`;
 }
+/* ===================== v11 #9: Terminvereinbarung (Uhrzeit + Dauer + Öffnungszeiten + Kunde/Auftrag) ===================== */
+function ensureTermine(){ if(!Array.isArray(S.termine))S.termine=[]; return S.termine; }
+function _hhmm2min(s){ var m=/^(\d{1,2}):(\d{2})$/.exec(s||''); return m?(+m[1]*60+ +m[2]):null; }
+function _min2hhmm(m){ return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); }
+function apptRanges(dateStr){ var d=new Date(dateStr+'T00:00:00'); if(isNaN(d))return []; var wd=(d.getDay()+6)%7; var hd=ensureHours()[wd]; if(!hd||hd.closed)return []; var out=[]; [hd.r1,hd.r2].forEach(function(r){ if(r&&r.on&&r.from&&r.to){ var a=_hhmm2min(r.from),b=_hhmm2min(r.to); if(a!=null&&b!=null&&b>a)out.push([a,b]); } }); return out; }
+function apptBusy(dateStr,excludeId){ return ensureTermine().filter(function(t){return t.date===dateStr&&t.id!==excludeId;}).map(function(t){var a=_hhmm2min(t.start);return a==null?null:[a,a+(+t.dur||30)];}).filter(Boolean); }
+function freeSlots(dateStr,dur,excludeId){ dur=+dur||30; var ranges=apptRanges(dateStr); if(!ranges.length)return []; var busy=apptBusy(dateStr,excludeId); var slots=[]; ranges.forEach(function(r){ for(var s=r[0]; s+dur<=r[1]; s+=15){ var e=s+dur; if(!busy.some(function(b){return s<b[1]&&e>b[0];})) slots.push(_min2hhmm(s)); } }); return slots; }
+function terminForOrder(oid){ return ensureTermine().find(function(t){return t.orderId===oid;})||null; }
+function fmtTermin(t){ if(!t)return ''; return fmtDate(t.date)+' · '+t.start+' Uhr'+(t.dur?(' ('+t.dur+' Min)'):''); }
+let TN=null;
+function terminModal(opts){ opts=opts||{}; ensureTermine();
+  if(opts.id){ TN=Object.assign({}, ensureTermine().find(function(t){return t.id===opts.id;})||{}); }
+  else { TN={ id:'', date:opts.date||today(), start:'', dur:30, cid:opts.cid||'', orderId:opts.orderId||'', technikerId:opts.technikerId||'', reason:'', note:'', custQuery:'' }; }
+  renderTerminModal();
+}
+function tnDate(v){ TN.date=v; TN.start=''; renderTerminModal(); }
+function tnDur(v){ TN.dur=+v||30; TN.start=''; renderTerminModal(); }
+function tnPickCust(cid){ TN.cid=cid; TN.orderId=''; TN.custQuery=''; renderTerminModal(); }
+function tnClearCust(){ TN.cid=''; TN.orderId=''; renderTerminModal(); }
+function tnSearch(v){ TN.custQuery=v; var el=document.getElementById('tn_matches'); if(!el)return; var q=(v||'').toLowerCase().trim(); if(!q){el.innerHTML='';return;} var ms=S.cust.filter(function(x){return (x.name+' '+(x.tel||'')+' '+(x.mail||'')).toLowerCase().indexOf(q)>=0;}).slice(0,6); el.innerHTML=ms.length?ms.map(function(c){return '<div class="listitem" style="cursor:pointer" onclick="tnPickCust(\''+c.id+'\')"><div class="avatar">'+initials(c.name)+'</div><div style="flex:1;min-width:0"><b>'+esc(c.name)+'</b><div class="muted" style="font-size:12px">'+esc(c.tel||'')+'</div></div><span class="btn sm">Wählen</span></div>';}).join(''):'<div class="muted" style="font-size:12px;padding:6px">Kein Kunde gefunden. <a style="color:var(--green);cursor:pointer" onclick="tnQuickCust()">Neuen Kunden anlegen</a></div>'; }
+function tnQuickCust(){ var name=prompt('Name des Kunden:'); if(!name)return; var tel=prompt('Telefon:')||''; var c={id:uid('c'),name:name.trim(),tel:tel.trim(),mail:'',adr:'',plz:'',stadt:'',typ:'Privat'}; S.cust.unshift(c); save(); tnPickCust(c.id); }
+function renderTerminModal(){
+  ensureTermine(); var c=TN.cid?cust(TN.cid):null;
+  var slots=TN.date?freeSlots(TN.date,TN.dur,TN.id):[];
+  var ordersOfCust=TN.cid?S.ord.filter(function(o){return o.cid===TN.cid&&!o.trashed;}):[];
+  var closed=TN.date&&!apptRanges(TN.date).length;
+  var durOpts=[15,30,45,60,90].map(function(x){return '<option value="'+x+'" '+(TN.dur==x?'selected':'')+'>'+x+' Min</option>';}).join('');
+  var startSel = closed
+    ? '<div class="muted" style="font-size:13px;padding:6px 0">An diesem Tag ist geschlossen – bitte anderes Datum wählen.</div>'
+    : (slots.length
+        ? '<select class="in" id="tn_start" onchange="TN.start=this.value">'+['<option value="">— Uhrzeit wählen —</option>'].concat(slots.map(function(s){return '<option value="'+s+'" '+(TN.start===s?'selected':'')+'>'+s+' Uhr</option>';})).join('')+'</select>'
+        : '<div class="muted" style="font-size:13px;padding:6px 0">Keine freien Zeiten für diese Dauer an dem Tag (alles belegt oder außerhalb der Öffnungszeiten).</div>');
+  var custBlock = c
+    ? '<div class="listitem"><div class="avatar">'+initials(c.name)+'</div><div style="flex:1;min-width:0"><b>'+esc(c.name)+'</b><div class="muted" style="font-size:12px">'+esc(c.tel||'')+'</div></div><button class="btn sm gho" onclick="tnClearCust()">ändern</button></div>'
+    : '<input class="in" id="tn_cq" placeholder="Kunde suchen (Name / Telefon)…" oninput="tnSearch(this.value)" value="'+esc(TN.custQuery||'')+'"><div id="tn_matches" style="margin-top:6px"></div>';
+  var orderBlock = c
+    ? (ordersOfCust.length
+        ? '<select class="in" id="tn_order"><option value="">— kein Auftrag / nur Kunde —</option>'+ordersOfCust.map(function(o){return '<option value="'+o.id+'" '+(TN.orderId===o.id?'selected':'')+'>'+esc(o.nr)+' · '+esc(oDevLabel(o))+'</option>';}).join('')+'</select>'
+        : '<div class="muted" style="font-size:12px">Kein offener Auftrag – Termin wird nur dem Kunden zugeordnet.</div>')
+    : '';
+  var techs=(S.users||[]);
+  openModal('<div class="dhead"><b style="flex:1">📅 '+(TN.id?'Termin bearbeiten':'Termin vereinbaren')+'</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>'
+   +'<div class="dbody">'
+   +'<label class="f">Kunde</label>'+custBlock
+   +(c&&orderBlock?'<label class="f" style="margin-top:10px">Auftrag (optional)</label>'+orderBlock:'')
+   +'<div class="grid g2" style="margin-top:10px"><div><label class="f">Datum</label><input class="in" type="date" id="tn_date" value="'+esc(TN.date)+'" onchange="tnDate(this.value)"></div>'
+   +'<div><label class="f">Dauer</label><select class="in" id="tn_dur" onchange="tnDur(this.value)">'+durOpts+'</select></div></div>'
+   +'<label class="f" style="margin-top:10px">Uhrzeit (nur freie Zeiten in den Öffnungszeiten)</label>'+startSel
+   +'<div class="grid g2" style="margin-top:10px"><div><label class="f">Techniker/Mitarbeiter (optional)</label><select class="in" id="tn_tech"><option value="">— keiner —</option>'+techs.map(function(u){return '<option value="'+u.id+'" '+(TN.technikerId===u.id?'selected':'')+'>'+esc(u.name)+'</option>';}).join('')+'</select></div>'
+   +'<div><label class="f">Grund / Terminart (optional)</label><input class="in" id="tn_reason" value="'+esc(TN.reason||'')+'" placeholder="z. B. Abgabe, Abholung, Beratung"></div></div>'
+   +'<label class="f" style="margin-top:10px">Interne Notiz (optional)</label><textarea class="in" id="tn_note" rows="2">'+esc(TN.note||'')+'</textarea>'
+   +'<div class="row" style="justify-content:flex-end;margin-top:14px;gap:8px">'+(TN.id?'<button class="btn gho" onclick="tnDelete()" style="color:#b4231a">Termin löschen</button>':'')+'<button class="btn pri" onclick="tnSave()">Termin speichern</button></div>'
+   +'</div>');
+  var cq=document.getElementById('tn_cq'); if(cq&&TN.custQuery)tnSearch(TN.custQuery);
+}
+function tnSave(){ ensureTermine();
+  var g=function(id){var e=document.getElementById(id);return e?e.value:'';};
+  if(!TN.cid){ toast('Bitte einen Kunden wählen'); return; }
+  var start=g('tn_start')||TN.start; if(!TN.date||!start){ toast('Bitte Datum und Uhrzeit wählen'); return; }
+  var rec={ id:TN.id||('tm'+Date.now().toString(36)+Math.random().toString(36).slice(2,5)), date:TN.date, start:start, dur:+g('tn_dur')||TN.dur||30, cid:TN.cid, orderId:g('tn_order')||TN.orderId||'', technikerId:g('tn_tech')||'', reason:g('tn_reason')||'', note:g('tn_note')||'', branch:(typeof curBranch==='function'?curBranch():''), createdBy:(S.userId||''), createdByName:(typeof curUserName==='function'?curUserName():''), createdAt:new Date().toISOString() };
+  var arr=ensureTermine(); var i=arr.findIndex(function(t){return t.id===rec.id;}); if(i>=0)arr[i]=rec; else arr.unshift(rec);
+  if(rec.orderId){ var o=S.ord.find(function(x){return x.id===rec.orderId;}); if(o){ o.appt=rec.date; o.apptTime=rec.start; if(typeof logActivity==='function')logActivity(o,'edit','Termin '+fmtTermin(rec)); } }
+  save(); closeAll(); toast('Termin gespeichert: '+fmtTermin(rec));
+  if(current==='kalender')views.kalender(); else if(current==='dashboard')views.dashboard&&views.dashboard();
+  var dr=document.getElementById('drawer'); if(rec.orderId&&dr&&dr.classList.contains('show'))openOrder(rec.orderId);
+  paintIcons();
+}
+function tnDelete(){ if(!TN.id)return; if(!confirm('Termin löschen?'))return; var t=ensureTermine().find(function(x){return x.id===TN.id;}); S.termine=ensureTermine().filter(function(x){return x.id!==TN.id;}); if(t&&t.orderId){var o=S.ord.find(function(x){return x.id===t.orderId;});if(o){o.appt='';o.apptTime='';}} save(); closeAll(); toast('Termin gelöscht'); if(current==='kalender')views.kalender(); paintIcons(); }
+function termineToday(){ return ensureTermine().filter(function(t){return t.date===today();}).sort(function(a,b){return (a.start||'').localeCompare(b.start||'');}); }
+function terminBoxOrder(o){ var t=terminForOrder(o.id);
+  return '<div class="card" style="margin-top:14px"><div class="between"><b>📅 Termin</b><button class="btn sm pri" onclick="terminModal('+(t?"{id:'"+t.id+"'}":"{cid:'"+o.cid+"',orderId:'"+o.id+"'}")+')">'+(t?'Termin ändern':'Termin vereinbaren')+'</button></div>'
+    +(t?'<div style="margin-top:6px;font-weight:700">'+esc(fmtTermin(t))+'</div>'+(t.reason?'<div class="muted" style="font-size:12px">'+esc(t.reason)+'</div>':'')+(t.technikerId&&techName(t.technikerId)?'<div class="muted" style="font-size:12px">👤 '+esc(techName(t.technikerId))+'</div>':'')
+       :'<div class="muted" style="font-size:13px;margin-top:6px">Noch kein Termin vereinbart.</div>')+'</div>'; }
+
 views.kalender=function(){
   const m=document.getElementById('main');
   const base=new Date(); base.setDate(1);
   const y=base.getFullYear(),mo=base.getMonth();
   const first=(new Date(y,mo,1).getDay()+6)%7; const dim=new Date(y,mo+1,0).getDate();
   const evByDay={};
-  visibleOrders().forEach(o=>{ if(o.appt){(evByDay[o.appt]=evByDay[o.appt]||[]).push({t:'Termin',o});}
+  ensureTermine().forEach(t=>{ (evByDay[t.date]=evByDay[t.date]||[]).push({t:'Termin',termin:t}); });
+  visibleOrders().forEach(o=>{ if(o.appt&&!terminForOrder(o.id)){(evByDay[o.appt]=evByDay[o.appt]||[]).push({t:'Termin',o});}
     if(o.due&&o.status!=='abgeholt'){(evByDay[o.due]=evByDay[o.due]||[]).push({t:'Fällig',o});}});
   let cells='';
   for(let i=0;i<first;i++)cells+='<div></div>';
   for(let dnum=1;dnum<=dim;dnum++){
     const ds=`${y}-${String(mo+1).padStart(2,'0')}-${String(dnum).padStart(2,'0')}`;
     const ev=evByDay[ds]||[]; const isToday=ds===today();
-    cells+=`<div style="border:1px solid var(--line);border-radius:10px;padding:8px;min-height:92px;${isToday?'outline:2px solid #0e7a3c;outline-offset:-2px':''}">
+    cells+=`<div onclick="terminModal({date:'${ds}'})" title="Klicken: Termin an diesem Tag anlegen" style="border:1px solid var(--line);border-radius:10px;padding:8px;min-height:92px;cursor:pointer;${isToday?'outline:2px solid #0e7a3c;outline-offset:-2px':''}">
       <div style="font-weight:700;font-size:13px;${isToday?'':'color:#888'}">${dnum}</div>
-      ${ev.slice(0,3).map(e=>`<div onclick="openOrder('${e.o.id}')" style="cursor:pointer;font-size:11px;margin-top:3px;padding:2px 5px;border-radius:5px;${e.t==='Termin'?'background:#0e7a3c;color:#fff':'background:var(--soft);color:#0e7a3c'}">${esc(cust(e.o.cid).name.split(' ')[0])}</div>`).join('')}
+      ${ev.slice(0,3).map(e=>{ if(e.termin){const tc=cust(e.termin.cid);return `<div onclick="event.stopPropagation();terminModal({id:'${e.termin.id}'})" style="cursor:pointer;font-size:11px;margin-top:3px;padding:2px 5px;border-radius:5px;background:#0e7a3c;color:#fff">${esc(e.termin.start)} ${esc((tc.name||'').split(' ')[0])}</div>`;} return `<div onclick="event.stopPropagation();openOrder('${e.o.id}')" style="cursor:pointer;font-size:11px;margin-top:3px;padding:2px 5px;border-radius:5px;${e.t==='Termin'?'background:#0e7a3c;color:#fff':'background:var(--soft);color:#0e7a3c'}">${esc(cust(e.o.cid).name.split(' ')[0])}</div>`;}).join('')}
       ${ev.length>3?`<div class="muted" style="font-size:11px;margin-top:2px">+${ev.length-3} mehr</div>`:''}
     </div>`;
   }
   const monName=base.toLocaleDateString('de-DE',{month:'long',year:'numeric'});
+  const tHeute=termineToday();
   m.innerHTML=`<div class="between"><div><h1 class="h1">Kalender</h1><p class="sub">${monName}</p></div>
-     <div class="row"><span class="pill solid"><span class="d"></span>Termin</span><span class="pill soft"><span class="d"></span>Fällig</span></div></div>
+     <div class="row"><span class="pill solid"><span class="d"></span>Termin</span><span class="pill soft"><span class="d"></span>Fällig</span><button class="btn pri" onclick="terminModal({})">＋ Neuer Termin</button></div></div>
+   ${tHeute.length?`<div class="card" style="margin-top:16px;border:1px solid var(--green)"><b>Heute · ${tHeute.length} Termin${tHeute.length>1?'e':''}</b>${tHeute.map(t=>{const tc=cust(t.cid);const o=t.orderId?S.ord.find(x=>x.id===t.orderId):null;return `<div class="listitem" style="cursor:pointer" onclick="${t.orderId?`openOrder('${t.orderId}')`:`terminModal({id:'${t.id}'})`}"><span class="pill solid" style="min-width:64px;justify-content:center">${esc(t.start)}</span><div style="flex:1;min-width:0"><b>${esc(tc.name||'—')}</b><div class="muted" style="font-size:12px">${t.dur} Min${t.reason?' · '+esc(t.reason):''}${o?' · '+esc(oDevLabel(o)):''}${t.technikerId&&techName(t.technikerId)?' · 👤 '+esc(techName(t.technikerId)):''}</div></div></div>`;}).join('')}</div>`:''}
    <div class="card" style="margin-top:16px">
      <div class="grid" style="grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:8px">${['Mo','Di','Mi','Do','Fr','Sa','So'].map(d=>`<div class="muted" style="font-size:12px;font-weight:700;text-align:center">${d}</div>`).join('')}</div>
      <div class="grid" style="grid-template-columns:repeat(7,1fr);gap:6px">${cells}</div>
@@ -4278,7 +4356,7 @@ function bootApp(){ensureWorkshop(); ensureMaster(); applyMaster(); ensureAcct()
   if(DB.backend==='server'){ setTimeout(()=>intakeImport(false),1500); setTimeout(()=>portalPollReplies(),2200); if(!window.__intakePoll)window.__intakePoll=setInterval(()=>intakeImport(false),90000); if(!window.__portalPoll)window.__portalPoll=setInterval(()=>portalPollReplies(),90000); }
 }
 /* Frischer, komplett leerer Zustand für ein neu registriertes Konto (keine Demo-Daten). */
-function blankState(){ return {v:11, __clean:true, cust:[], ord:[], parts:[], orders:[], sold:[], counter:1000, rules:defaultRules(), sales:[], cash:{connected:''}, mailLog:[], calls:[], phone:defaultPhone(), users:[{id:'u1',name:'Inhaber',role:'inhaber',pin:'1234'}], userId:'u1', insurance:defaultInsurance(), wgLeads:[], drafts:[], quotes:[], requests:[], quoteCounter:1000, feedback:[], reactDone:[]}; }
+function blankState(){ return {v:11, __clean:true, cust:[], ord:[], parts:[], orders:[], sold:[], counter:1000, rules:defaultRules(), sales:[], cash:{connected:''}, mailLog:[], calls:[], phone:defaultPhone(), users:[{id:'u1',name:'Inhaber',role:'inhaber',pin:'1234'}], userId:'u1', insurance:defaultInsurance(), wgLeads:[], drafts:[], quotes:[], requests:[], quoteCounter:1000, feedback:[], reactDone:[], termine:[]}; }
 function finishServerBoot(hadState){ const ov=document.getElementById('sbLogin'); if(ov)ov.remove(); if(!hadState){ try{ localStorage.setItem(KEY, JSON.stringify(blankState())); }catch(e){} } S=load(); if(DB.backend==='server' && typeof Sync!=='undefined'){ try{ Sync.ensureArrays(); }catch(e){} } try{ const _du=localStorage.getItem('rep_user_dev'); if(_du && (S.users||[]).some(u=>u.id===_du)) S.userId=_du; }catch(e){} bootApp(); if(DB.backend==='server' && typeof Sync!=='undefined'){ try{ Sync.start(); }catch(e){} try{ seqReserve('order'); seqReserve('quote'); }catch(e){} } }
 /* Server-Modus: Anmeldung / Selbst-Registrierung an der echten Datenbank (nur mit config.js) */
 let _sbMode='login'; let _sbResetToken=''; let _sbMsg='';
