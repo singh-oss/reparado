@@ -1103,7 +1103,7 @@ function openOrder(id){
      ${confirmStatusBox(o)}
      <div class="grid g2" style="margin-top:14px">
        <div style="grid-column:1/-1"><label class="f">Gerät${oDevices(o).length>1?'e ('+oDevices(o).length+')':''} &amp; Reparatur</label>
-         ${oDevices(o).map((d,di)=>{const ll=lockLabel(d);const ps=devPositions(d);const meta=[d.imei?'IMEI '+esc(d.imei):'',d.fach?esc(d.fach):'',ll?'🔒 '+esc(ll):'',d.technikerId?'👤 '+esc(techName(d.technikerId)):''].filter(Boolean).join(' · ');return `<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:flex-start"><div style="flex:1;min-width:0"><div class="between"><b style="min-width:0">Gerät ${di+1}: ${esc(d.brand)} ${esc(d.model)}</b><b class="mono">${eur(devTotal(d))}</b></div>${meta?`<div class="muted" style="font-size:12px;margin-top:2px">${meta}</div>`:''}${ps.map(p=>`<div class="between" style="font-size:13px;padding:4px 0 0"><span class="muted">${esc(p.reparatur)}${p.qual?' · '+esc(p.qual):''}</span><span class="mono">${eur(p.price)}</span></div>`).join('')}</div><div style="flex:none" title="${esc(d.brand)} ${esc(d.model)}">${modelThumb(d.brand,d.model,60,d.typ)}</div></div>`;}).join('')}
+         ${oDevices(o).map((d,di)=>{const ll=lockLabel(d);const ps=devPositions(d);const meta=[d.imei?'IMEI '+esc(d.imei):'',d.fach?esc(d.fach):'',ll?'🔒 '+esc(ll):'',d.technikerId?'👤 '+esc(techName(d.technikerId)):''].filter(Boolean).join(' · ');return `<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:flex-start"><div style="flex:1;min-width:0"><div class="between"><b style="min-width:0">Gerät ${di+1}: ${esc(d.brand)} ${esc(d.model)}</b><b class="mono">${eur(devTotal(d))}</b></div>${meta?`<div class="muted" style="font-size:12px;margin-top:2px">${meta}</div>`:''}${(d.fehler||'').trim()?`<div style="font-size:12px;margin-top:3px;word-break:break-word"><b>Fehlerbeschreibung:</b> ${esc(d.fehler.trim()).replace(/\n/g,'<br>')}</div>`:''}${ps.map(p=>`<div class="between" style="font-size:13px;padding:4px 0 0"><span class="muted">${esc(p.reparatur)}${p.qual?' · '+esc(p.qual):''}</span><span class="mono">${eur(p.price)}</span></div>`).join('')}</div><div style="flex:none" title="${esc(d.brand)} ${esc(d.model)}">${modelThumb(d.brand,d.model,60,d.typ)}</div></div>`;}).join('')}
          <div class="between" style="padding:9px 0"><b>Gesamt (inkl. MwSt.)</b><b style="font-size:18px">${eur(oTotal(o))}</b></div>${(oTotal(o)>0)?`<div class="between" style="font-size:12px;color:var(--ink2)"><span>Netto ${eur(netOf(oTotal(o)))}</span><span>darin ${MWST_RATE} % MwSt: ${eur(vatOf(oTotal(o)))}</span></div>`:''}</div>
        <div><label class="f">Priorität</label><div style="font-weight:700">${esc(o.prio)}</div></div>
        <div><label class="f">Termin / Fällig</label><div style="font-weight:700">${o.appt?'Termin '+fmtDate(o.appt)+' · ':''}Fällig ${fmtDate(o.due)}</div></div>
@@ -1287,7 +1287,7 @@ function noCollect(){ if(!NO)return; const g=id=>{const e=document.getElementByI
   NO.typ=g('no_typ')||NO.typ;NO.anrede=g('no_anrede');NO.firma=g('no_firma');NO.vorname=g('no_vorname');NO.nachname=g('no_nachname');NO.tel=g('no_tel');NO.mail=g('no_mail');NO.plz=g('no_plz');NO.stadt=g('no_stadt');NO.adr=g('no_adr');
   NO.prio=g('no_prio')||NO.prio;NO.technikerId=g('no_tech');NO.notes=g('no_notes');NO.due=g('no_due')||NO.due;NO.appt=g('no_appt');
   const tm=document.querySelector('input[name=no_termin]:checked');if(tm)NO.terminMode=tm.value;
-  NO.devices.forEach((d,i)=>{d.typ=g('dev'+i+'_typ')||d.typ;d.brand=g('dev'+i+'_brand');d.model=g('dev'+i+'_model');d.imei=g('dev'+i+'_imei');d.fach=g('dev'+i+'_fach');d.ref=g('dev'+i+'_ref');d.warranty=g('dev'+i+'_warranty')||d.warranty;const gt=document.getElementById('dev'+i+'_tech');if(gt)d.technikerId=gt.value;
+  NO.devices.forEach((d,i)=>{d.typ=g('dev'+i+'_typ')||d.typ;d.brand=g('dev'+i+'_brand');d.model=g('dev'+i+'_model');d.imei=g('dev'+i+'_imei');d.fach=g('dev'+i+'_fach');d.ref=g('dev'+i+'_ref');d.fehler=g('dev'+i+'_fehler');d.warranty=g('dev'+i+'_warranty')||d.warranty;const gt=document.getElementById('dev'+i+'_tech');if(gt)d.technikerId=gt.value;
     if(!Array.isArray(d.positions)||!d.positions.length)d.positions=[blankPosition()];
     d.positions.forEach((p,j)=>{const gr=document.getElementById('dev'+i+'_pos'+j+'_reparatur');if(gr)p.reparatur=gr.value;const gp=document.getElementById('dev'+i+'_pos'+j+'_price');if(gp)p.price=gp.value;const gq=document.getElementById('dev'+i+'_pos'+j+'_qual');if(gq)p.qual=gq.value||p.qual;});
     const p0=d.positions[0]||{};d.reparatur=p0.reparatur||'';d.qual=p0.qual||'Original';d.price=(p0.price!==undefined?p0.price:''); /* Spiegel positions[0] */
@@ -1616,6 +1616,8 @@ function noDevBlock(d,i){
     ${devPositions(d).map((p,j)=>noPosBlock(i,j,p,devPositions(d).length)).join('')}
     <button type="button" class="btn sm" style="margin-top:8px" onclick="noAddPosition(${i})">+ Weiteren Fehler hinzufügen</button>
     <div class="muted" style="font-size:11px;margin-top:6px">Nicht in der Liste? Fehler einfach eintippen – wird automatisch gespeichert.</div>
+    <label class="f" style="margin-top:12px">Fehlerbeschreibung (Kundenangabe – erscheint auf dem Beleg)</label>
+    <textarea class="in" id="dev${i}_fehler" rows="2" placeholder="z. B. Gerät wird heiß, schaltet sich selbstständig aus, lädt zeitweise nicht …">${esc(d.fehler||'')}</textarea>
     ${devPositions(d).length>1?`<div class="between" style="margin-top:10px;padding-top:8px;border-top:1px solid var(--line);font-weight:700"><span>Gerät ${i+1} gesamt</span><span class="mono">${eur(devTotal(d))}</span></div>`:''}
     <div class="grid g2" style="margin-top:10px"><div><label class="f">Garantie (Monate)</label><select class="in" id="dev${i}_warranty">${[6,12,24,0].map(w=>`<option ${(+d.warranty)===w?'selected':''}>${w}</option>`).join('')}</select></div>
       <div><label class="f">Techniker (dieses Gerät)</label><select class="in" id="dev${i}_tech"><option value="">— wie Auftrag —</option>${(S.users||[]).map(u=>`<option value="${u.id}" ${d.technikerId===u.id?'selected':''}>${esc(u.name)}${u.role?' ('+(ROLE_LABEL[u.role]||u.role)+')':''}</option>`).join('')}</select></div></div>
@@ -1967,7 +1969,9 @@ function labelPanelInner(){const cfg=ensureLabelCfg();const tpls=ensureLabelTpls
    <div class="row" style="margin-top:12px;gap:8px;flex-wrap:wrap"><button class="btn sm pri" onclick="testPrintLabel()">🖨️ Testdruck</button><button class="btn sm" onclick="labelSaveTpl()">Als Vorlage speichern</button>${tpls.length?`<select class="in" style="max-width:200px" onchange="if(this.value)labelLoadTpl(this.value)"><option value="">Vorlage laden…</option>${tpls.map(t=>`<option value="${esc(t.name)}">${esc(t.name)}</option>`).join('')}</select>`:''}</div>
    ${tpls.length?`<div class="muted" style="font-size:12px;margin-top:6px">Vorlagen: ${tpls.map(t=>`${esc(t.name)} <a onclick="labelDelTpl('${qa(t.name)}')" style="color:#c0392b;cursor:pointer">✕</a>`).join(' · ')}</div>`:''}`; }
 function labelSettingsCard(){ return `<div class="card" style="margin-top:16px"><b>🏷️ Etikettendruck</b><p class="muted" style="font-size:13px;margin:4px 0 10px">Etikettengröße, Ränder, Inhalte und Vorlagen einstellen. Vorschau in Originalgröße; Testdruck ohne echten Auftrag.</p><div id="labelPanel">${labelPanelInner()}</div></div>`; }
-function devDetailRows(o){ return oDevices(o).map((d,i)=>{const meta=[d.imei?'IMEI/SN: '+esc(d.imei):'',d.fach?'Fach: '+esc(d.fach):'',lockLabel(d)?'Sperre: '+esc(lockLabel(d)):'',(d.technikerId&&techName(d.technikerId))?'Techniker: '+esc(techName(d.technikerId)):''].filter(Boolean).join(' · ');const name=[d.brand,d.model].filter(Boolean).join(' ')||'Gerät';return `<div style="font-size:12px;color:#333;margin-top:3px"><b>Gerät ${i+1}: ${esc(name)}</b>${meta?`<span style="color:#666"> · ${meta}</span>`:''}</div>`;}).join(''); }
+function devDetailRows(o){ return oDevices(o).map((d,i)=>{const meta=[d.imei?'IMEI/SN: '+esc(d.imei):'',d.fach?'Fach: '+esc(d.fach):'',lockLabel(d)?'Sperre: '+esc(lockLabel(d)):'',(d.technikerId&&techName(d.technikerId))?'Techniker: '+esc(techName(d.technikerId)):''].filter(Boolean).join(' · ');const name=[d.brand,d.model].filter(Boolean).join(' ')||'Gerät';const fb=(d.fehler||'').trim();return `<div style="font-size:12px;color:#333;margin-top:5px"><b>Gerät ${i+1}: ${esc(name)}</b>${meta?`<span style="color:#666"> · ${meta}</span>`:''}${fb?`<div style="color:#333;margin-top:2px;word-break:break-word"><b>Fehlerbeschreibung:</b> ${esc(fb).replace(/\n/g,'<br>')}</div>`:''}</div>`;}).join(''); }
+/* v11 #11: prominente Geräte-Blöcke für den Kundenbeleg (Hersteller+Modell fett & groß, je Gerät ein Block) */
+function receiptDeviceBlocks(o){ const devs=oDevices(o); return devs.map((d,i)=>{const name=[d.brand,d.model].filter(Boolean).join(' ')||'Gerät';const meta=[d.imei?'IMEI/SN: '+esc(d.imei):'',d.fach?'Fach: '+esc(d.fach):'',lockLabel(d)?'Sperre: '+esc(lockLabel(d)):'',(d.technikerId&&techName(d.technikerId))?'Techniker: '+esc(techName(d.technikerId)):''].filter(Boolean).join(' · ');const fb=(d.fehler||'').trim();const pos=devPositions(d).map(p=>`<div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:3px 0"><span>${esc(p.reparatur)||'Reparatur'}${p.qual?` <span style="color:#6b7280 !important">(${esc(p.qual)})</span>`:''}</span><span style="font-family:monospace;white-space:nowrap">${eur(p.price)}</span></div>`).join('');return `<div class="rc-dev">${devs.length>1?`<div class="rc-dev-idx">Gerät ${i+1} von ${devs.length}</div>`:''}<div class="rc-dev-name">${esc(name)}</div>${meta?`<div class="rc-dev-meta">${meta}</div>`:''}${fb?`<div class="rc-dev-fb"><b>Fehlerbeschreibung:</b> ${esc(fb).replace(/\n/g,'<br>')}</div>`:''}<div style="margin-top:6px;border-top:1px solid #eee;padding-top:4px">${pos}</div></div>`;}).join(''); }
 function sigBlock(o){ if(!o.sig)return '';
   const conf=o.sigConsents?'☑ AGB gelesen &amp; akzeptiert &nbsp;&nbsp; ☑ Hinweis zur Datensicherung bestätigt':'Der Kunde hat den Auftrag bestätigt.';
   return `<div style="margin-top:18px;padding-top:12px;border-top:1px solid #ddd">
@@ -1989,9 +1993,15 @@ function printReceipt(id){const o=S.ord.find(x=>x.id===id); if(!o)return; const 
    .rcpt,.rcpt *{color:#1f2937 !important;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif}
    .rcpt{max-width:540px;margin:0 auto;font-size:13px;line-height:1.45}
    .rc-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:2px solid #0e7a3c;padding-bottom:12px}
-   .rc-co{font-weight:800;font-size:16px}.rc-co-sub{color:#6b7280 !important;font-size:11px;line-height:1.55}
+   .rc-co{font-weight:900;font-size:23px;letter-spacing:-.3px;color:#0f2318 !important}.rc-co-sub{color:#6b7280 !important;font-size:11px;line-height:1.55}
    .rc-code{text-align:right;flex:none}.rc-code .lbl{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#6b7280 !important}
-   .rc-code .no{font-weight:900;font-size:20px;letter-spacing:-.5px;color:#0e7a3c !important}
+   .rc-code .no{font-weight:900;font-size:29px;letter-spacing:-.5px;color:#0e7a3c !important;line-height:1}
+   .rc-cust-name{font-weight:900;font-size:17px;color:#0f2318 !important;margin-bottom:2px}
+   .rc-dev{border:1px solid #e3e8e4;border-radius:10px;padding:10px 12px;margin-top:8px}
+   .rc-dev-idx{font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:#6b7280 !important;font-weight:700}
+   .rc-dev-name{font-weight:900;font-size:18px;letter-spacing:-.2px;color:#0f2318 !important}
+   .rc-dev-meta{font-size:11px;color:#6b7280 !important;margin-top:2px}
+   .rc-dev-fb{font-size:12.5px;margin-top:5px;word-break:break-word}
    .rc-title{font-size:15px;font-weight:800;margin:14px 0 8px}
    .rc-grid{display:flex;gap:12px}.rc-grid>div{flex:1;min-width:0}
    .rc-box{border:1px solid #e3e8e4;border-radius:10px;padding:10px 12px}
@@ -2014,11 +2024,10 @@ function printReceipt(id){const o=S.ord.find(x=>x.id===id); if(!o)return; const 
    </div>
    <div class="rc-title">Reparaturauftrag / Kundenbeleg</div>
    <div class="rc-grid">
-     <div class="rc-box"><div class="rc-lbl">Kunde</div><b>${esc(c.name)}</b>${(c.firma&&c.firma!==c.name)?'<br>'+esc(c.firma):''}${c.adr?'<br>'+esc(c.adr):''}${(c.plz||c.stadt)?'<br>'+esc(((c.plz||'')+' '+(c.stadt||'')).trim()):''}${c.tel?'<br>'+esc(c.tel):''}${c.mail?'<br>'+esc(c.mail):''}</div>
+     <div class="rc-box"><div class="rc-lbl">Kunde</div><div class="rc-cust-name">${esc(c.name)}</div>${(c.firma&&c.firma!==c.name)?esc(c.firma)+'<br>':''}${c.adr?esc(c.adr)+'<br>':''}${(c.plz||c.stadt)?esc(((c.plz||'')+' '+(c.stadt||'')).trim())+'<br>':''}${c.tel?esc(c.tel):''}${c.mail?'<br>'+esc(c.mail):''}</div>
      <div class="rc-box"><div class="rc-lbl">Auftragsdaten</div>Angenommen: ${fmtDate(o.created)}<br>Status: ${esc(statusLabel(o.status))}${(o.technikerId&&techName(o.technikerId))?'<br>Techniker: '+esc(techName(o.technikerId)):''}</div>
    </div>
-   <div class="rc-box" style="margin-top:10px"><div class="rc-lbl">Gerät &amp; Reparatur</div>${devDetailRows(o)}
-     <table class="rc-tbl"><thead><tr><th>Position</th><th style="text-align:right">Betrag</th></tr></thead><tbody>${posRows(o)}</tbody></table>
+   <div style="margin-top:12px"><div class="rc-lbl">Gerät &amp; Reparatur</div>${receiptDeviceBlocks(o)}
      <div class="rc-price"><div class="rc-sub">Netto ${eur(netOf(total))} · darin ${MWST_RATE} % MwSt ${eur(vatOf(total))}</div><div><span class="rc-sub">Gesamt (inkl. MwSt.)</span> <span class="big">${eur(total)}</span></div></div>
    </div>
    <div class="rc-bottom">
