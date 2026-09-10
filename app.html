@@ -849,7 +849,7 @@ function renderCiPicker(){var el=document.getElementById('ci_picker');if(!el)ret
   var brands=catBrands();var q=(ciSel.search||'').toLowerCase().trim();var models=[];
   if(q){brands.forEach(function(b){catModelNames(b).forEach(function(m){if((b+' '+m).toLowerCase().indexOf(q)>=0)models.push({b:b,m:m});});});models=models.slice(0,60);}
   else{catModelNames(ciSel.brand).forEach(function(m){models.push({b:ciSel.brand,m:m});});}
-  var brandCards=brands.map(function(b){var on=(b===ciSel.brand&&!q);return '<button type="button" class="cibr'+(on?' on':'')+'" onclick="ciPickBrand(\''+qa(b)+'\')">'+brandMonogram(b,28)+'<span>'+esc(b)+'</span></button>';}).join('');
+  var brandCards=brands.map(function(b){var on=(b===ciSel.brand&&!q);var lg=catBrandLogo(b);var ic=lg?'<span style="width:28px;height:28px;flex:none;display:inline-flex;align-items:center;justify-content:center"><img src="'+lg+'" alt="'+esc(b)+'" style="max-width:28px;max-height:28px;object-fit:contain"></span>':brandMonogram(b,28);return '<button type="button" class="cibr'+(on?' on':'')+'" onclick="ciPickBrand(\''+qa(b)+'\')">'+ic+'<span>'+esc(b)+'</span></button>';}).join('');
   var cards=models.map(function(x){var sel=(x.b===ciSel.brand&&x.m===ciSel.model);
     return '<button type="button" class="cimod'+(sel?' on':'')+'" onclick="ciPickModel(\''+qa(x.b)+'\',\''+qa(x.m)+'\')">'+(sel?'<span class="cimod-chk">✓</span>':'')+modelThumb(x.b,x.m,58)+'<span class="cimod-nm">'+esc(x.m)+'</span>'+(q?'<span class="cimod-br">'+esc(x.b)+'</span>':'')+'</button>';}).join('');
   el.innerHTML='<div class="cibr-wrap"'+(q?' style="display:none"':'')+'>'+brandCards+'</div><div class="cimod-grid">'+(cards||'<div class="muted" style="font-size:13px;padding:8px">Kein Modell gefunden – tippen Sie oben den Namen ein, Sie können es trotzdem abgeben.</div>')+'</div>';}
@@ -3052,6 +3052,10 @@ function catDelModel(brand,name){if(!confirm('Modell „'+name+'" löschen?'))re
 function catSetModelType(brand,name,type){const m=catModelObj(brand,name);if(m){m.type=type;save();}}
 function catImgUpload(brand,name,input){const f=input.files&&input.files[0];if(!f)return;const rd=new FileReader();rd.onload=function(){const im=new Image();im.onload=function(){const cv=document.createElement('canvas');const max=240;let w=im.width,h=im.height;if(w>=h&&w>max){h=Math.round(h*max/w);w=max;}else if(h>w&&h>max){w=Math.round(w*max/h);h=max;}cv.width=w;cv.height=h;const cx=cv.getContext('2d');cx.fillStyle='#fff';cx.fillRect(0,0,w,h);cx.drawImage(im,0,0,w,h);const m=catModelObj(brand,name);if(m){m.img=cv.toDataURL('image/jpeg',0.82);save();views.preise();paintIcons();toast('Bild gespeichert');}};im.src=rd.result;};rd.readAsDataURL(f);}
 function catImgClear(brand,name){const m=catModelObj(brand,name);if(m){m.img='';save();views.preise();paintIcons();}}
+/* v11 #12: echte Hersteller-Logos pro Marke (vom Betreiber hochgeladen; Monogramm als Fallback) */
+function catBrandLogo(b){const c=ensureCat();return (c.brandLogos&&c.brandLogos[b])||'';}
+function catBrandLogoUpload(b,input){const f=input.files&&input.files[0];if(!f)return;const rd=new FileReader();rd.onload=function(){const im=new Image();im.onload=function(){const cv=document.createElement('canvas');const max=120;let w=im.width,h=im.height;if(w>max||h>max){if(w>=h){h=Math.round(h*max/w);w=max;}else{w=Math.round(w*max/h);h=max;}}cv.width=w;cv.height=h;const cx=cv.getContext('2d');cx.clearRect(0,0,w,h);cx.drawImage(im,0,0,w,h);const c=ensureCat();c.brandLogos=c.brandLogos||{};c.brandLogos[b]=cv.toDataURL('image/png');save();if(views.preise)views.preise();paintIcons();toast('Logo gespeichert: '+b);};im.src=rd.result;};rd.readAsDataURL(f);}
+function catBrandLogoClear(b){const c=ensureCat();if(c.brandLogos){delete c.brandLogos[b];save();if(views.preise)views.preise();paintIcons();toast('Logo entfernt');}}
 function catAddRepair(){const nm=(prompt('Neue Reparaturart:')||'').trim();if(!nm)return;const bp=+((prompt('Basispreis (€):','49'))||0);const c=ensureCat();if(!c.repairs.includes(nm))c.repairs.push(nm);c.base[nm]=bp;save();views.preise();paintIcons();toast('Reparaturart angelegt');}
 function catDelRepair(nm){if(!confirm('Reparaturart „'+nm+'" löschen?'))return;const c=ensureCat();c.repairs=c.repairs.filter(x=>x!==nm);delete c.base[nm];save();views.preise();paintIcons();toast('Reparaturart gelöscht');}
 function catSetBase(nm,val){const c=ensureCat();c.base[nm]=+val||0;save();}
@@ -3070,6 +3074,13 @@ views.preise=function(){
     const models=catModels(catBrand);
     body=`<div class="row" style="margin:14px 0;flex-wrap:wrap;gap:8px">${c.brands.map(b=>`<button class="chip ${catBrand===b?'on':''}" onclick="catBrand='${qa(b)}';views.preise();paintIcons()">${esc(b)}</button>`).join('')}<button class="btn sm" onclick="catAddBrand()">+ Marke</button></div>
      <div class="between"><b>${esc(catBrand)} · ${models.length} Modell${models.length===1?'':'e'}</b><div class="row"><button class="btn sm" onclick="catAddModel('${qa(catBrand)}')">+ Modell</button>${c.brands.length>1?`<button class="btn sm gho" onclick="catDelBrand('${qa(catBrand)}')">Marke löschen</button>`:''}</div></div>
+     ${catBrand?`<div class="row" style="align-items:center;gap:10px;margin-top:10px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;flex-wrap:wrap">
+       <span class="muted" style="font-size:12px;font-weight:700">Marken-Logo</span>
+       <span style="width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center">${catBrandLogo(catBrand)?`<img src="${catBrandLogo(catBrand)}" style="max-width:30px;max-height:30px;object-fit:contain">`:brandMonogram(catBrand,28)}</span>
+       <label class="btn sm" style="cursor:pointer">Logo hochladen<input type="file" accept="image/*" style="display:none" onchange="catBrandLogoUpload('${qa(catBrand)}',this)"></label>
+       ${catBrandLogo(catBrand)?`<button class="btn sm gho" onclick="catBrandLogoClear('${qa(catBrand)}')">entfernen</button>`:''}
+       <span class="muted" style="font-size:11px">Erscheint im Self-Check. Für die Nutzungsrechte am Logo ist der Betreiber verantwortlich.</span>
+     </div>`:''}
      <div class="card" style="padding:0;overflow:auto;margin-top:10px"><table><thead><tr><th>Bild</th><th>Modell</th><th>Gerätetyp</th><th></th></tr></thead>
        <tbody>${models.length?models.map(mo=>`<tr>
          <td>${mo.img?`<img src="${mo.img}" style="width:46px;height:46px;object-fit:contain;border:1px solid var(--line);border-radius:8px;background:#fff">`:`<div style="width:46px;height:46px;border:1px dashed var(--line);border-radius:8px;display:grid;place-items:center;color:#bbb;font-size:10px">kein Bild</div>`}</td>
