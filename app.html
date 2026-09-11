@@ -3422,6 +3422,59 @@ function ensureBranches(){ if(!S.branches){ S.branches=S.__clean?[]:[
     {id:'br2',name:'Hechingen',rev:11180,orders:121,rating:4.9},
     {id:'br3',name:'Reutlingen',rev:7650,orders:88,rating:4.5}
   ]; } return S.branches; }
+/* v2 Doc #2: Auswertung nach Hersteller & Modell + Zeiträume + Vorzeitraum-Vergleich */
+let statRange='monat', statFrom='', statTo='';
+function _stWeek(ds,backDays){const d=new Date(ds+'T12:00:00');const to=new Date();to.setHours(12,0,0,0);to.setDate(to.getDate()-(backDays||0));const from=new Date(to);from.setDate(from.getDate()-6);return d>=new Date(from.toDateString())&&d<=new Date(to.toDateString());}
+function statInRange(ds){ if(!ds)return false; const t=today();
+  if(statRange==='heute')return ds===t;
+  if(statRange==='woche')return _stWeek(ds,0);
+  if(statRange==='monat')return ds.slice(0,7)===t.slice(0,7);
+  if(statRange==='jahr')return ds.slice(0,4)===t.slice(0,4);
+  if(statRange==='frei')return (!statFrom||ds>=statFrom)&&(!statTo||ds<=statTo);
+  return true; }
+function statInPrev(ds){ if(!ds)return false; const now=new Date();
+  if(statRange==='heute'){const y=new Date();y.setDate(y.getDate()-1);return ds===y.toISOString().slice(0,10);}
+  if(statRange==='woche')return _stWeek(ds,7);
+  if(statRange==='monat'){const d=new Date(now.getFullYear(),now.getMonth()-1,1);return ds.slice(0,7)===d.toISOString().slice(0,7);}
+  if(statRange==='jahr')return ds.slice(0,4)===String(now.getFullYear()-1);
+  if(statRange==='frei'){ if(!statFrom||!statTo)return false; const f=new Date(statFrom),tt=new Date(statTo);const len=Math.max(1,Math.round((tt-f)/86400000)+1);const pf=new Date(f);pf.setDate(pf.getDate()-len);const pt=new Date(f);pt.setDate(pt.getDate()-1);const s=pf.toISOString().slice(0,10),e=pt.toISOString().slice(0,10);return ds>=s&&ds<=e; }
+  return false; }
+function statCollect(fn){ const all=S.ord.filter(o=>!o.trashed&&fn(o.created));
+  const brand={},model={},fehler={}; let cnt=0,rev=0;
+  all.forEach(o=>{ const devs=oDevices(o); const ot=oTotal(o); rev+=ot; const per=devs.length?ot/devs.length:0;
+    devs.forEach(d=>{ const b=d.brand||'Sonstige'; (brand[b]=brand[b]||{cnt:0,rev:0}); brand[b].cnt++; brand[b].rev+=per; cnt++;
+      const mn=[d.brand,d.model].filter(Boolean).join(' '); if(mn){model[mn]=(model[mn]||0)+1;}
+      devPositions(d).forEach(p=>{ if(p.reparatur)fehler[p.reparatur]=(fehler[p.reparatur]||0)+1; }); }); });
+  return {orders:all.length,cnt,rev,brand,model,fehler}; }
+function statSetRange(r){statRange=r;views.statistik();paintIcons();}
+function statSetFrom(v){statFrom=v;if(statFrom&&statTo)views.statistik();}
+function statSetTo(v){statTo=v;if(statFrom&&statTo)views.statistik();}
+const RANGE_LBL={heute:'Heute',woche:'Diese Woche',monat:'Dieser Monat',jahr:'Dieses Jahr',frei:'Frei'};
+function statBrandSection(){
+  const cur=statCollect(statInRange), prev=statCollect(statInPrev);
+  const brands=Object.entries(cur.brand).sort((a,b)=>b[1].cnt-a[1].cnt);
+  const maxB=Math.max(1,...brands.map(b=>b[1].cnt));
+  const models=Object.entries(cur.model).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const maxM=Math.max(1,...models.map(m=>m[1]));
+  const seg=['heute','woche','monat','jahr','frei'].map(r=>`<button class="${statRange===r?'on':''}" onclick="statSetRange('${r}')">${RANGE_LBL[r]}</button>`).join('');
+  const freibar=statRange==='frei'?`<div class="row" style="margin-top:10px;gap:10px"><div><label class="f">Von</label><input class="in" type="date" value="${statFrom}" onchange="statSetFrom(this.value)"></div><div><label class="f">Bis</label><input class="in" type="date" value="${statTo}" onchange="statSetTo(this.value)"></div></div>`:'';
+  const ordChg=prev.orders?Math.round((cur.orders-prev.orders)/prev.orders*100):(cur.orders?100:0);
+  const revChg=prev.rev?Math.round((cur.rev-prev.rev)/prev.rev*100):(cur.rev?100:0);
+  const upO=cur.orders>=prev.orders, upR=cur.rev>=prev.rev;
+  const brandRows=brands.length?brands.map(([b,v])=>{const pct=cur.cnt?Math.round(v.cnt/cur.cnt*100):0;return `<div style="margin-bottom:12px"><div class="between" style="margin-bottom:4px"><span><b>${esc(b)}</b> <span class="muted">· ${v.cnt} Aufträge · ${pct}%</span></span><b class="mono">${eur(v.rev)}</b></div><div class="bar"><i style="width:${v.cnt/maxB*100}%"></i></div></div>`;}).join(''):'<p class="muted" style="font-size:13px">Keine Aufträge im gewählten Zeitraum.</p>';
+  const modelRows=models.length?models.map(([mn,c])=>`<div style="margin-bottom:10px"><div class="between" style="margin-bottom:4px"><span>${esc(mn)}</span><b>${c}</b></div><div class="bar"><i style="width:${c/maxM*100}%"></i></div></div>`).join(''):'<p class="muted" style="font-size:13px">Keine Modelle im Zeitraum.</p>';
+  return `<div class="card" style="margin-top:16px"><div class="between" style="flex-wrap:wrap;gap:10px"><b>Auswertung nach Hersteller &amp; Modell</b><div class="seg">${seg}</div></div>${freibar}
+    <div class="grid g4" style="margin-top:14px">
+      <div class="card kpi" style="box-shadow:none;border:1px solid var(--line)"><div class="n">${cur.orders}</div><div class="l">Aufträge (${esc(RANGE_LBL[statRange])})</div><div class="t" style="color:${upO?'#34a24a':'#c0392b'}">${upO?'▲':'▼'} ${Math.abs(ordChg)}% vs. Vorzeitraum</div></div>
+      <div class="card kpi" style="box-shadow:none;border:1px solid var(--line)"><div class="n">${eur(cur.rev)}</div><div class="l">Umsatz</div><div class="t" style="color:${upR?'#34a24a':'#c0392b'}">${upR?'▲':'▼'} ${Math.abs(revChg)}% vs. Vorzeitraum</div></div>
+      <div class="card kpi" style="box-shadow:none;border:1px solid var(--line)"><div class="n">${brands.length}</div><div class="l">Hersteller</div></div>
+      <div class="card kpi" style="box-shadow:none;border:1px solid var(--line)"><div class="n">${Object.keys(cur.model).length}</div><div class="l">Modelle</div></div>
+    </div>
+    <div class="grid g2" style="margin-top:16px">
+      <div><div style="font-weight:700;margin-bottom:10px">Aufträge je Hersteller</div>${brandRows}</div>
+      <div><div style="font-weight:700;margin-bottom:10px">Top-Modelle</div>${modelRows}</div>
+    </div></div>`;
+}
 views.statistik=function(){
   const m=document.getElementById('main');
   const rep=S.ord.filter(o=>(o.status==='abgeholt'||o.status==='fertig')&&isThisMonth(o.pickedAt||o.readyAt||o.created)).reduce((s,o)=>s+(+o.price||0),0);
@@ -3432,7 +3485,7 @@ views.statistik=function(){
   const byType={};S.ord.forEach(o=>byType[o.issue]=(byType[o.issue]||0)+1);
   const top=Object.entries(byType).sort((a,b)=>b[1]-a[1]).slice(0,6);
   const maxT=Math.max(1,...top.map(t=>t[1]));
-  m.innerHTML=`<div class="between"><div><h1 class="h1">Statistik</h1><p class="sub">Aktueller Monat</p></div></div>
+  m.innerHTML=`<div class="between"><div><h1 class="h1">Statistik</h1><p class="sub">Aktueller Monat</p></div></div>${statBrandSection()}
    <div class="grid g4" style="margin-top:16px">
      <div class="card kpi"><div class="n">${eur(total)}</div><div class="l">Gesamtumsatz</div></div>
      <div class="card kpi"><div class="n">${eur(rep)}</div><div class="l">Reparaturen</div></div>
