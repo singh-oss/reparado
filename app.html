@@ -50,6 +50,11 @@
   .top .search{flex:1;max-width:460px;display:flex;align-items:center;gap:8px;background:var(--soft);border:1px solid transparent;border-radius:11px;padding:9px 12px;color:var(--ink2);transition:.14s}
   .top .search:focus-within{border-color:var(--green);background:#fff;box-shadow:var(--ring)}
   .top .search input{border:0;background:transparent;outline:0;width:100%;color:var(--ink)}
+  /* allgemeines Suchfeld (auch außerhalb der Kopfleiste, z. B. Kundenliste) */
+  .search{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:11px;padding:9px 12px;background:var(--soft);transition:.14s}
+  .search:focus-within{border-color:var(--green);background:#fff;box-shadow:var(--ring)}
+  .search .ic{width:18px;height:18px;color:var(--ink2);flex:none}
+  .search input{border:0;background:transparent;outline:0;width:100%;color:var(--ink)}
   .top .sp{flex:1}
   .content{padding:24px 26px 60px;max-width:1180px;width:100%}
 
