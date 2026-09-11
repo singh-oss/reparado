@@ -251,10 +251,9 @@
   .cats{display:grid;grid-template-columns:repeat(6,1fr);gap:16px}
   @media(max-width:900px){.cats{grid-template-columns:repeat(3,1fr)}}
   @media(max-width:520px){.cats{grid-template-columns:repeat(2,1fr)}}
-  .cat{text-align:center;border:1px solid var(--line);border-radius:18px;padding:22px 12px;background:#fff;box-shadow:var(--shadow-sm);transition:.16s ease}
+  .cat{text-align:center;border:1px solid var(--line);border-radius:16px;padding:10px 10px 16px;background:#fff;box-shadow:var(--shadow-sm);transition:.16s ease;overflow:hidden}
   .cat:hover{transform:translateY(-3px);box-shadow:var(--shadow-md);border-color:#d9e6dc}
-  .cat .ic{width:52px;height:52px;border-radius:14px;margin:0 auto 12px;display:grid;place-items:center;background:var(--green-tint);color:var(--green-d)}
-  .cat .ic svg{width:26px;height:26px}
+  .cat img{width:100%;height:96px;object-fit:cover;border-radius:11px;margin-bottom:11px;display:block;background:var(--soft)}
   .cat .t{font-weight:800;font-size:14px}
   .cat .s{color:var(--ink2);font-size:12px}
   .catsmore{text-align:center;color:var(--ink2);font-size:14px;margin-top:22px}
@@ -350,36 +349,10 @@
       </div>
     </div>
 
-    <!-- device mockup -->
+    <!-- echter App-Screenshot -->
     <div class="shot">
       <div class="bar"><i></i><i></i><i></i><div class="u"></div></div>
-      <div class="shotgrid">
-        <div class="sb">
-          <div class="b"><span class="wm">VEL<span class="q">Q</span>IO</span></div>
-          <a class="on"><span class="dt"></span>Dashboard</a>
-          <a><span class="dt"></span>Aufträge</a>
-          <a><span class="dt"></span>Termine</a>
-          <a><span class="dt"></span>Kunden</a>
-          <a><span class="dt"></span>Ersatzteile</a>
-          <a><span class="dt"></span>Statistiken</a>
-        </div>
-        <div class="bd">
-          <div class="greet">Guten Tag!</div>
-          <div class="sm">Hier ist dein Überblick.</div>
-          <div class="kpis">
-            <div class="k"><div class="n">28</div><div class="l">Offene Aufträge</div></div>
-            <div class="k"><div class="n">12</div><div class="l">Heute Termine</div></div>
-            <div class="k"><div class="n">3</div><div class="l">Warten auf Teile</div></div>
-            <div class="k"><div class="n g">98%</div><div class="l">Zufriedenheit</div></div>
-          </div>
-          <div style="margin-top:14px">
-            <div class="mockrow"><div class="av">MM</div><div style="flex:1"><div class="nm">Max Müller · iPhone 15 Pro</div><div class="mt">A-1043 · Displaytausch</div></div><span class="pill solid"><span class="d"></span>In Bearbeitung</span></div>
-            <div class="mockrow"><div class="av">AD</div><div style="flex:1"><div class="nm">Ayşe Demir · Galaxy S24</div><div class="mt">A-1042 · Akkutausch</div></div><span class="pill amber"><span class="d"></span>Warten auf Teil</span></div>
-            <div class="mockrow"><div class="av">LW</div><div style="flex:1"><div class="nm">Lukas Weber · iPad</div><div class="mt">A-1041 · Diagnose</div></div><span class="pill blue"><span class="d"></span>Abholbereit</span></div>
-            <div class="mockrow"><div class="av">SK</div><div style="flex:1"><div class="nm">Sarah Koch · E-Scooter</div><div class="mt">A-1040 · Reifen</div></div><span class="pill"><span class="d"></span>Offen</span></div>
-          </div>
-        </div>
-      </div>
+      <img src="/hero-app.png" alt="Velqio – Werkstatt-Dashboard" style="display:block;width:100%;height:auto">
     </div>
   </div>
 </div>
@@ -485,12 +458,12 @@
     <div class="t">Ein Werkzeug für alles, was repariert wird.</div>
   </div>
   <div class="cats">
-    <div class="cat"><div class="ic" data-ic="phone"></div><div class="t">Smartphone</div><div class="s">Reparatur</div></div>
-    <div class="cat"><div class="ic" data-ic="tablet"></div><div class="t">Tablet</div><div class="s">Reparatur</div></div>
-    <div class="cat"><div class="ic" data-ic="laptop"></div><div class="t">Laptop</div><div class="s">Reparatur</div></div>
-    <div class="cat"><div class="ic" data-ic="scooter"></div><div class="t">E-Scooter</div><div class="s">Reparatur</div></div>
-    <div class="cat"><div class="ic" data-ic="devices"></div><div class="t">Kleingeräte</div><div class="s">Reparatur</div></div>
-    <div class="cat"><div class="ic" data-ic="case"></div><div class="t">Zubehör</div><div class="s">&amp; Cases</div></div>
+    <div class="cat"><img src="/cat-smartphone.png" alt="Smartphone-Reparatur" loading="lazy"><div class="t">Smartphone</div><div class="s">Reparatur</div></div>
+    <div class="cat"><img src="/cat-tablet.png" alt="Tablet-Reparatur" loading="lazy"><div class="t">Tablet</div><div class="s">Reparatur</div></div>
+    <div class="cat"><img src="/cat-laptop.png" alt="Laptop-Reparatur" loading="lazy"><div class="t">Laptop</div><div class="s">Reparatur</div></div>
+    <div class="cat"><img src="/cat-escooter.png" alt="E-Scooter-Reparatur" loading="lazy"><div class="t">E-Scooter</div><div class="s">Reparatur</div></div>
+    <div class="cat"><img src="/cat-kleingeraete.png" alt="Kleingeräte-Reparatur" loading="lazy"><div class="t">Kleingeräte</div><div class="s">Reparatur</div></div>
+    <div class="cat"><img src="/cat-zubehoer.png" alt="Zubehör &amp; Cases" loading="lazy"><div class="t">Zubehör</div><div class="s">&amp; Cases</div></div>
   </div>
   <div class="catsmore">… und vieles mehr. Velqio passt sich deinem Betrieb an.</div>
  </div>
