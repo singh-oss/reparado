@@ -108,6 +108,7 @@ function renderPortal(d,t){
       <div><div style="font-weight:800;font-size:18px">${esc(d.device||'')}</div>
         <div class="muted" style="font-size:14px">${esc(d.issue||'')} · Auftrag ${esc(d.nr||'')}</div></div>
       <span class="badge" style="border-color:${esc(d.statusColor||'#0e7a3c')};color:${esc(d.statusColor||'#0e7a3c')}"><span class="d"></span>${esc(d.statusLabel||'')}</span></div></div>
+    ${(d.devicesDetail&&d.devicesDetail.some(x=>x.zustand||x.zubehoer))?`<div class="card"><div style="font-weight:800;margin-bottom:8px">Zustand bei Annahme</div>${d.devicesDetail.map(x=>`${d.devicesDetail.length>1?`<div style="font-weight:700;margin-top:6px">${esc(x.name)}</div>`:''}${x.zustand?`<div class="row"><span>Zustand</span><b style="text-align:right;max-width:62%">${esc(x.zustand)}</b></div>`:''}${x.zubehoer?`<div class="row"><span>Mitgegeben</span><b style="text-align:right;max-width:62%">${esc(x.zubehoer)}</b></div>`:''}`).join('')}<p class="muted" style="font-size:12px;margin-top:8px">Bitte prüfen Sie diese Angaben zum Gerätezustand und Zubehör. Bei Unstimmigkeiten wenden Sie sich vor der Unterschrift an die Werkstatt.</p></div>`:''}
     <div class="card"><div class="steps">
       ${STEPS.map((st,i)=>{const cls=i<cur?'done':(i===cur?'cur':'future');const showWait=(d.status==='warten'&&i===1);
         return `<div class="step ${cls}"><div class="linewrap"><div class="cir">${i<cur?CK:(i+1)}</div><div class="bar"></div></div>
