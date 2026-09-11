@@ -6,13 +6,13 @@
 <title>Velqio · Werkstatt-Software</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#ffffff; --ink:#0f2318; --ink2:#5f6b64; --line:#eaedeb; --line2:#f1f3f2;
     --soft:#f5f8f6; --soft2:#eef2ef; --white:#fff;
     --green:#34a24a; --green-d:#2a8b3d; --green-tint:#e9f5ec; --black:#34a24a;
-    --radius:16px;
+    --radius:16px; --font-head:'Montserrat','Inter',-apple-system,sans-serif;
     --shadow:0 1px 2px rgba(16,40,27,.04),0 6px 16px rgba(16,40,27,.05),0 18px 40px rgba(16,40,27,.04);
     --shadow-sm:0 1px 2px rgba(16,40,27,.05),0 4px 12px rgba(16,40,27,.05);
     --ring:0 0 0 3px rgba(14,122,60,.16);
@@ -38,8 +38,8 @@
   .nav a{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;color:var(--ink2);font-weight:600}
   .nav a .ic{width:18px;height:18px;flex:none;color:currentColor}
   .nav a:hover{background:var(--soft)}
-  .nav a.active{background:var(--green-tint);color:var(--green)}
-  .nav a.active .ic{color:var(--green)}
+  .nav a.active{background:var(--green);color:#fff;box-shadow:0 2px 6px rgba(42,139,61,.25),0 8px 18px rgba(52,162,74,.18)}
+  .nav a.active .ic{color:#fff}
   .nav .grouplbl{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:#9aa8a0;padding:16px 12px 6px;font-weight:700}
   .nav a .badge{margin-left:auto;background:var(--green);color:#fff;font-size:11px;border-radius:20px;padding:1px 7px;font-weight:700;font-variant-numeric:tabular-nums}
   .nav a.active .badge{background:var(--green);color:#fff}
@@ -53,7 +53,7 @@
   .top .sp{flex:1}
   .content{padding:24px 26px 60px;max-width:1180px;width:100%}
 
-  .h1{font-size:25px;font-weight:800;letter-spacing:-.03em;margin:0}
+  .h1{font-family:var(--font-head);font-size:26px;font-weight:800;letter-spacing:-.02em;margin:0}
   .sub{color:var(--ink2);margin:3px 0 0}
   .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
   .between{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
@@ -72,7 +72,7 @@
   .g4{grid-template-columns:repeat(4,1fr)}
   .g2{grid-template-columns:1fr 1fr}
   .muted{color:var(--ink2)}
-  .kpi .n{font-size:31px;font-weight:800;letter-spacing:-.035em;font-variant-numeric:tabular-nums}
+  .kpi .n{font-family:var(--font-head);font-size:31px;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
   .kpi .l{color:var(--ink2);font-size:13px;margin-top:3px}
   .kpi .t{font-size:12px;font-weight:700;margin-top:8px;color:var(--green)}
   .pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px;border:1px solid #34a24a;white-space:nowrap}
