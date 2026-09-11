@@ -103,6 +103,25 @@
   .in{width:100%;border:1px solid var(--line);border-radius:11px;padding:10px 12px;outline:0;background:#fff;transition:.14s;color:var(--ink)}
   .in:focus{border-color:var(--green);box-shadow:var(--ring)}
   .divider{height:1px;background:var(--line);margin:16px 0}
+  /* v2 Doc: Zustand/Zubehör große Kacheln + Foto-Thumbs */
+  .zsec{margin-top:10px}
+  .zlab{font-size:12px;font-weight:700;color:#333;margin:0 0 6px}
+  .ztiles{display:flex;flex-wrap:wrap;gap:8px}
+  .ztile{border:1.5px solid var(--line);background:#fff;color:var(--ink);border-radius:12px;padding:11px 15px;font-weight:600;font-size:14px;cursor:pointer;transition:.12s;line-height:1.1}
+  .ztile:hover{border-color:#cbd8ce;background:var(--soft)}
+  .ztile.on{border-color:var(--green);background:var(--green-tint);color:var(--green-d);box-shadow:inset 0 0 0 1px var(--green)}
+  .ztile.gut.on{border-color:var(--green);background:var(--green);color:#fff;box-shadow:none}
+  .ztile.alt{border-style:dashed}
+  .zfotos{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
+  .zfoto{position:relative;width:84px;height:84px;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--soft)}
+  .zfoto img{width:100%;height:100%;object-fit:cover;display:block}
+  .zfoto .zfx{position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,.62);color:#fff;display:grid;place-items:center;font-size:14px;cursor:pointer;line-height:1}
+  .zfoto .zft{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);color:#fff;font-size:9px;text-align:center;padding:1px 0}
+  .zfadd{width:84px;height:84px;border:1.5px dashed var(--line);border-radius:10px;display:grid;place-items:center;color:var(--ink2);font-weight:600;font-size:12px;cursor:pointer;text-align:center;transition:.12s}
+  .zfadd:hover{border-color:var(--green);color:var(--green-d);background:var(--green-tint)}
+  .field-missing{border-color:#e05b4d !important;box-shadow:0 0 0 3px rgba(224,91,77,.15) !important}
+  .zmiss{color:#c0392b;font-size:12px;font-weight:600;margin-top:6px}
+  .missbanner{background:#fdecea;border:1px solid #f5b7b1;color:#922b21;border-radius:12px;padding:14px 16px;margin-bottom:14px;font-size:14px;line-height:1.55}
   .empty{text-align:center;color:var(--ink2);padding:40px 10px}
   .switch{width:42px;height:24px;border-radius:20px;background:#d9d9d9;position:relative;transition:.15s;flex:none;border:0}
   .switch.on{background:#34a24a}
@@ -1259,7 +1278,17 @@ function saveSig(id){const c=document.getElementById('sig');const o=S.ord.find(x
 
 /* ============================ NEUER / EDIT AUFTRAG (Reparatur-Eingang, mit Entwurf) ============================ */
 function priceFor(brand,model,repair){const c=ensureCat();const k=brand+'|'+model+'|'+repair;if(c.prices[k]!==undefined&&c.prices[k]!=='')return +c.prices[k];const base=c.base[repair];if(base===undefined)return '';const names=catModelNames(brand);const i=names.indexOf(model);const f=i>=0?1+((i%3)*0.06):1;const bf=(c.brandMul&&c.brandMul[brand])||(brand==='Sonstige'||!brand?1:1.05);return Math.round(base*bf*f);}
-function blankDevice(){return {typ:'Smartphone',brand:'',model:'',imei:'',fach:'',ref:'',reparatur:'',price:'',qual:'Original',warranty:6,lock:'Kein',lockval:'',technikerId:'',positions:[blankPosition()]};}
+/* v2 Doc #3/#4: Zustand-Sektionen + Zubehör-Optionen (zentral) */
+const ZUSTAND_SECTIONS=[
+  {key:'display',label:'Display',opts:['Einwandfrei','Kratzer','Riss','Bruch','Sonstiges'],sonst:true},
+  {key:'rueck',label:'Rückseite',opts:['Einwandfrei','Kratzer','Riss / Bruch','Sonstiges'],sonst:true},
+  {key:'rahmen',label:'Rahmen / Gehäuse',opts:['Einwandfrei','Gebrauchsspuren','Delle','Beschädigt','Sonstiges'],sonst:true},
+  {key:'weitere',label:'Weitere Auffälligkeiten',opts:['Gerät verbogen','Feuchtigkeitsspuren','Starke Gebrauchsspuren'],sonst:false}
+];
+const ZUBEHOER_OPTS=['SIM-Karte','Speicherkarte','Hülle','S Pen / Stift','Ladekabel','Netzteil','Ladegerät','Originalverpackung'];
+const ZUBEHOER_KEIN='Kein Zubehör mitgegeben';
+function blankZustand(){return {display:[],rueck:[],rahmen:[],weitere:[]};}
+function blankDevice(){return {typ:'Smartphone',brand:'',model:'',imei:'',fach:'',ref:'',reparatur:'',price:'',qual:'Original',warranty:6,lock:'Kein',lockSet:false,lockval:'',technikerId:'',positions:[blankPosition()],zustand:blankZustand(),zsonst:{display:'',rueck:'',rahmen:''},zubehoer:[],zubehoerNote:'',fotos:[]};}
 /* Sperr-Typ normalisieren (Altdaten: 'Passwort / PIN' / 'Muster (Pattern)' / 'Keine') */
 function normLock(s){s=s||'';if(/PIN|Passwort/i.test(s))return 'PIN';if(/Muster|Pattern/i.test(s))return 'Muster';return 'Kein';}
 function lockLabel(d){const l=normLock(d&&d.lock);if(l==='PIN')return 'PIN'+((d&&d.lockval)?' · '+d.lockval:'');if(l==='Muster')return 'Muster'+((d&&d.lockval)?' · '+d.lockval:'');return '';}
@@ -1268,7 +1297,7 @@ function blankForm(){return {mode:'auftrag',draftId:'',editId:'',quoteEditId:'',
 function dPlus(n){const x=new Date();x.setDate(x.getDate()+(+n||0));return x.toISOString().slice(0,10);}
 function newQuote(pref){ closeAll(); NO=blankForm(); NO.mode='angebot'; NO.draftId=uid('dr'); NO.due=dPlus(14); if(pref)Object.assign(NO,pref); current='neworder'; renderNewOrder(); window.scrollTo(0,0); }
 function editQuote(id){ closeAll(); const q=(S.quotes||[]).find(x=>x.id===id); if(!q)return; NO=quoteToForm(q); NO.mode='angebot'; NO.quoteEditId=id; NO.draftId=uid('dr'); current='neworder'; renderNewOrder(); window.scrollTo(0,0); }
-function quoteToForm(q){const c=cust(q.cid);const nm=(c.name||'').split(' ');const f=blankForm();f.mode='angebot';f.cid=q.cid;f.typ=c.typ||'Privat';f.firma=c.firma||'';f.anrede=c.anrede||'Herr';f.vorname=nm.slice(0,-1).join(' ')||nm[0]||'';f.nachname=nm.length>1?nm[nm.length-1]:'';f.tel=c.tel||'+49 ';f.mail=c.mail||'';f.plz=c.plz||'';f.stadt=c.stadt||'';f.adr=c.adr||'';f.notes=q.notes||'';f.due=q.validUntil||dPlus(14);f.devices=oDevices(q).map(d=>({typ:d.typ||'Smartphone',brand:d.brand||'',model:d.model||'',imei:d.imei||'',fach:d.fach||'',ref:d.ref||'',reparatur:d.reparatur||'',price:(d.price!==undefined&&d.price!==''?d.price:''),qual:d.qual||'Original',warranty:d.warranty||6,lock:normLock(d.lock),lockval:d.lockval||'',technikerId:d.technikerId||'',positions:(Array.isArray(d.positions)&&d.positions.length?d.positions.map(p=>({reparatur:p.reparatur||'',qual:p.qual||'Original',price:(p.price!==undefined&&p.price!==''?p.price:'')})):[{reparatur:d.reparatur||'',qual:d.qual||'Original',price:(d.price!==undefined&&d.price!==''?d.price:'')}])}));return f;}
+function quoteToForm(q){const c=cust(q.cid);const nm=(c.name||'').split(' ');const f=blankForm();f.mode='angebot';f.cid=q.cid;f.typ=c.typ||'Privat';f.firma=c.firma||'';f.anrede=c.anrede||'Herr';f.vorname=nm.slice(0,-1).join(' ')||nm[0]||'';f.nachname=nm.length>1?nm[nm.length-1]:'';f.tel=c.tel||'+49 ';f.mail=c.mail||'';f.plz=c.plz||'';f.stadt=c.stadt||'';f.adr=c.adr||'';f.notes=q.notes||'';f.due=q.validUntil||dPlus(14);f.devices=oDevices(q).map(d=>({typ:d.typ||'Smartphone',brand:d.brand||'',model:d.model||'',imei:d.imei||'',fach:d.fach||'',ref:d.ref||'',reparatur:d.reparatur||'',price:(d.price!==undefined&&d.price!==''?d.price:''),qual:d.qual||'Original',warranty:d.warranty||6,lock:normLock(d.lock),lockval:d.lockval||'',technikerId:d.technikerId||'',zustand:(d.zustand?JSON.parse(JSON.stringify(d.zustand)):blankZustand()),zsonst:(d.zsonst?JSON.parse(JSON.stringify(d.zsonst)):{}),zubehoer:((d.zubehoer||[]).slice()),zubehoerNote:(d.zubehoerNote||''),fotos:((d.fotos||[]).slice()),lockSet:(d.lockSet!==undefined?d.lockSet:(normLock(d.lock)!=='Kein')),positions:(Array.isArray(d.positions)&&d.positions.length?d.positions.map(p=>({reparatur:p.reparatur||'',qual:p.qual||'Original',price:(p.price!==undefined&&p.price!==''?p.price:'')})):[{reparatur:d.reparatur||'',qual:d.qual||'Original',price:(d.price!==undefined&&d.price!==''?d.price:'')}])}));return f;}
 function noQuoteSave(status){ noCollect();
   if(!NO.vorname&&!NO.nachname&&!NO.firma){toast('Bitte Kundennamen angeben');return;}
   if((NO.tel||'').replace(/\D/g,'').length<5){toast('Bitte Telefonnummer angeben');return;}
@@ -1290,7 +1319,7 @@ let NO=null;
 function newOrder(){ closeAll(); NO=blankForm(); NO.draftId=uid('dr'); current='neworder'; renderNewOrder(); window.scrollTo(0,0); }
 function editOrder(id){ closeAll(); const o=S.ord.find(x=>x.id===id); if(!o)return; NO=orderToForm(o); NO.editId=id; current='neworder'; renderNewOrder(); window.scrollTo(0,0); }
 function resumeDraft(did){ closeAll(); const d=(S.drafts||[]).find(x=>x.id===did); if(!d)return; NO=Object.assign(blankForm(),JSON.parse(JSON.stringify(d.data))); NO.draftId=did; NO.editId=''; current='neworder'; renderNewOrder(); window.scrollTo(0,0); }
-function orderToForm(o){const c=cust(o.cid);const nm=(c.name||'').split(' ');const f=blankForm();f.cid=o.cid;f.typ=c.typ||'Privat';f.firma=c.firma||'';f.anrede=c.anrede||'Herr';f.vorname=nm.slice(0,-1).join(' ')||nm[0]||'';f.nachname=nm.length>1?nm[nm.length-1]:'';f.tel=c.tel||'+49 ';f.mail=c.mail||'';f.plz=c.plz||'';f.stadt=c.stadt||'';f.adr=c.adr||'';f.lock=o.lock||'Keine';f.lockval=o.lockval||'';f.prio=o.prio||'Standard';f.technikerId=o.technikerId||'';f.notes=o.notes||'';f.due=o.due||today();f.appt=o.appt||'';f.terminMode=o.appt?'termin':'kein';f.sig=o.sig||'';f.devices=oDevices(o).map((d,idx)=>({typ:d.typ||'Smartphone',brand:d.brand||'',model:d.model||'',imei:d.imei||'',fach:d.fach||'',ref:d.ref||'',reparatur:d.reparatur||'',price:(d.price!==undefined&&d.price!==0?d.price:(d.price===0?0:'')),qual:d.qual||'Original',warranty:d.warranty||6,lock:normLock(d.lock!==undefined?d.lock:(idx===0?o.lock:'')),lockval:(d.lockval!==undefined?d.lockval:(idx===0?(o.lockval||''):'')),technikerId:d.technikerId||'',positions:(Array.isArray(d.positions)&&d.positions.length?d.positions.map(p=>({reparatur:p.reparatur||'',qual:p.qual||'Original',price:(p.price!==undefined&&p.price!==''?p.price:'')})):[{reparatur:d.reparatur||'',qual:d.qual||'Original',price:(d.price!==undefined&&d.price!==0?d.price:(d.price===0?0:''))}])}));return f;}
+function orderToForm(o){const c=cust(o.cid);const nm=(c.name||'').split(' ');const f=blankForm();f.cid=o.cid;f.typ=c.typ||'Privat';f.firma=c.firma||'';f.anrede=c.anrede||'Herr';f.vorname=nm.slice(0,-1).join(' ')||nm[0]||'';f.nachname=nm.length>1?nm[nm.length-1]:'';f.tel=c.tel||'+49 ';f.mail=c.mail||'';f.plz=c.plz||'';f.stadt=c.stadt||'';f.adr=c.adr||'';f.lock=o.lock||'Keine';f.lockval=o.lockval||'';f.prio=o.prio||'Standard';f.technikerId=o.technikerId||'';f.notes=o.notes||'';f.due=o.due||today();f.appt=o.appt||'';f.terminMode=o.appt?'termin':'kein';f.sig=o.sig||'';f.devices=oDevices(o).map((d,idx)=>({typ:d.typ||'Smartphone',brand:d.brand||'',model:d.model||'',imei:d.imei||'',fach:d.fach||'',ref:d.ref||'',reparatur:d.reparatur||'',price:(d.price!==undefined&&d.price!==0?d.price:(d.price===0?0:'')),qual:d.qual||'Original',warranty:d.warranty||6,lock:normLock(d.lock!==undefined?d.lock:(idx===0?o.lock:'')),lockval:(d.lockval!==undefined?d.lockval:(idx===0?(o.lockval||''):'')),technikerId:d.technikerId||'',zustand:(d.zustand?JSON.parse(JSON.stringify(d.zustand)):blankZustand()),zsonst:(d.zsonst?JSON.parse(JSON.stringify(d.zsonst)):{}),zubehoer:((d.zubehoer||[]).slice()),zubehoerNote:(d.zubehoerNote||''),fotos:((d.fotos||[]).slice()),lockSet:(d.lockSet!==undefined?d.lockSet:(normLock(d.lock)!=='Kein')),positions:(Array.isArray(d.positions)&&d.positions.length?d.positions.map(p=>({reparatur:p.reparatur||'',qual:p.qual||'Original',price:(p.price!==undefined&&p.price!==''?p.price:'')})):[{reparatur:d.reparatur||'',qual:d.qual||'Original',price:(d.price!==undefined&&d.price!==0?d.price:(d.price===0?0:''))}])}));return f;}
 function noHasContent(){ if(!NO)return false; const d=NO.devices[0]||{}; return !!(NO.vorname||NO.nachname||(NO.tel||'').replace(/\D/g,'').length>3||NO.firma||NO.mail||d.brand||d.model||d.reparatur||(d.positions&&d.positions.some(p=>p.reparatur))||NO.notes); }
 function noTitleOf(){const nm=((NO.vorname+' '+NO.nachname).trim())||NO.firma||'Unbenannter Kunde';const d=NO.devices[0]||{};const dev=[d.brand,d.model].filter(Boolean).join(' ');return nm+(dev?' · '+dev:'');}
 function noCollect(){ if(!NO)return; const g=id=>{const e=document.getElementById(id);return e?e.value:'';};
@@ -1302,7 +1331,9 @@ function noCollect(){ if(!NO)return; const g=id=>{const e=document.getElementByI
     d.positions.forEach((p,j)=>{const gr=document.getElementById('dev'+i+'_pos'+j+'_reparatur');if(gr)p.reparatur=gr.value;const gp=document.getElementById('dev'+i+'_pos'+j+'_price');if(gp)p.price=gp.value;const gq=document.getElementById('dev'+i+'_pos'+j+'_qual');if(gq)p.qual=gq.value||p.qual;});
     const p0=d.positions[0]||{};d.reparatur=p0.reparatur||'';d.qual=p0.qual||'Original';d.price=(p0.price!==undefined?p0.price:''); /* Spiegel positions[0] */
     const lk=document.querySelector('input[name=dev'+i+'_lock]:checked');if(lk)d.lock=lk.value; d.lock=normLock(d.lock);
-    if(d.lock==='PIN')d.lockval=g('dev'+i+'_lockval'); else if(d.lock==='Kein')d.lockval=''; /* Muster: lockval wird beim Zeichnen gesetzt */});
+    if(d.lock==='PIN')d.lockval=g('dev'+i+'_lockval'); else if(d.lock==='Kein')d.lockval=''; /* Muster: lockval wird beim Zeichnen gesetzt */
+    ZUSTAND_SECTIONS.forEach(s=>{if(s.sonst){const _e=document.getElementById('dev'+i+'_zs_'+s.key);if(_e){d.zsonst=d.zsonst||{};d.zsonst[s.key]=_e.value;}}});
+    const _zn=document.getElementById('dev'+i+'_zubnote');if(_zn)d.zubehoerNote=_zn.value;});
   /* Auftrags-Spiegel (Rückwärtskompatibilität): Sperre des 1. Geräts */
   const d0=NO.devices[0]||{};NO.lock=d0.lock||'Kein';NO.lockval=d0.lockval||'';
 }
@@ -1362,9 +1393,73 @@ if(!window.__patGlobal){window.__patGlobal=1;
   window.addEventListener('mousemove',move);window.addEventListener('touchmove',move,{passive:false});
   window.addEventListener('mouseup',up);window.addEventListener('touchend',up);
 }
-function noLockPick(i,l){noCollect();NO.devices[i].lock=l;renderNewOrder();}
+function noLockPick(i,l){noCollect();NO.devices[i].lock=l;NO.devices[i].lockSet=true;renderNewOrder();}
 function noQuickPick(i){const v=(document.getElementById('dev'+i+'_search').value||'').trim();if(!v)return;noCollect();const brand=catBrands().find(b=>v.toLowerCase().startsWith(b.toLowerCase()));const d=NO.devices[i];if(brand){d.brand=brand;const rest=v.slice(brand.length).trim();const mm=catModelNames(brand).find(x=>x.toLowerCase()===rest.toLowerCase());d.model=mm||rest;if(d.model){const t=catModelType(brand,d.model);if(t)d.typ=t;}}else{d.model=v;}const p0=(d.positions&&d.positions[0]);if(p0&&d.brand&&p0.reparatur){const pr=priceFor(d.brand,d.model,p0.reparatur);if(pr!=='')p0.price=pr;}renderNewOrder();}
 function noAddDevice(){noCollect();NO.devices.push(blankDevice());renderNewOrder();}
+/* ---- v2 Doc #3/#4/#6: Zustand + Zubehör + Fotos bei Annahme (je Gerät) ---- */
+function fFotoTs(ts){if(!ts)return '';try{const d=new Date(ts);return d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})+' '+d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});}catch(e){return '';}}
+function noAnnahmeBlock(d,i){
+  const secs=ZUSTAND_SECTIONS.map(s=>{
+    const sel=(d.zustand&&d.zustand[s.key])||[];
+    const tiles=s.opts.map(o=>{const on=sel.indexOf(o)>=0;const gut=(o==='Einwandfrei');return `<button type="button" class="ztile${on?' on':''}${gut?' gut':''}" onclick="noZustandToggle(${i},'${s.key}','${o.replace(/'/g,"\\'")}')">${esc(o)}</button>`;}).join('');
+    const showSonst=s.sonst&&sel.indexOf('Sonstiges')>=0;
+    const note=(d.zsonst&&d.zsonst[s.key])||'';
+    return `<div class="zsec"><div class="zlab">${esc(s.label)}</div><div class="ztiles">${tiles}</div>${s.sonst?`<textarea class="in" id="dev${i}_zs_${s.key}" rows="1" placeholder="Sonstiges – kurz beschreiben…" style="margin-top:8px;${showSonst?'':'display:none'}">${esc(note)}</textarea>`:''}</div>`;
+  }).join('');
+  const zub=(d.zubehoer)||[];
+  const ztiles=ZUBEHOER_OPTS.map(o=>`<button type="button" class="ztile${zub.indexOf(o)>=0?' on':''}" onclick="noZubehoerToggle(${i},'${o.replace(/'/g,"\\'")}')">${esc(o)}</button>`).join('');
+  const keinTile=`<button type="button" class="ztile alt${zub.indexOf(ZUBEHOER_KEIN)>=0?' on':''}" onclick="noZubehoerToggle(${i},'${ZUBEHOER_KEIN}')">${ZUBEHOER_KEIN}</button>`;
+  const fotos=(d.fotos)||[];
+  const thumbs=fotos.map((f,k)=>`<div class="zfoto"><img src="${f.src}" alt=""><span class="zfx" onclick="noRemoveFoto(${i},${k})">×</span><span class="zft">${esc(fFotoTs(f.ts))}</span></div>`).join('');
+  return `<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line)" id="dev${i}_annahme">
+    <div class="between"><label class="f" style="margin:0">Zustand bei Annahme *</label><button type="button" class="btn sm gho" onclick="noZustandGut(${i})">✓ Gerät äußerlich einwandfrei</button></div>
+    ${secs}
+    <label class="f" style="margin-top:14px" id="dev${i}_zublabel">Mitgegebenes Zubehör *</label>
+    <div class="ztiles">${ztiles}${keinTile}</div>
+    <textarea class="in" id="dev${i}_zubnote" rows="1" placeholder="Sonstiges Zubehör / Hinweise…" style="margin-top:8px">${esc(d.zubehoerNote||'')}</textarea>
+    <label class="f" style="margin-top:14px">📷 Fotos bei Annahme (optional)</label>
+    <div class="zfotos">${thumbs}<label class="zfadd">＋ Foto<input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="noAddFoto(${i},this)"></label></div>
+  </div>`;
+}
+function noZustandToggle(i,sec,opt){noCollect();const d=NO.devices[i];if(!d.zustand)d.zustand=blankZustand();let a=d.zustand[sec]||(d.zustand[sec]=[]);const isGut=(opt==='Einwandfrei');const idx=a.indexOf(opt);
+  if(idx>=0){a.splice(idx,1);} else if(isGut){d.zustand[sec]=[opt];} else {a=a.filter(x=>x!=='Einwandfrei');a.push(opt);d.zustand[sec]=a;}
+  renderNewOrder();}
+function noZustandGut(i){noCollect();const d=NO.devices[i];if(!d.zustand)d.zustand=blankZustand();d.zustand.display=['Einwandfrei'];d.zustand.rueck=['Einwandfrei'];d.zustand.rahmen=['Einwandfrei'];renderNewOrder();}
+function noZubehoerToggle(i,opt){noCollect();const d=NO.devices[i];let a=d.zubehoer||(d.zubehoer=[]);
+  if(opt===ZUBEHOER_KEIN){d.zubehoer=(a.indexOf(ZUBEHOER_KEIN)>=0)?[]:[ZUBEHOER_KEIN];}
+  else {a=a.filter(x=>x!==ZUBEHOER_KEIN);const idx=a.indexOf(opt);if(idx>=0)a.splice(idx,1);else a.push(opt);d.zubehoer=a;}
+  renderNewOrder();}
+function noAddFoto(i,input){const files=Array.from(input.files||[]);if(!files.length)return;noCollect();const d=NO.devices[i];d.fotos=d.fotos||[];let pending=files.length;files.forEach(f=>{imgToDataURL(f,1000,0.8,function(url){d.fotos.push({src:url,ts:new Date().toISOString()});if(--pending===0){noSaveDraft();renderNewOrder();}});});}
+function noRemoveFoto(i,k){noCollect();const d=NO.devices[i];if(d.fotos)d.fotos.splice(k,1);renderNewOrder();}
+/* ---- v2 Doc #9: Pflichtfeld-/Vollständigkeitsprüfung ---- */
+function inUseDev(d){return !!(d.brand||d.model||devPositions(d).some(p=>p.reparatur)||(d.zustand&&['display','rueck','rahmen','weitere'].some(k=>((d.zustand[k])||[]).length))||((d.zubehoer||[]).length));}
+function noValidate(){
+  const miss=[];
+  if(!((NO.mail||'').trim()))miss.push({t:'E-Mail-Adresse',el:'no_mail'});
+  NO.devices.forEach((d,i)=>{ if(i>0&&!inUseDev(d))return;
+    const pre=NO.devices.length>1?('Gerät '+(i+1)+': '):'';
+    if(!d.brand||!d.model)miss.push({t:pre+'Hersteller & Modell',el:'dev'+i+'_model'});
+    if(!devPositions(d).some(p=>p.reparatur))miss.push({t:pre+'Fehler / Reparatur',el:'dev'+i+'_pos0_reparatur'});
+    const z=d.zustand||{};
+    if(!(((z.display||[]).length)&&((z.rueck||[]).length)&&((z.rahmen||[]).length)))miss.push({t:pre+'Gerätezustand',el:'dev'+i+'_annahme'});
+    if(!((d.zubehoer||[]).length))miss.push({t:pre+'Mitgegebenes Zubehör',el:'dev'+i+'_zublabel'});
+    if(!d.lockSet)miss.push({t:pre+'Displaysperre',el:'dev'+i+'_lockrow'});
+    else if(normLock(d.lock)==='PIN'&&!((d.lockval||'').trim()))miss.push({t:pre+'PIN / Passwort',el:'dev'+i+'_lockval'});
+    else if(normLock(d.lock)==='Muster'&&!((d.lockval||'').trim()))miss.push({t:pre+'Entsperrmuster einzeichnen',el:'dev'+i+'_lockpat'});
+  });
+  return miss;
+}
+function noShowMissing(miss){
+  document.querySelectorAll('.field-missing').forEach(e=>e.classList.remove('field-missing'));
+  miss.forEach(m=>{const el=document.getElementById(m.el);if(el)el.classList.add('field-missing');});
+  const list=miss.map(m=>m.t).join(' · ');
+  let b=document.getElementById('noMissBanner');
+  if(!b){b=document.createElement('div');b.id='noMissBanner';b.className='missbanner';const f=document.getElementById('noForm');if(f)f.insertBefore(b,f.firstChild);}
+  b.innerHTML='<b>Auftrag kann noch nicht abgeschlossen werden.</b><br>Bitte vervollständigen Sie: '+esc(list);
+  const first=miss.length?document.getElementById(miss[0].el):null;
+  if(first)first.scrollIntoView({behavior:'smooth',block:'center'}); else if(b)b.scrollIntoView({behavior:'smooth',block:'start'});
+  toast('Bitte fehlende Pflichtangaben ergänzen');
+}
 function noRemoveDevice(i){noCollect();NO.devices.splice(i,1);renderNewOrder();}
 function noTyp(){noCollect();renderNewOrder();}
 function noLock(){noCollect();renderNewOrder();}
@@ -1565,11 +1660,12 @@ function noKioskSave(){const c=document.getElementById('sig');if(!window.__sigDi
 function noSaveExit(){noCollect();if(noHasContent()){noSaveDraft();toast('Als Entwurf gespeichert');}NO=null;go('auftraege');}
 function noCancel(){noCollect();const isQ=NO.mode==='angebot';if(!NO.editId&&!NO.quoteEditId&&noHasContent()){if(!confirm(isQ?'Angebot verwerfen?':'Auftrag verwerfen? Der ungespeicherte Entwurf wird gelöscht.'))return;if(!isQ)S.drafts=(S.drafts||[]).filter(x=>x.id!==NO.draftId);save();}NO=null;go(isQ?'angebote':'auftraege');}
 function noFinalize(){ noCollect();
-  if(!NO.vorname&&!NO.nachname&&!NO.firma){toast('Bitte Kundennamen angeben');return;}
-  if((NO.tel||'').replace(/\D/g,'').length<5){toast('Bitte Telefonnummer angeben');return;}
-  const d0=NO.devices[0]||{}; if(!d0.brand&&!d0.model){toast('Bitte Gerät (Marke/Modell) angeben');return;}
-  if(!devPositions(d0).some(p=>p.reparatur)){toast('Bitte mindestens eine Reparaturposition angeben');return;}
-  for(const d of NO.devices){ if((d.brand||d.model)&&!devPositions(d).some(p=>p.reparatur)){toast('Bitte für jedes Gerät mindestens eine Reparaturposition angeben');return;} }
+  if(!NO.vorname&&!NO.nachname&&!NO.firma){noShowMissing([{t:'Kundenname',el:'no_vorname'}]);return;}
+  if((NO.tel||'').replace(/\D/g,'').length<5){noShowMissing([{t:'Telefonnummer',el:'no_tel'}]);return;}
+  const _miss=noValidate(); if(_miss.length){noShowMissing(_miss);return;}
+  document.querySelectorAll('.field-missing').forEach(e=>e.classList.remove('field-missing'));
+  {const _b=document.getElementById('noMissBanner');if(_b)_b.remove();}
+  const d0=NO.devices[0]||{};
   const name=((NO.vorname+' '+NO.nachname).trim())||NO.firma; const digits=(NO.tel||'').replace(/\D/g,'');
   let c=NO.cid?S.cust.find(x=>x.id===NO.cid):null;
   if(!c)c=S.cust.find(x=>x.tel&&x.tel.replace(/\D/g,'')===digits&&digits.length>5);
@@ -1597,7 +1693,7 @@ function noBuildDevices(){ const built=[];
     if(!ps.length)return;
     ps.forEach(p=>catLearnRepair(p.reparatur));
     const p0=ps[0];
-    built.push({typ:d.typ,brand:d.brand,model:d.model,imei:d.imei,fach:d.fach,ref:d.ref,warranty:+d.warranty||6,lock:normLock(d.lock),lockval:(normLock(d.lock)==='Kein'?'':(d.lockval||'')),technikerId:d.technikerId||'',positions:ps,reparatur:p0.reparatur,qual:p0.qual,price:p0.price});
+    built.push({typ:d.typ,brand:d.brand,model:d.model,imei:d.imei,fach:d.fach,ref:d.ref,warranty:+d.warranty||6,lock:normLock(d.lock),lockval:(normLock(d.lock)==='Kein'?'':(d.lockval||'')),technikerId:d.technikerId||'',positions:ps,reparatur:p0.reparatur,qual:p0.qual,price:p0.price,zustand:(d.zustand||blankZustand()),zsonst:(d.zsonst||{}),zubehoer:(d.zubehoer||[]),zubehoerNote:(d.zubehoerNote||''),fotos:(d.fotos||[])});
   });
   return built; }
 function noMirror(devs){ const f=devs[0]||{}; return {devtyp:f.typ||'Smartphone',brand:f.brand||'',model:f.model||'',imei:f.imei||'',fach:f.fach||'',ref:f.ref||'',qual:f.qual||'Original',warranty:f.warranty||6,lock:normLock(f.lock),lockval:f.lockval||'',issue:devs.reduce((a,d)=>a.concat(devPositions(d).map(p=>p.reparatur)),[]).filter(Boolean).join(' · '),price:devs.reduce((s,d)=>s+devTotal(d),0)}; }
@@ -1631,9 +1727,10 @@ function noDevBlock(d,i){
     ${devPositions(d).length>1?`<div class="between" style="margin-top:10px;padding-top:8px;border-top:1px solid var(--line);font-weight:700"><span>Gerät ${i+1} gesamt</span><span class="mono">${eur(devTotal(d))}</span></div>`:''}
     <div class="grid g2" style="margin-top:10px"><div><label class="f">Garantie (Monate)</label><select class="in" id="dev${i}_warranty">${[6,12,24,0].map(w=>`<option ${(+d.warranty)===w?'selected':''}>${w}</option>`).join('')}</select></div>
       <div><label class="f">Techniker (dieses Gerät)</label><select class="in" id="dev${i}_tech"><option value="">— wie Auftrag —</option>${(S.users||[]).map(u=>`<option value="${u.id}" ${d.technikerId===u.id?'selected':''}>${esc(u.name)}${u.role?' ('+(ROLE_LABEL[u.role]||u.role)+')':''}</option>`).join('')}</select></div></div>
+    ${noAnnahmeBlock(d,i)}
     <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line)">
-      <label class="f">Displaysperre / Entsperrmethode</label>
-      <div class="row" style="margin-top:4px">${['Kein','PIN','Muster'].map(l=>{const cur=normLock(d.lock);return `<label class="chip ${cur===l?'on':''}" style="cursor:pointer"><input type="radio" name="dev${i}_lock" value="${l}" ${cur===l?'checked':''} onchange="noLockPick(${i},'${l}')" style="display:none">${l==='Kein'?'Kein Sperrcode':(l==='PIN'?'PIN / Passwort':'Muster')}</label>`;}).join('')}</div>
+      <label class="f">Displaysperre / Entsperrmethode *</label>
+      <div class="row" id="dev${i}_lockrow" style="margin-top:4px">${['Kein','PIN','Muster'].map(l=>{const cur=normLock(d.lock);return `<label class="chip ${cur===l?'on':''}" style="cursor:pointer"><input type="radio" name="dev${i}_lock" value="${l}" ${cur===l?'checked':''} onchange="noLockPick(${i},'${l}')" style="display:none">${l==='Kein'?'Kein Sperrcode':(l==='PIN'?'PIN / Passwort':'Muster')}</label>`;}).join('')}</div>
       <div id="dev${i}_lockpin" style="${normLock(d.lock)==='PIN'?'':'display:none'};margin-top:10px"><label class="f">PIN / Passwort (Hinweis für die Werkstatt)</label><input class="in" id="dev${i}_lockval" value="${esc(normLock(d.lock)==='PIN'?(d.lockval||''):'')}" placeholder="z. B. 0000"></div>
       <div id="dev${i}_lockpat" style="${normLock(d.lock)==='Muster'?'':'display:none'};margin-top:10px">
         <label class="f">Entsperrmuster — mit gedrückter Maus/Finger über die Punkte ziehen</label>
