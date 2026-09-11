@@ -110,6 +110,34 @@ def _wh_verify(payload, sig, secret):
     except Exception:
         return False
 
+# ---------- 2-Faktor-Authentifizierung per E-Mail (Code) ----------
+def _twofa_on():
+    if not bool(_cfg("TWOFA_ENABLED", True)):
+        return False
+    return bool(str(_cfg("SMTP_HOST", "") or ""))   # nur wenn E-Mail-Versand möglich
+def _rand_code():
+    return "%06d" % (int.from_bytes(os.urandom(4), "big") % 1000000)
+def _code_hash(code, challenge):
+    return hmac.new(SECRET, (challenge + "|" + str(code)).encode(), hashlib.sha256).hexdigest()
+def _mask_email(e):
+    try:
+        u, d = e.split("@", 1)
+        return (u[0] + "***" if len(u) > 1 else "***") + "@" + d
+    except Exception:
+        return e
+def _2fa_start(user, purpose):
+    ch = uid("2fa"); code = _rand_code(); exp = time.time() + 600
+    with _lock, db() as c:
+        c.execute("INSERT OR REPLACE INTO twofa(challenge,user_id,workshop_id,email,name,role,code_hash,purpose,expires,tries) VALUES(?,?,?,?,?,?,?,?,?,0)",
+                  (ch, user["id"], user["workshop_id"], user["email"], user["name"], user["role"], _code_hash(code, ch), purpose, exp))
+    txt = ("Hallo,\n\ndein Velqio-Bestaetigungscode lautet:\n\n    " + code +
+           "\n\nDer Code ist 10 Minuten gueltig. Wenn du dich nicht anmelden wolltest, ignoriere diese E-Mail.\n\nDein Velqio-Team")
+    try:
+        send_mail(user["workshop_id"], user["email"], "Velqio - Dein Bestaetigungscode: " + code, txt)
+    except Exception:
+        pass
+    return ch
+
 # ---------- Datenbank ----------
 class _DBCtx:
     """Context-Manager: committet bei Erfolg, rollt bei Fehler zurück und SCHLIESST IMMER die Verbindung
@@ -174,6 +202,9 @@ def init_db():
           id INTEGER PRIMARY KEY AUTOINCREMENT, workshop_id TEXT, order_id TEXT,
           entry_id TEXT, user_id TEXT, user_name TEXT, action TEXT, detail TEXT, at TEXT);
         CREATE UNIQUE INDEX IF NOT EXISTS ux_activity_entry ON activity_log(workshop_id, entry_id);
+        CREATE TABLE IF NOT EXISTS twofa(
+          challenge TEXT PRIMARY KEY, user_id TEXT, workshop_id TEXT, email TEXT,
+          name TEXT, role TEXT, code_hash TEXT, purpose TEXT, expires REAL, tries INTEGER DEFAULT 0);
         """)
         # Abo/Stripe-Spalten (idempotent nachrüsten)
         for col in ("plan", "sub_status", "trial_end", "stripe_customer", "stripe_sub", "current_period_end"):
@@ -513,9 +544,45 @@ class H(BaseHTTPRequestHandler):
                 u = c.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
             if not u or not check_pw(pw, u["pw_hash"], u["pw_salt"]):
                 return self._send(401, {"error": "E-Mail oder Passwort falsch"})
+            if _twofa_on():
+                ch = _2fa_start(u, "login")
+                return self._send(200, {"twofa": True, "challenge": ch, "email": _mask_email(u["email"])})
             token = make_token(u["id"], u["workshop_id"])
             return self._send(200, {"token": token, "workshopId": u["workshop_id"],
                                     "name": u["name"], "role": u["role"], "billing": billing_info(u["workshop_id"])})
+
+        if self.path == "/api/auth/2fa/verify":
+            ch = body.get("challenge") or ""; code = (body.get("code") or "").strip()
+            now = time.time()
+            with _lock, db() as c:
+                row = c.execute("SELECT * FROM twofa WHERE challenge=?", (ch,)).fetchone()
+                if not row or (row["expires"] or 0) < now:
+                    return self._send(400, {"error": "Code abgelaufen. Bitte neu anmelden."})
+                if (row["tries"] or 0) >= 5:
+                    c.execute("DELETE FROM twofa WHERE challenge=?", (ch,))
+                    return self._send(400, {"error": "Zu viele Fehlversuche. Bitte neu anmelden."})
+                if not hmac.compare_digest(_code_hash(code, ch), row["code_hash"] or ""):
+                    c.execute("UPDATE twofa SET tries=tries+1 WHERE challenge=?", (ch,))
+                    left = 5 - ((row["tries"] or 0) + 1)
+                    return self._send(400, {"error": "Code falsch. Noch %d Versuch(e)." % max(0, left)})
+                c.execute("DELETE FROM twofa WHERE challenge=?", (ch,))
+            token = make_token(row["user_id"], row["workshop_id"])
+            return self._send(200, {"token": token, "workshopId": row["workshop_id"],
+                                    "name": row["name"], "role": row["role"], "billing": billing_info(row["workshop_id"])})
+
+        if self.path == "/api/auth/2fa/resend":
+            ch = body.get("challenge") or ""; now = time.time()
+            with db() as c:
+                row = c.execute("SELECT workshop_id,email,expires FROM twofa WHERE challenge=?", (ch,)).fetchone()
+            if not row:
+                return self._send(400, {"error": "Sitzung abgelaufen. Bitte neu anmelden."})
+            code = _rand_code()
+            with _lock, db() as c:
+                c.execute("UPDATE twofa SET code_hash=?, expires=?, tries=0 WHERE challenge=?", (_code_hash(code, ch), time.time() + 600, ch))
+            txt = ("Hallo,\n\ndein neuer Velqio-Bestaetigungscode lautet:\n\n    " + code + "\n\n10 Minuten gueltig.\n\nDein Velqio-Team")
+            try: send_mail(row["workshop_id"], row["email"], "Velqio - Dein Bestaetigungscode: " + code, txt)
+            except Exception: pass
+            return self._send(200, {"ok": True})
 
         if self.path == "/api/billing/checkout":
             p = self._auth()
@@ -590,6 +657,9 @@ class H(BaseHTTPRequestHandler):
                               (usr, wid, email, ph, salt, "inhaber", uname, now))
             except sqlite3.IntegrityError:
                 return self._send(409, {"error": "Diese E-Mail ist bereits registriert"})
+            if _twofa_on():
+                ch = _2fa_start({"id": usr, "workshop_id": wid, "email": email, "name": uname, "role": "inhaber"}, "signup")
+                return self._send(200, {"twofa": True, "challenge": ch, "email": _mask_email(email)})
             token = make_token(usr, wid)
             return self._send(200, {"token": token, "workshopId": wid, "name": uname, "role": "inhaber", "billing": billing_info(wid)})
 

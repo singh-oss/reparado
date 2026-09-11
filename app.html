@@ -351,18 +351,23 @@ const DB = {
   login(email,pw){ const self=this; if(!CFG) return Promise.reject(new Error('Keine Server-Config'));
     return fetch(API+'/api/auth/login', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email:email,password:pw})})
       .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, d:d}; }); })
-      .then(function(res){ if(res.ok && res.d.token){ self._setSession(res.d); return res.d; }
+      .then(function(res){ if(res.ok && (res.d.token||res.d.twofa)){ if(res.d.token) self._setSession(res.d); return res.d; }
         throw new Error((res.d && res.d.error) || 'Anmeldung fehlgeschlagen'); }); },
   signup(workshopName,email,pw){ const self=this; if(!CFG) return Promise.reject(new Error('Keine Server-Config'));
     return fetch(API+'/api/auth/signup', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({workshopName:workshopName,email:email,password:pw})})
       .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, d:d}; }); })
-      .then(function(res){ if(res.ok && res.d.token){ self._setSession(res.d); return res.d; }
+      .then(function(res){ if(res.ok && (res.d.token||res.d.twofa)){ if(res.d.token) self._setSession(res.d); return res.d; }
         throw new Error((res.d && res.d.error) || 'Registrierung fehlgeschlagen'); }); },
   requestReset(email){ if(!CFG) return Promise.reject(new Error('Keine Server-Config'));
     return fetch(API+'/api/auth/reset', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email:email})}).then(function(r){return r.json();}); },
   confirmReset(token,pw){ if(!CFG) return Promise.reject(new Error('Keine Server-Config'));
     return fetch(API+'/api/auth/reset/confirm', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({token:token,password:pw})})
       .then(function(r){ return r.json().then(function(d){ if(!r.ok||d.error) throw new Error(d.error||'Fehler'); return d; }); }); },
+  verify2fa(challenge,code){ const self=this;
+    return fetch(API+'/api/auth/2fa/verify', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({challenge:challenge,code:code})})
+      .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
+      .then(function(res){ if(res.ok && res.d.token){ self._setSession(res.d); return res.d; } throw new Error((res.d && res.d.error) || 'Code ungültig'); }); },
+  resend2fa(challenge){ return fetch(API+'/api/auth/2fa/resend', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({challenge:challenge})}).then(function(r){return r.json();}); },
   restoreSession(){ try{ const t=localStorage.getItem('reparado_token'); if(t){ this.token=t; return true; } }catch(e){} return false; },
   logoutServer(){ this.token=null; try{localStorage.removeItem('reparado_token');}catch(e){} }
 };
@@ -4611,13 +4616,13 @@ function finishServerBoot(hadState){ const ov=document.getElementById('sbLogin')
     else { fetchBilling(); }
   } }
 /* Server-Modus: Anmeldung / Selbst-Registrierung an der echten Datenbank (nur mit config.js) */
-let _sbMode='login'; let _sbResetToken=''; let _sbMsg='';
+let _sbMode='login'; let _sbResetToken=''; let _sbMsg=''; let _sb2fa=null;
 function sbSwitch(m){ _sbMode=m; _sbMsg=''; serverLoginOverlay(); }
 function serverLoginOverlay(err){
   let ov=document.getElementById('sbLogin'); if(!ov){ov=document.createElement('div');ov.id='sbLogin';ov.style.cssText='position:fixed;inset:0;z-index:9999;background:#0f2318;display:grid;place-items:center;padding:20px;overflow:auto';document.body.appendChild(ov);}
-  const signup=_sbMode==='signup', forgot=_sbMode==='forgot', reset=_sbMode==='reset';
+  const signup=_sbMode==='signup', forgot=_sbMode==='forgot', reset=_sbMode==='reset', twofa=_sbMode==='2fa';
   const inp='width:100%;padding:11px;border:1px solid #eaedeb;border-radius:10px;margin:4px 0 12px';
-  const sub=signup?'Neue Werkstatt anlegen – kostenlos testen':forgot?'Passwort zurücksetzen':reset?'Neues Passwort vergeben':'Anmeldung an dein Werkstatt-Konto';
+  const sub=signup?'Neue Werkstatt anlegen – kostenlos testen':forgot?'Passwort zurücksetzen':reset?'Neues Passwort vergeben':twofa?'Sicherheits-Bestätigung per E-Mail':'Anmeldung an dein Werkstatt-Konto';
   let btn, fields;
   if(reset){
     fields=`<label style="font-size:12px;font-weight:700;color:#5f6b64">Neues Passwort</label><input id="sbPw" type="password" style="${inp}" placeholder="mind. 6 Zeichen">`;
@@ -4625,6 +4630,9 @@ function serverLoginOverlay(err){
   } else if(forgot){
     fields=`<div style="color:#5f6b64;font-size:13px;margin-bottom:10px">Gib deine E-Mail ein – wir senden dir einen Link zum Zurücksetzen.</div><label style="font-size:12px;font-weight:700;color:#5f6b64">E-Mail</label><input id="sbEmail" type="email" style="${inp}" placeholder="werkstatt@mail.de">`;
     btn=`<button onclick="sbDoForgot()" style="width:100%;padding:12px;border:0;border-radius:10px;background:#34a24a;color:#fff;font-weight:700;cursor:pointer">Link senden</button>`;
+  } else if(twofa){
+    fields=`<div style="color:#5f6b64;font-size:13px;margin-bottom:12px">Wir haben einen 6-stelligen Bestätigungscode an <b>${esc((_sb2fa&&_sb2fa.email)||'deine E-Mail')}</b> gesendet. Bitte gib ihn ein.</div><label style="font-size:12px;font-weight:700;color:#5f6b64">Bestätigungscode</label><input id="sb2faCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" style="${inp};letter-spacing:8px;font-size:22px;text-align:center" placeholder="••••••"><div style="text-align:right;margin:-6px 0 4px"><a onclick="sbResend2fa()" style="color:#34a24a;font-size:12px;font-weight:700;cursor:pointer">Code erneut senden</a></div>`;
+    btn=`<button onclick="sbDo2fa()" style="width:100%;padding:12px;border:0;border-radius:10px;background:#34a24a;color:#fff;font-weight:700;cursor:pointer">Bestätigen &amp; anmelden</button>`;
   } else {
     fields=`${signup?`<label style="font-size:12px;font-weight:700;color:#5f6b64">Werkstatt-Name</label><input id="sbWs" style="${inp}" placeholder="z. B. Handy Klinik Musterstadt">`:''}
      <label style="font-size:12px;font-weight:700;color:#5f6b64">E-Mail</label><input id="sbEmail" type="email" style="${inp}" placeholder="werkstatt@mail.de">
@@ -4633,7 +4641,7 @@ function serverLoginOverlay(err){
      ${signup?'':`<div style="text-align:right;margin:-6px 0 12px"><a onclick="sbSwitch('forgot')" style="color:#34a24a;font-size:12px;font-weight:700;cursor:pointer">Passwort vergessen?</a></div>`}`;
     btn=`<button onclick="${signup?'sbDoSignup()':'sbDoLogin()'}" style="width:100%;padding:12px;border:0;border-radius:10px;background:#34a24a;color:#fff;font-weight:700;cursor:pointer">${signup?'Konto anlegen &amp; starten':'Anmelden'}</button>`;
   }
-  const backLink=(forgot||reset)?`<div style="text-align:center;margin-top:14px;font-size:13px;color:#5f6b64"><a onclick="sbSwitch('login')" style="color:#34a24a;font-weight:700;cursor:pointer">← Zurück zur Anmeldung</a></div>`
+  const backLink=(forgot||reset||twofa)?`<div style="text-align:center;margin-top:14px;font-size:13px;color:#5f6b64"><a onclick="sbSwitch('login')" style="color:#34a24a;font-weight:700;cursor:pointer">← Zurück zur Anmeldung</a></div>`
     :`<div style="text-align:center;margin-top:14px;font-size:13px;color:#5f6b64">${signup?`Schon registriert? <a onclick="sbSwitch('login')" style="color:#34a24a;font-weight:700;cursor:pointer">Anmelden</a>`:`Noch kein Konto? <a onclick="sbSwitch('signup')" style="color:#34a24a;font-weight:700;cursor:pointer">Werkstatt anlegen</a>`}</div>`;
   ov.innerHTML=`<div style="background:#fff;border-radius:16px;padding:28px;max-width:390px;width:100%;font-family:Inter,sans-serif">
      <div style="margin-bottom:4px"><img src="/velqio-wordmark.png" alt="Velqio" style="height:30px;display:block"></div>
@@ -4647,10 +4655,11 @@ function serverLoginOverlay(err){
    </div>`;
   const pw=document.getElementById('sbPw'); if(pw)pw.onkeydown=e=>{if(e.key==='Enter'){reset?sbDoReset():signup?sbDoSignup():sbDoLogin();}};
   const em=document.getElementById('sbEmail'); if(em&&forgot)em.onkeydown=e=>{if(e.key==='Enter')sbDoForgot();};
+  const c2=document.getElementById('sb2faCode'); if(c2){try{c2.focus();}catch(e){} c2.onkeydown=e=>{if(e.key==='Enter')sbDo2fa();};}
 }
 function sbDoLogin(){const em=(document.getElementById('sbEmail')||{}).value||'';const pw=(document.getElementById('sbPw')||{}).value||'';
   if(!em||!pw){serverLoginOverlay('Bitte E-Mail und Passwort eingeben.');return;}
-  DB.login(em.trim(),pw).then(()=>DB.hydrate()).then(had=>finishServerBoot(had)).catch(e=>serverLoginOverlay(e.message||'Anmeldung fehlgeschlagen.'));
+  DB.login(em.trim(),pw).then(function(d){ if(d&&d.twofa){ sb2faStart(d,'login'); return; } return DB.hydrate().then(had=>finishServerBoot(had)); }).catch(e=>serverLoginOverlay(e.message||'Anmeldung fehlgeschlagen.'));
 }
 function sbDoSignup(){const ws=(document.getElementById('sbWs')||{}).value||'';const em=(document.getElementById('sbEmail')||{}).value||'';const pw=(document.getElementById('sbPw')||{}).value||'';
   if(!ws.trim()){serverLoginOverlay('Bitte einen Werkstatt-Namen angeben.');return;}
@@ -4658,8 +4667,13 @@ function sbDoSignup(){const ws=(document.getElementById('sbWs')||{}).value||'';c
   const consent=(document.getElementById('sbConsent')||{}).checked;
   if(!consent){serverLoginOverlay('Bitte AGB und AVV akzeptieren, um fortzufahren.');return;}
   const legal={acceptedAt:new Date().toISOString(),agb:'v1',avv:'v1',datenschutz:'v1',email:em.trim()};
-  DB.signup(ws.trim(),em.trim(),pw).then(()=>{ finishServerBoot(false); try{masterSet('name',ws.trim());}catch(e){} try{S.legal=legal;save();}catch(e){} }).catch(e=>serverLoginOverlay(e.message||'Registrierung fehlgeschlagen.'));
+  DB.signup(ws.trim(),em.trim(),pw).then(function(d){ if(d&&d.twofa){ sb2faStart(d,'signup',{legal:legal,ws:ws.trim()}); return; } finishServerBoot(false); try{masterSet('name',ws.trim());}catch(e){} try{S.legal=legal;save();}catch(e){} }).catch(e=>serverLoginOverlay(e.message||'Registrierung fehlgeschlagen.'));
 }
+function sb2faStart(d,mode,extra){ _sb2fa={challenge:d.challenge,email:d.email,mode:mode,legal:(extra&&extra.legal)||null,ws:(extra&&extra.ws)||''}; _sbMode='2fa'; _sbMsg='Code gesendet – bitte E-Mail prüfen.'; serverLoginOverlay(); }
+function sbDo2fa(){ const code=((document.getElementById('sb2faCode')||{}).value||'').replace(/\D/g,''); if(code.length<6){serverLoginOverlay('Bitte den 6-stelligen Code eingeben.');return;} if(!_sb2fa){serverLoginOverlay('Bitte erneut anmelden.');return;}
+  DB.verify2fa(_sb2fa.challenge,code).then(function(){ const m=_sb2fa; _sb2fa=null; if(m.mode==='signup'){ finishServerBoot(false); try{masterSet('name',m.ws);}catch(e){} try{S.legal=m.legal;save();}catch(e){} } else { DB.hydrate().then(had=>finishServerBoot(had)); } }).catch(e=>serverLoginOverlay(e.message||'Code ungültig.'));
+}
+function sbResend2fa(){ if(!_sb2fa)return; DB.resend2fa(_sb2fa.challenge).then(function(){ _sbMsg='Neuer Code wurde gesendet.'; serverLoginOverlay(); }).catch(function(){ serverLoginOverlay('Konnte Code nicht senden – bitte erneut versuchen.'); }); }
 function sbDoForgot(){const em=(document.getElementById('sbEmail')||{}).value||'';
   if(!em.trim()){serverLoginOverlay('Bitte E-Mail eingeben.');return;}
   DB.requestReset(em.trim()).then(()=>{_sbMode='login';_sbMsg='Falls ein Konto mit dieser E-Mail existiert, haben wir dir einen Link zum Zurücksetzen geschickt. Bitte prüfe dein Postfach.';serverLoginOverlay();}).catch(()=>{_sbMode='login';_sbMsg='Falls ein Konto existiert, ist der Link unterwegs.';serverLoginOverlay();});

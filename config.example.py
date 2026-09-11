@@ -20,6 +20,10 @@ SMTP_USER = ""                 # Postfach-Login
 SMTP_PASS = ""                 # Postfach-Passwort
 MAIL_FROM = "Dein Handy Doc <info@deinhandydoc.de>"
 
+# 2-Faktor-Authentifizierung per E-Mail (Code bei Login + Registrierung).
+# Aktiv nur, wenn SMTP oben konfiguriert ist. Auf False setzen zum Deaktivieren.
+TWOFA_ENABLED = True
+
 # Abrechnung / Stripe (Abo Basic/Pro/AI). Leer lassen = Abo deaktiviert (App läuft ohne Bezahlschranke).
 APP_BASE_URL = "https://velqio.de"          # für Checkout-Rücksprung + Passwort-Reset-Links
 STRIPE_SECRET_KEY    = ""                    # sk_live_… (GEHEIM! nur hier auf dem Server)
