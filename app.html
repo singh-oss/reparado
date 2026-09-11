@@ -182,7 +182,7 @@
 <body>
 <div class="app">
   <aside class="side" id="side">
-    <div class="brand"><span style="font-family:Inter,-apple-system,sans-serif;font-weight:900;letter-spacing:-.02em;font-size:23px;color:#12261a">VEL<span style="color:var(--green)">Q</span>IO<sup style="font-size:.36em;font-weight:700;color:#8a938d;top:-.9em;position:relative">&reg;</sup></span></div>
+    <div class="brand"><img src="/velqio-wordmark.png" alt="Velqio" style="height:26px;display:block"></div>
     <div class="nav" id="nav">
       <a data-view="dashboard" class="active"><span class="ic" data-ic="grid"></span> Übersicht</a>
       <a data-view="anrufe"><span class="ic" data-ic="phone"></span> Empfang <span class="badge" id="bg-call">0</span></a>
@@ -226,7 +226,7 @@
 </div>
 
 <div id="loginScreen"><div class="loginbox">
-  <div class="loginbrand"><span style="font-family:Inter,-apple-system,sans-serif;font-weight:900;letter-spacing:-.02em;font-size:26px;color:#12261a">VEL<span style="color:var(--green)">Q</span>IO<sup style="font-size:.36em;font-weight:700;color:#8a938d;top:-.9em;position:relative">&reg;</sup></span></div>
+  <div class="loginbrand"><img src="/velqio-wordmark.png" alt="Velqio" style="height:34px;display:block"></div>
   <div class="muted" style="margin-bottom:20px" id="loginWs">Anmeldung</div>
   <div id="loginStep"></div>
   <div class="loginhint">Demo-PINs · Geschäftsführung <b>1234</b> · Mitarbeiter <b>0000</b></div>
@@ -4420,7 +4420,7 @@ function serverLoginOverlay(err){
   const backLink=(forgot||reset)?`<div style="text-align:center;margin-top:14px;font-size:13px;color:#5f6b64"><a onclick="sbSwitch('login')" style="color:#34a24a;font-weight:700;cursor:pointer">← Zurück zur Anmeldung</a></div>`
     :`<div style="text-align:center;margin-top:14px;font-size:13px;color:#5f6b64">${signup?`Schon registriert? <a onclick="sbSwitch('login')" style="color:#34a24a;font-weight:700;cursor:pointer">Anmelden</a>`:`Noch kein Konto? <a onclick="sbSwitch('signup')" style="color:#34a24a;font-weight:700;cursor:pointer">Werkstatt anlegen</a>`}</div>`;
   ov.innerHTML=`<div style="background:#fff;border-radius:16px;padding:28px;max-width:390px;width:100%;font-family:Inter,sans-serif">
-     <div style="display:flex;align-items:baseline;margin-bottom:4px"><span style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-weight:900;font-size:28px;letter-spacing:-.02em;color:#12261a;line-height:1">VEL<span style="color:#34a24a">Q</span>IO<sup style="font-size:.36em;font-weight:700;color:#5f6b64;top:-.9em;position:relative">&reg;</sup></span></div>
+     <div style="margin-bottom:4px"><img src="/velqio-wordmark.png" alt="Velqio" style="height:30px;display:block"></div>
      <div style="color:#5f6b64;font-size:13px;margin-bottom:16px">${sub}</div>
      ${_sbMsg?`<div style="background:#e9f5ec;color:#34a24a;border-radius:8px;padding:10px;font-size:13px;margin-bottom:12px">${esc(_sbMsg)}</div>`:''}
      ${fields}
