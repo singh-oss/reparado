@@ -126,6 +126,10 @@
   .cta{display:flex;gap:14px;margin-top:30px;flex-wrap:wrap}
   .microtrust{margin-top:16px;color:var(--ink2);font-size:13.5px;display:flex;gap:16px;flex-wrap:wrap}
   .microtrust b{color:var(--green-d)}
+  .herofeats{display:flex;flex-wrap:wrap;gap:16px 26px;margin-top:24px}
+  .herofeats .hf{display:flex;align-items:center;gap:9px;font-weight:700;font-size:14px;color:var(--ink)}
+  .herofeats .hf .ic{width:34px;height:34px;border-radius:10px;background:var(--green-tint);color:var(--green-d);display:grid;place-items:center;box-shadow:inset 0 0 0 1px rgba(52,162,74,.14)}
+  .herofeats .hf .ic svg{width:18px;height:18px}
   @media(max-width:960px){h1{font-size:46px;letter-spacing:-1.6px}}
   @media(max-width:520px){h1{font-size:36px;letter-spacing:-1.2px}.hero .lead{font-size:17px}}
 
@@ -303,7 +307,7 @@
 <header>
  <div class="wrap nav">
    <a class="brand" href="/"><img src="/velqio-wordmark.png" alt="Velqio" style="height:30px;display:block"></a>
-   <div class="links"><a href="#funktionen">Funktionen</a><a href="#preise">Preise</a><a href="#ki">KI</a><a href="#branchen">Branchen</a></div>
+   <div class="links"><a href="#preise">Preise</a><a href="#branchen">Branchen</a></div>
    <div class="sp"></div>
    <div class="actions" style="display:flex;gap:10px">
      <a class="btn ghost" href="app.html">Anmelden</a>
@@ -328,6 +332,12 @@
         <a class="btn big" href="#preise">Preise ansehen</a>
       </div>
       <div class="microtrust"><span>✓ <b>14 Tage</b> gratis</span><span>✓ ohne Kreditkarte</span><span>✓ Server in Deutschland</span></div>
+      <div class="herofeats">
+        <div class="hf"><span class="ic" data-ic="bolt"></span>Effizienter arbeiten</div>
+        <div class="hf"><span class="ic" data-ic="trend"></span>Mehr Umsatz</div>
+        <div class="hf"><span class="ic" data-ic="smile"></span>Zufriedenere Kunden</div>
+        <div class="hf"><span class="ic" data-ic="leaf"></span>Nachhaltiger wirtschaften</div>
+      </div>
       <div class="lgcard">
         <h3><span class="d2"></span>Schon Kunde? Direkt einloggen</h3>
         <form class="lgform" onsubmit="return landingLogin(event)">
@@ -374,36 +384,6 @@
   </div>
 </div>
 
-<!-- ===== VALUES ===== -->
-<div class="values wrap">
-  <div class="valgrid">
-    <div class="val"><div class="ic" data-ic="bolt"></div><div class="t">Schneller arbeiten</div><div class="s">Weniger Klicks, klare Abläufe.</div></div>
-    <div class="val"><div class="ic" data-ic="shield"></div><div class="t">Besseren Service</div><div class="s">Kunden immer auf dem Laufenden.</div></div>
-    <div class="val"><div class="ic" data-ic="chart"></div><div class="t">Intelligenter organisieren</div><div class="s">Alles an einem Ort, immer im Blick.</div></div>
-    <div class="val"><div class="ic" data-ic="leaf"></div><div class="t">Nachhaltiger wirtschaften</div><div class="s">Reparieren statt wegwerfen.</div></div>
-  </div>
-</div>
-
-<!-- ===== FEATURES ===== -->
-<section id="funktionen">
- <div class="wrap">
-  <div class="sec-h">
-    <div class="kick">Alle Funktionen. Ein Design.</div>
-    <div class="t">Alles, was eine Werkstatt braucht.</div>
-    <div class="s">Ein System für den ganzen Ablauf – von der Annahme bis zur Abholung. Modern, klar, schnell.</div>
-  </div>
-  <div class="feat">
-    <div class="card"><div class="ic" data-ic="clip"></div><h3>Aufträge verwalten</h3><p>Gerät, Fehler, Preis – in Sekunden angelegt. Klarer Statusfluss mit Farb-Leitsystem.</p></div>
-    <div class="card"><div class="ic" data-ic="cal"></div><h3>Termine planen</h3><p>Kalender mit freien Slots aus deinen Öffnungszeiten. Kunden buchen selbst online.</p></div>
-    <div class="card"><div class="ic" data-ic="users"></div><h3>Kunden betreuen</h3><p>Kundenkartei, Historie und automatische Benachrichtigungen per E-Mail & WhatsApp.</p></div>
-    <div class="card"><div class="ic" data-ic="box"></div><h3>Ersatzteile organisieren</h3><p>Lager & Bestellungen hängen am Auftrag. Teil da? Auftrag läuft automatisch weiter.</p></div>
-    <div class="card"><div class="ic" data-ic="wrench"></div><h3>Reparaturen dokumentieren</h3><p>Mehrere Geräte, mehrere Fehler, Technikerzuweisung, Unterschrift & Kundenbeleg.</p></div>
-    <div class="card"><div class="ic" data-ic="chart"></div><h3>Auswertungen erhalten</h3><p>Umsatz, häufigste Reparaturen, Durchlaufzeiten – auf einen Blick, ohne Excel.</p></div>
-    <div class="card"><div class="ic" data-ic="pin"></div><h3>Standorte vernetzen</h3><p>Mehrere Filialen unter einem Dach, mit Rollen, Rechten und geteiltem Katalog.</p></div>
-    <div class="card"><div class="ic" data-ic="gear"></div><h3>Individuell erweiterbar</h3><p>Eigene Vorlagen, Etiketten, Kundenportal per QR und offene Schnittstellen.</p></div>
-  </div>
- </div>
-</section>
 
 <!-- ===== PRICING ===== -->
 <section id="preise">
@@ -496,39 +476,6 @@
  </div>
 </section>
 
-<!-- ===== AI BAND ===== -->
-<section id="ki" class="aiband">
- <div class="wrap">
-  <div class="sec-h">
-    <div class="kick">Velqio AI</div>
-    <div class="t">Das Telefon klingelt. Du schraubst weiter.</div>
-    <div class="s">Die KI beantwortet die immer gleichen Fragen selbst – am Telefon und per WhatsApp, aus deinen echten Daten. Auch nach Feierabend.</div>
-  </div>
-  <div class="airow">
-    <div class="chat">
-      <div class="callbar"><span class="p"></span><div><b style="color:#fff">Eingehender Anruf</b><div style="color:rgba(234,244,236,.7);font-size:13px">Unbekannt · Velqio AI übernimmt</div></div></div>
-      <div class="b ki"><small>Velqio AI</small>Guten Tag, Sie sprechen mit der digitalen Assistentin. Wie kann ich Ihnen helfen?</div>
-      <div class="b an"><small>Anrufer</small>Hallo, ist mein Samsung schon fertig?</div>
-      <div class="b ki"><small>Velqio AI</small>Auf welchen Namen läuft der Auftrag?</div>
-      <div class="b an"><small>Anrufer</small>Koch.</div>
-      <div class="b ki"><small>Velqio AI</small>Ihr Galaxy ist abholbereit – Mo–Fr 9–18 Uhr. Endbetrag 189 €.</div>
-      <div class="b an"><small>Anrufer</small>Perfekt, danke!</div>
-    </div>
-    <div>
-      <div style="font-size:26px;font-weight:900;letter-spacing:-1px;margin-bottom:10px;color:#fff">Nie wieder mitten in der Reparatur ans Telefon.</div>
-      <p style="color:rgba(234,244,236,.8);font-size:17px">„Ist mein Handy fertig?", „Was kostet ein Displaytausch?", „Habt ihr auf?" – Velqio AI antwortet sofort aus deinen echten Daten und schreibt Status-Updates automatisch per WhatsApp.</p>
-      <ul class="ailist">
-        <li data-ic="check">Liest Reparaturstatus vor – Telefon &amp; WhatsApp</li>
-        <li data-ic="check">Nennt Preise &amp; Lagerbestand aus deinen Daten</li>
-        <li data-ic="check">Bucht Termine direkt in deinen Kalender</li>
-        <li data-ic="check">Fasst Aufträge zusammen &amp; wertet aus</li>
-        <li data-ic="check">Übernimmt automatisch nach Feierabend</li>
-      </ul>
-      <a class="btn pri big" style="margin-top:22px" href="app.html">Velqio AI testen →</a>
-    </div>
-  </div>
- </div>
-</section>
 
 <!-- ===== BRANCHEN ===== -->
 <section id="branchen">
