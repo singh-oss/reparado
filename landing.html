@@ -3,24 +3,25 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Velqio – Die einfache Software für Reparaturwerkstätten</title>
-<meta name="description" content="Velqio ist die schwarz-weiß-einfache Werkstatt-Software für Handy-Reparaturen: Aufträge, Kunden, Lager, Kasse und automatische Erinnerungen an Kunden & Team.">
+<title>Velqio – Die Software für moderne Reparaturbetriebe</title>
+<meta name="description" content="Velqio ist die einfache Werkstatt-Software für Reparaturbetriebe: Aufträge, Termine, Kunden, Ersatzteile, Kundenportal & KI. Ein System. Alle Abläufe. Mehr Zeit für das, was zählt.">
 <link rel="canonical" href="https://velqio.de/">
 <meta name="robots" content="index,follow,max-image-preview:large">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Velqio">
-<meta property="og:title" content="Velqio – Die einfache Software für Reparaturwerkstätten">
-<meta property="og:description" content="Velqio ist die einfache Werkstatt-Software für Handy-Reparaturen: Aufträge, Kunden, Lager, Kasse und automatische Erinnerungen an Kunden & Team.">
+<meta property="og:title" content="Velqio – Die Software für moderne Reparaturbetriebe">
+<meta property="og:description" content="Ein System. Alle Abläufe. Mehr Zeit für das, was zählt. Aufträge, Termine, Kunden, Ersatzteile, Kundenportal & KI – für Reparaturbetriebe.">
 <meta property="og:url" content="https://velqio.de/">
 <meta property="og:locale" content="de_DE">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Velqio – Werkstatt-Software für Reparaturbetriebe">
-<meta name="twitter:description" content="Aufträge, Kunden, Lager, Kasse & automatische Kunden-Erinnerungen – einfach.">
+<meta name="twitter:description" content="Aufträge, Termine, Kunden, Ersatzteile, Kundenportal & KI – ein System für den ganzen Werkstattalltag.">
 <meta property="og:image" content="https://velqio.de/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Velqio – Die einfache Software für Reparaturwerkstätten">
+<meta property="og:image:alt" content="Velqio – Die Software für moderne Reparaturbetriebe">
 <meta name="twitter:image" content="https://velqio.de/og-image.png">
+<meta name="theme-color" content="#ffffff">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -51,10 +52,14 @@
       "name": "Velqio",
       "operatingSystem": "Web",
       "applicationCategory": "BusinessApplication",
-      "description": "Werkstatt-Software für Reparaturbetriebe: Aufträge, Kunden, Lager, Kasse, Kundenportal und automatische Erinnerungen.",
+      "description": "Werkstatt-Software für Reparaturbetriebe: Aufträge, Termine, Kunden, Ersatzteile, Kundenportal, Statistiken und KI.",
       "url": "https://velqio.de/",
       "inLanguage": "de-DE",
-      "offers": { "@type": "Offer", "priceCurrency": "EUR", "category": "SaaS" },
+      "offers": [
+        { "@type": "Offer", "name": "Basic", "price": "49.90", "priceCurrency": "EUR", "category": "SaaS" },
+        { "@type": "Offer", "name": "Pro", "price": "84.90", "priceCurrency": "EUR", "category": "SaaS" },
+        { "@type": "Offer", "name": "AI", "price": "99.90", "priceCurrency": "EUR", "category": "SaaS" }
+      ],
       "publisher": { "@id": "https://velqio.de/#org" }
     }
   ]
@@ -62,321 +67,583 @@
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Montserrat:wght@600;700;800;900&display=swap" rel="stylesheet">
 <style>
-  :root{--ink:#0f2318;--ink2:#5f6b64;--line:#eaedeb;--soft:#f5f8f6;--radius:18px;--green:#0e7a3c;--green-d:#0b6733;--green-tint:#eaf4ee;--ring:0 0 0 3px rgba(14,122,60,.16);--shadow-sm:0 1px 2px rgba(16,40,27,.05),0 4px 12px rgba(16,40,27,.05)}
+  :root{
+    --ink:#12261a;--ink2:#5f6b64;--line:#e7ece8;--soft:#f4f8f5;--soft2:#eef4ef;
+    --radius:20px;
+    --green:#34a24a;--green-d:#2a8b3d;--green-dk:#0f5c2a;--green-tint:#e9f5ec;
+    --leaf:#7cc244;
+    --ring:0 0 0 3px rgba(52,162,74,.18);
+    --shadow-sm:0 1px 2px rgba(16,40,27,.05),0 6px 18px rgba(16,40,27,.05);
+    --shadow-md:0 2px 6px rgba(16,40,27,.06),0 20px 46px rgba(16,40,27,.09);
+  }
   *{box-sizing:border-box;margin:0;padding:0}
   html{scroll-behavior:smooth}
   body{font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:#fff;font-size:16px;line-height:1.55;letter-spacing:-.006em;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
   a{color:inherit;text-decoration:none}
-  ::selection{background:rgba(14,122,60,.14)}
-  .wrap{max-width:1120px;margin:0 auto;padding:0 24px}
-  .btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:#fff;color:var(--green);border-radius:13px;padding:13px 22px;font-weight:700;font-size:15px;cursor:pointer;transition:.14s ease;box-shadow:0 1px 1.5px rgba(16,40,27,.04)}
-  .btn:hover{border-color:#cfe0d5;background:var(--green-tint)}
-  .btn:focus-visible{outline:none;box-shadow:var(--ring)}
-  .btn.pri{background:var(--green);color:#fff;border-color:var(--green);box-shadow:0 2px 4px rgba(11,103,51,.26),0 10px 24px rgba(14,122,60,.22)}
-  .btn.pri:hover{background:var(--green-d);border-color:var(--green-d)}
-  .btn.big{padding:16px 30px;font-size:17px;border-radius:14px}
+  ::selection{background:rgba(52,162,74,.16)}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 24px}
 
-  header{position:sticky;top:0;z-index:40;background:rgba(255,255,255,.72);backdrop-filter:saturate(180%) blur(16px);border-bottom:1px solid var(--line)}
-  .nav{display:flex;align-items:center;gap:24px;height:70px}
-  .logo{display:flex;align-items:center;gap:10px;font-weight:900;font-size:22px;letter-spacing:-.6px}
-  .logo .dot{width:30px;height:30px;border-radius:9px;background:#0e7a3c;color:#fff;display:grid;place-items:center;font-size:17px}
+  /* ===== Wortmarke (Quer-Logo) ===== */
+  .wm{font-family:'Montserrat',sans-serif;font-weight:900;letter-spacing:-.018em;line-height:1;color:var(--ink);display:inline-flex;align-items:baseline;white-space:nowrap}
+  .wm .q{color:var(--green)}
+  .wm sup{font-size:.36em;font-weight:700;top:-.85em;position:relative;color:var(--ink2);margin-left:.04em}
+  .wm.on-green{color:#fff}.wm.on-green .q{color:#c9f0cf}.wm.on-green sup{color:rgba(255,255,255,.7)}
+  .lockup{display:flex;flex-direction:column;gap:3px}
+  .lockup .sub{font-family:'Montserrat',sans-serif;font-weight:700;font-size:10px;letter-spacing:.24em;color:var(--ink2);text-transform:uppercase}
+  .lockup.on-green .sub{color:rgba(255,255,255,.72)}
+
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--line);background:#fff;color:var(--green-d);border-radius:13px;padding:13px 22px;font-weight:700;font-size:15px;cursor:pointer;transition:.15s ease;box-shadow:0 1px 1.5px rgba(16,40,27,.04)}
+  .btn:hover{border-color:#cbe3d1;background:var(--green-tint);transform:translateY(-1px)}
+  .btn:focus-visible{outline:none;box-shadow:var(--ring)}
+  .btn.pri{background:var(--green);color:#fff;border-color:var(--green);box-shadow:0 2px 6px rgba(42,139,61,.28),0 12px 26px rgba(52,162,74,.24)}
+  .btn.pri:hover{background:var(--green-d);border-color:var(--green-d)}
+  .btn.big{padding:16px 30px;font-size:17px;border-radius:15px}
+  .btn.block{width:100%}
+
+  header{position:sticky;top:0;z-index:40;background:rgba(255,255,255,.78);backdrop-filter:saturate(180%) blur(16px);border-bottom:1px solid var(--line)}
+  .nav{display:flex;align-items:center;gap:24px;height:72px}
+  .nav .brand{display:flex;align-items:center}
+  .nav .brand .wm{font-size:25px}
   .nav .links{display:flex;gap:26px;margin-left:20px}
   .nav .links a{color:var(--ink2);font-weight:600;font-size:15px}
-  .nav .links a:hover{color:#0e7a3c}
+  .nav .links a:hover{color:var(--green-d)}
   .nav .sp{flex:1}
-  @media(max-width:820px){.nav .links{display:none}}
+  @media(max-width:900px){.nav .links{display:none}}
+  @media(max-width:520px){.nav .actions .ghost{display:none}}
 
-  .hero{padding:74px 0 40px;text-align:center}
-  .badge{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:30px;padding:7px 16px;font-size:13px;font-weight:700;color:var(--ink2);margin-bottom:26px;box-shadow:var(--shadow-sm)}
-  .badge .d{width:7px;height:7px;border-radius:50%;background:#0e7a3c}
-  h1{font-size:60px;line-height:1.03;letter-spacing:-2.4px;font-weight:900;max-width:900px;margin:0 auto}
-  h1 .u{text-decoration:underline;text-decoration-thickness:4px;text-underline-offset:6px}
-  .hero p.lead{font-size:20px;color:var(--ink2);max-width:640px;margin:24px auto 0}
-  .cta{display:flex;gap:14px;justify-content:center;margin-top:34px;flex-wrap:wrap}
-  .trust{margin-top:22px;color:var(--ink2);font-size:14px}
-  @media(max-width:720px){h1{font-size:40px;letter-spacing:-1.4px}.hero p.lead{font-size:17px}}
+  /* ===== Hero ===== */
+  .hero{padding:64px 0 44px;position:relative;overflow:hidden}
+  .hero:before{content:"";position:absolute;inset:0;background:radial-gradient(1100px 460px at 78% -8%,rgba(124,194,68,.16),transparent 60%),radial-gradient(900px 420px at 10% 6%,rgba(52,162,74,.08),transparent 62%);z-index:-1}
+  .herogrid{display:grid;grid-template-columns:1.02fr .98fr;gap:48px;align-items:center}
+  @media(max-width:960px){.herogrid{grid-template-columns:1fr;gap:34px}}
+  .eyebrow{display:inline-flex;align-items:center;gap:9px;border:1px solid var(--line);background:#fff;border-radius:30px;padding:7px 15px;font-size:13px;font-weight:700;color:var(--ink2);box-shadow:var(--shadow-sm);margin-bottom:22px}
+  .eyebrow .lf{color:var(--green)}
+  h1{font-size:56px;line-height:1.04;letter-spacing:-2.2px;font-weight:900}
+  h1 .g{color:var(--green)}
+  .hero .lead{font-size:19px;color:var(--ink2);max-width:520px;margin:22px 0 0}
+  .cta{display:flex;gap:14px;margin-top:30px;flex-wrap:wrap}
+  .microtrust{margin-top:16px;color:var(--ink2);font-size:13.5px;display:flex;gap:16px;flex-wrap:wrap}
+  .microtrust b{color:var(--green-d)}
+  @media(max-width:960px){h1{font-size:46px;letter-spacing:-1.6px}}
+  @media(max-width:520px){h1{font-size:36px;letter-spacing:-1.2px}.hero .lead{font-size:17px}}
 
-  /* App mockup */
-  .shot{max-width:1000px;margin:52px auto 0;border:1px solid var(--line);border-radius:20px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.10)}
-  .shot .bar{display:flex;align-items:center;gap:7px;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--soft)}
-  .shot .bar i{width:11px;height:11px;border-radius:50%;background:#d5d5d5;display:block}
-  .shotgrid{display:grid;grid-template-columns:200px 1fr;min-height:340px}
-  .shotgrid .sb{border-right:1px solid var(--line);padding:16px 12px}
-  .shotgrid .sb .b{font-weight:900;font-size:16px;margin-bottom:14px;display:flex;gap:8px;align-items:center}
-  .shotgrid .sb .b .dot{width:22px;height:22px;border-radius:7px;background:#0e7a3c;color:#fff;display:grid;place-items:center;font-size:12px}
-  .shotgrid .sb a{display:block;padding:8px 10px;border-radius:8px;color:var(--ink2);font-weight:600;font-size:14px;margin-bottom:2px}
-  .shotgrid .sb a.on{background:#0e7a3c;color:#fff}
-  .shotgrid .bd{padding:20px;text-align:left}
-  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-  .kpis .k{border:1px solid var(--line);border-radius:12px;padding:14px}
-  .kpis .k .n{font-size:24px;font-weight:900;letter-spacing:-1px}
-  .kpis .k .l{color:var(--ink2);font-size:12px}
-  .mockrow{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}
+  .ribbon{position:absolute;top:26px;right:24px;text-align:right;z-index:2}
+  .ribbon .script{font-family:'Montserrat',sans-serif;font-style:italic;font-weight:800;color:var(--green-d);font-size:20px;letter-spacing:-.3px}
+  .ribbon .small{font-size:10.5px;letter-spacing:.16em;color:var(--ink2);font-weight:700;margin-top:3px}
+  @media(max-width:960px){.ribbon{display:none}}
+
+  /* device mockup */
+  .shot{background:#fff;border:1px solid var(--line);border-radius:22px;overflow:hidden;box-shadow:var(--shadow-md)}
+  .shot .bar{display:flex;align-items:center;gap:7px;padding:12px 15px;border-bottom:1px solid var(--line);background:var(--soft)}
+  .shot .bar i{width:11px;height:11px;border-radius:50%;background:#d7ddd8;display:block}
+  .shot .bar .u{margin-left:12px;flex:1;height:22px;border-radius:7px;background:#fff;border:1px solid var(--line)}
+  .shotgrid{display:grid;grid-template-columns:150px 1fr;min-height:330px}
+  .shotgrid .sb{border-right:1px solid var(--line);padding:14px 10px;background:var(--soft)}
+  .shotgrid .sb .b{margin-bottom:14px;padding-left:4px}
+  .shotgrid .sb .b .wm{font-size:16px}
+  .shotgrid .sb a{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:9px;color:var(--ink2);font-weight:600;font-size:13.5px;margin-bottom:2px}
+  .shotgrid .sb a .dt{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.5}
+  .shotgrid .sb a.on{background:var(--green);color:#fff}.shotgrid .sb a.on .dt{opacity:1}
+  .shotgrid .bd{padding:18px}
+  .greet{font-weight:900;font-size:17px;letter-spacing:-.4px;margin-bottom:2px}
+  .greet+.sm{color:var(--ink2);font-size:12.5px;margin-bottom:14px}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+  .kpis .k{border:1px solid var(--line);border-radius:12px;padding:11px;background:#fff}
+  .kpis .k .n{font-size:20px;font-weight:900;letter-spacing:-1px}
+  .kpis .k .n.g{color:var(--green)}
+  .kpis .k .l{color:var(--ink2);font-size:10.5px;margin-top:1px}
+  .mockrow{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
   .mockrow:last-child{border:0}
-  .av{width:30px;height:30px;border-radius:8px;background:#0e7a3c;color:#fff;display:grid;place-items:center;font-size:12px;font-weight:700}
-  .pill{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;border:1px solid #0e7a3c}
-  .pill.solid{background:#0e7a3c;color:#fff}
-  .pill.soft{border-color:var(--line);color:var(--ink2)}
+  .av{width:28px;height:28px;border-radius:8px;background:var(--green-tint);color:var(--green-d);display:grid;place-items:center;font-size:11px;font-weight:800}
+  .mockrow .nm{font-weight:700;font-size:13px}
+  .mockrow .mt{color:var(--ink2);font-size:11.5px}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px;border:1px solid var(--green)}
+  .pill.solid{background:var(--green);color:#fff;border-color:var(--green)}
+  .pill.amber{color:#a9600a;border-color:#e9c58a;background:#fdf4e6}
+  .pill.blue{color:#1e6fb8;border-color:#bcd9f0;background:#eef6fd}
   .pill .d{width:6px;height:6px;border-radius:50%;background:currentColor}
-  @media(max-width:720px){.shotgrid{grid-template-columns:1fr}.shotgrid .sb{display:none}}
+  @media(max-width:520px){.shotgrid{grid-template-columns:1fr}.shotgrid .sb{display:none}.kpis{grid-template-columns:1fr 1fr}}
 
-  section{padding:72px 0}
-  .sec-h{text-align:center;max-width:640px;margin:0 auto 44px}
-  .sec-h .t{font-size:38px;font-weight:900;letter-spacing:-1.4px}
-  .sec-h .s{color:var(--ink2);font-size:18px;margin-top:12px}
-  .feat{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
-  @media(max-width:820px){.feat{grid-template-columns:1fr}}
-  .card{border:1px solid var(--line);border-radius:var(--radius);padding:26px;box-shadow:var(--shadow-sm);transition:.16s ease}
-  .card:hover{box-shadow:0 2px 6px rgba(16,40,27,.06),0 14px 34px rgba(16,40,27,.07);transform:translateY(-2px)}
-  .card .ic{width:46px;height:46px;border-radius:12px;background:#0e7a3c;color:#fff;display:grid;place-items:center;margin-bottom:16px}
+  /* ===== Value props (4) ===== */
+  .values{margin-top:8px;padding:54px 0 8px}
+  .valgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+  @media(max-width:820px){.valgrid{grid-template-columns:1fr 1fr}}
+  .val{text-align:center;padding:8px}
+  .val .ic{width:56px;height:56px;border-radius:16px;margin:0 auto 14px;display:grid;place-items:center;background:var(--green-tint);color:var(--green-d);box-shadow:inset 0 0 0 1px rgba(52,162,74,.14)}
+  .val .ic svg{width:28px;height:28px}
+  .val .t{font-weight:900;font-size:17px;letter-spacing:-.3px}
+  .val .s{color:var(--ink2);font-size:14px;margin-top:3px}
+
+  section{padding:74px 0}
+  .sec-h{text-align:center;max-width:720px;margin:0 auto 46px}
+  .sec-h .kick{font-family:'Montserrat',sans-serif;font-weight:800;font-size:12px;letter-spacing:.2em;color:var(--green);text-transform:uppercase;margin-bottom:12px}
+  .sec-h .t{font-size:40px;font-weight:900;letter-spacing:-1.6px;line-height:1.08}
+  .sec-h .s{color:var(--ink2);font-size:18px;margin-top:14px}
+  @media(max-width:520px){.sec-h .t{font-size:30px;letter-spacing:-1px}}
+
+  /* feature tiles */
+  .feat{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  @media(max-width:960px){.feat{grid-template-columns:1fr 1fr}}
+  @media(max-width:520px){.feat{grid-template-columns:1fr 1fr}}
+  .card{border:1px solid var(--line);border-radius:var(--radius);padding:22px;background:#fff;box-shadow:var(--shadow-sm);transition:.16s ease}
+  .card:hover{box-shadow:var(--shadow-md);transform:translateY(-3px);border-color:#d9e6dc}
+  .card .ic{width:46px;height:46px;border-radius:13px;background:var(--green-tint);color:var(--green-d);display:grid;place-items:center;margin-bottom:15px}
   .card .ic svg{width:24px;height:24px}
-  .maillist .ico svg{width:20px;height:20px}
-  .chat{border:1px solid var(--line);border-radius:18px;padding:18px;display:flex;flex-direction:column;gap:10px;box-shadow:0 24px 60px rgba(0,0,0,.07)}
-  .chat .b{max-width:86%;padding:10px 13px;border-radius:14px;font-size:14px;line-height:1.5}
-  .chat .b.ki{align-self:flex-end;background:#0e7a3c;color:#fff;border-bottom-right-radius:4px}
-  .chat .b.an{align-self:flex-start;background:var(--soft);border-bottom-left-radius:4px}
-  .chat .b small{display:block;font-size:11px;opacity:.6;font-weight:700;margin-bottom:2px}
-  .callbar{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;margin-bottom:14px;background:var(--soft)}
-  .callbar .p{width:10px;height:10px;border-radius:50%;background:#0e7a3c}
-  .card h3{font-size:19px;margin-bottom:8px;letter-spacing:-.3px}
-  .card p{color:var(--ink2);font-size:15px}
+  .card h3{font-size:16.5px;margin-bottom:6px;letter-spacing:-.3px}
+  .card p{color:var(--ink2);font-size:14px;line-height:1.5}
 
-  .alt{background:#0e7a3c;color:#fff}
-  .alt .sec-h .s{color:rgba(255,255,255,.82)}
-  .alt .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;counter-reset:s}
-  @media(max-width:820px){.alt .steps{grid-template-columns:1fr 1fr}}
-  .alt .step{border:1px solid rgba(255,255,255,.22);border-radius:14px;padding:22px}
-  .alt .step .num{width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.5);display:grid;place-items:center;font-weight:800;margin-bottom:14px}
-  .alt .step h4{font-size:17px;margin-bottom:6px}
-  .alt .step p{color:rgba(255,255,255,.8);font-size:14px}
+  /* ===== Pricing ===== */
+  #preise{background:linear-gradient(180deg,var(--soft) 0%,#fff 100%)}
+  .prices{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;align-items:stretch;max-width:1080px;margin:0 auto}
+  @media(max-width:900px){.prices{grid-template-columns:1fr;max-width:460px}}
+  .price{border:1px solid var(--line);border-radius:22px;padding:30px 26px;display:flex;flex-direction:column;background:#fff;box-shadow:var(--shadow-sm);position:relative}
+  .price .plan{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+  .price .plan .wm{font-size:19px}
+  .price .plan .nm{font-family:'Montserrat',sans-serif;font-weight:900;font-size:19px;letter-spacing:.02em}
+  .price .plan .ai{font-size:16px}
+  .price .amt{font-size:42px;font-weight:900;letter-spacing:-2px;margin:14px 0 0;font-family:'Montserrat',sans-serif}
+  .price .amt small{font-size:15px;font-weight:700;color:var(--ink2);letter-spacing:0}
+  .price .tl{font-weight:800;font-size:16px;margin:16px 0 2px}
+  .price .desc{color:var(--ink2);font-size:14px;min-height:38px}
+  .price ul{list-style:none;margin:16px 0 22px;flex:1}
+  .price li{padding:7px 0;font-size:14px;display:flex;gap:10px;align-items:flex-start;color:#26332c}
+  .price li svg{width:17px;height:17px;flex:none;color:var(--green);margin-top:2px}
+  .price.hot{border:2px solid var(--green);box-shadow:0 4px 14px rgba(52,162,74,.14),0 26px 54px rgba(52,162,74,.14);transform:translateY(-6px)}
+  @media(max-width:900px){.price.hot{transform:none}}
+  .price.hot .tag{position:absolute;top:-14px;left:50%;transform:translateX(-50%);background:var(--green);color:#fff;font-family:'Montserrat',sans-serif;font-size:11px;font-weight:800;letter-spacing:.12em;padding:6px 16px;border-radius:20px;box-shadow:0 6px 16px rgba(52,162,74,.4)}
+  .price.dark{background:linear-gradient(165deg,#123a20 0%,#0d2c18 100%);border-color:#123a20;color:#eaf4ec}
+  .price.dark .desc{color:rgba(234,244,236,.72)}
+  .price.dark li{color:rgba(234,244,236,.92)}
+  .price.dark li svg{color:var(--leaf)}
+  .price.dark .amt small{color:rgba(234,244,236,.6)}
+  .price.dark .plan .aibadge{width:30px;height:30px;border-radius:9px;background:linear-gradient(140deg,var(--leaf),var(--green));display:grid;place-items:center;color:#0d2c18;font-weight:900;font-size:13px;box-shadow:0 4px 10px rgba(124,194,68,.4)}
+  .pricenote{text-align:center;color:var(--ink2);font-size:13.5px;margin-top:26px}
 
-  /* reminders showcase */
-  .remwrap{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:center}
-  @media(max-width:820px){.remwrap{grid-template-columns:1fr}}
-  .maillist .m{display:flex;gap:14px;align-items:flex-start;padding:16px;border:1px solid var(--line);border-radius:14px;margin-bottom:12px}
-  .maillist .m .ico{width:40px;height:40px;border-radius:10px;background:#0e7a3c;color:#fff;display:grid;place-items:center;flex:none;font-weight:700}
-  .maillist .m.w .ico{background:#fff;color:#0e7a3c;border:1px solid #0e7a3c}
-  .maillist .m .sub{color:var(--ink2);font-size:14px;margin-top:2px}
-  .maillist .m .when{margin-left:auto;font-size:12px;color:#999;font-weight:700;white-space:nowrap}
+  /* benefit chips */
+  .chips{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;max-width:920px;margin:0 auto;padding-top:8px}
+  .chip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:#fff;border-radius:30px;padding:9px 16px;font-size:13.5px;font-weight:600;color:var(--ink);box-shadow:var(--shadow-sm)}
+  .chip svg{width:16px;height:16px;color:var(--green)}
 
-  /* pricing */
-  .prices{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;align-items:stretch}
-  @media(max-width:820px){.prices{grid-template-columns:1fr}}
-  .price{border:1px solid var(--line);border-radius:18px;padding:28px;display:flex;flex-direction:column}
-  .price.hot{border:2px solid #0e7a3c;position:relative}
-  .price.hot .tag{position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:#0e7a3c;color:#fff;font-size:12px;font-weight:800;padding:5px 14px;border-radius:20px}
-  .price .name{font-weight:800;font-size:18px}
-  .price .amt{font-size:44px;font-weight:900;letter-spacing:-2px;margin:12px 0 2px}
-  .price .amt small{font-size:16px;font-weight:700;color:var(--ink2)}
-  .price ul{list-style:none;margin:18px 0;flex:1}
-  .price li{padding:8px 0;border-bottom:1px solid var(--line);font-size:15px;display:flex;gap:10px}
-  .price li::before{content:"✓";font-weight:900}
+  /* AI band */
+  .aiband{background:linear-gradient(160deg,#123a20 0%,#0d2c18 100%);color:#eaf4ec}
+  .aiband .sec-h .kick{color:var(--leaf)}
+  .aiband .sec-h .t{color:#fff}.aiband .sec-h .s{color:rgba(234,244,236,.78)}
+  .airow{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:center}
+  @media(max-width:900px){.airow{grid-template-columns:1fr;gap:26px}}
+  .chat{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.14);border-radius:20px;padding:18px;display:flex;flex-direction:column;gap:10px}
+  .chat .b{max-width:88%;padding:10px 13px;border-radius:14px;font-size:14px;line-height:1.5}
+  .chat .b.ki{align-self:flex-end;background:var(--green);color:#fff;border-bottom-right-radius:4px}
+  .chat .b.an{align-self:flex-start;background:rgba(255,255,255,.1);border-bottom-left-radius:4px}
+  .chat .b small{display:block;font-size:10.5px;opacity:.75;font-weight:700;margin-bottom:2px}
+  .callbar{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid rgba(255,255,255,.14);border-radius:12px;margin-bottom:6px;background:rgba(255,255,255,.05)}
+  .callbar .p{width:10px;height:10px;border-radius:50%;background:var(--leaf);box-shadow:0 0 0 4px rgba(124,194,68,.22)}
+  .ailist{list-style:none;margin:18px 0 0}
+  .ailist li{display:flex;gap:12px;align-items:flex-start;padding:9px 0;color:rgba(234,244,236,.92);font-size:15px}
+  .ailist li svg{width:20px;height:20px;color:var(--leaf);flex:none;margin-top:2px}
 
-  .final{text-align:center;padding:90px 0}
-  .final .t{font-size:44px;font-weight:900;letter-spacing:-1.6px;max-width:760px;margin:0 auto}
-  footer{border-top:1px solid var(--line);padding:40px 0;color:var(--ink2);font-size:14px}
-  .footgrid{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;align-items:center}
+  /* device categories */
+  .cats{display:grid;grid-template-columns:repeat(6,1fr);gap:16px}
+  @media(max-width:900px){.cats{grid-template-columns:repeat(3,1fr)}}
+  @media(max-width:520px){.cats{grid-template-columns:repeat(2,1fr)}}
+  .cat{text-align:center;border:1px solid var(--line);border-radius:18px;padding:22px 12px;background:#fff;box-shadow:var(--shadow-sm);transition:.16s ease}
+  .cat:hover{transform:translateY(-3px);box-shadow:var(--shadow-md);border-color:#d9e6dc}
+  .cat .ic{width:52px;height:52px;border-radius:14px;margin:0 auto 12px;display:grid;place-items:center;background:var(--green-tint);color:var(--green-d)}
+  .cat .ic svg{width:26px;height:26px}
+  .cat .t{font-weight:800;font-size:14px}
+  .cat .s{color:var(--ink2);font-size:12px}
+  .catsmore{text-align:center;color:var(--ink2);font-size:14px;margin-top:22px}
+
+  /* testimonial */
+  .quote{max-width:820px;margin:0 auto;text-align:center}
+  .quote .mk{font-family:'Montserrat',sans-serif;font-size:60px;line-height:.5;color:var(--green);font-weight:900}
+  .quote blockquote{font-size:24px;font-weight:700;letter-spacing:-.5px;line-height:1.42;margin:18px 0 22px}
+  .quote .who{display:flex;align-items:center;justify-content:center;gap:12px}
+  .quote .who .av{width:46px;height:46px;border-radius:50%;background:var(--green-tint);color:var(--green-d);display:grid;place-items:center;font-weight:900}
+  .quote .who .nm{font-weight:800;font-size:15px;text-align:left}
+  .quote .who .rl{color:var(--ink2);font-size:13px;text-align:left}
+
+  /* login card */
+  .lgcard{max-width:100%;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-sm);padding:18px 20px;text-align:left;margin-top:22px}
+  .lgcard h3{font-size:14px;font-weight:800;color:var(--ink);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+  .lgcard h3 .d2{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block}
+  .lgform{display:flex;gap:10px;flex-wrap:wrap}
+  .lgform input{flex:1 1 160px;min-width:0;border:1px solid var(--line);border-radius:11px;padding:12px 14px;font-size:15px;font-family:inherit;color:var(--ink);background:var(--soft)}
+  .lgform input:focus{outline:none;border-color:var(--green);box-shadow:var(--ring);background:#fff}
+  .lgform button{flex:0 0 auto}
+  .lgmeta{margin-top:11px;font-size:13px;color:var(--ink2)}
+  .lgmeta a{color:var(--green-d);font-weight:600}
+  .lgerr{margin-top:9px;font-size:13.5px;color:#b4231a;font-weight:600}
+  @media(max-width:560px){.lgform button{flex:1 1 100%}}
+
+  /* final */
+  .final{background:linear-gradient(160deg,var(--green) 0%,var(--green-d) 100%);color:#fff;text-align:center;padding:84px 0;position:relative;overflow:hidden}
+  .final:before{content:"";position:absolute;inset:0;background:radial-gradient(700px 300px at 80% 120%,rgba(124,194,68,.4),transparent 60%);z-index:0}
+  .final .wrap{position:relative;z-index:1}
+  .final .t{font-size:42px;font-weight:900;letter-spacing:-1.6px;max-width:820px;margin:0 auto}
+  .final .s{color:rgba(255,255,255,.86);font-size:18px;margin-top:14px}
+  .final .btn{background:#fff;color:var(--green-d);border-color:#fff}
+  .final .btn:hover{background:#f2fbf3}
+
+  footer{background:#0d2c18;color:rgba(234,244,236,.7);padding:52px 0 34px;font-size:14px}
+  .footgrid{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:30px}
+  @media(max-width:820px){.footgrid{grid-template-columns:1fr;gap:24px}}
+  footer .wm{font-size:24px}
+  footer a{color:rgba(234,244,236,.72)}
+  footer a:hover{color:#fff}
+  .footcol h5{font-family:'Montserrat',sans-serif;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:rgba(234,244,236,.5);margin-bottom:12px;font-weight:800}
+  .footcol a{display:block;padding:4px 0}
+  .rpp{display:flex;gap:18px;font-family:'Montserrat',sans-serif;font-weight:800;font-size:12px;letter-spacing:.2em;color:var(--leaf);margin-top:14px}
+  .footbar{border-top:1px solid rgba(255,255,255,.1);margin-top:34px;padding-top:20px;display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;font-size:12.5px;color:rgba(234,244,236,.55)}
+  .footbar .claim{font-family:'Montserrat',sans-serif;letter-spacing:.14em;font-weight:700}
 </style>
 </head>
 <body>
-<style>
-.lgcard{max-width:560px;margin:24px auto 0;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-sm);padding:18px 20px;text-align:left}
-.lgcard h3{font-size:15px;font-weight:800;color:var(--ink);margin-bottom:12px;display:flex;align-items:center;gap:8px}
-.lgcard h3 .d2{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block}
-.lgform{display:flex;gap:10px;flex-wrap:wrap}
-.lgform input{flex:1 1 180px;min-width:0;border:1px solid var(--line);border-radius:11px;padding:12px 14px;font-size:15px;font-family:inherit;color:var(--ink);background:var(--soft)}
-.lgform input:focus{outline:none;border-color:var(--green);box-shadow:var(--ring);background:#fff}
-.lgform button{flex:0 0 auto}
-.lgmeta{margin-top:11px;font-size:13px;color:var(--ink2)}
-.lgmeta a{color:var(--green);font-weight:600}
-.lgerr{margin-top:9px;font-size:13.5px;color:#b4231a;font-weight:600}
-@media(max-width:560px){.lgform button{flex:1 1 100%}}
-</style>
 <header>
  <div class="wrap nav">
-   <div class="logo"><img src="/velqio-logo.png" alt="Velqio" style="height:34px;width:34px;border-radius:50%;object-fit:cover;vertical-align:middle">&nbsp;Velqio</div>
-   <div class="links"><a href="#telefon">KI-Telefon</a><a href="#features">Funktionen</a><a href="#reminders">Erinnerungen</a><a href="#preise">Preise</a></div>
+   <a class="brand" href="/"><span class="wm">VEL<span class="q">Q</span>IO<sup>®</sup></span></a>
+   <div class="links"><a href="#funktionen">Funktionen</a><a href="#preise">Preise</a><a href="#ki">KI</a><a href="#branchen">Branchen</a></div>
    <div class="sp"></div>
-   <a class="btn" href="app.html">Anmelden</a>
-   <a class="btn pri" href="app.html">Kostenlos testen</a>
+   <div class="actions" style="display:flex;gap:10px">
+     <a class="btn ghost" href="app.html">Anmelden</a>
+     <a class="btn pri" href="app.html">Kostenlos testen</a>
+   </div>
  </div>
 </header>
 
-<div class="hero wrap">
-  <div class="badge"><span class="d"></span>Die KI-Empfangskraft für Reparaturwerkstätten</div>
-  <h1>Deine Werkstatt hat jetzt<br>eine <span class="u">Empfangskraft</span>.</h1>
-  <p class="lead">Velqio nimmt Anrufe an, bucht Termine und hält deine Kunden auf dem Laufenden. Die ganze Verwaltung – Aufträge, Lager, Kasse – erledigt sich dabei von selbst.</p>
-  <div class="cta">
-    <a class="btn pri big" href="app.html">Kostenlos starten →</a>
-    <a class="btn big" href="#telefon">Empfangskraft ansehen</a>
+<!-- ===== HERO ===== -->
+<div class="hero">
+  <div class="ribbon">
+    <div class="script">Reparieren statt Wegwerfen.</div>
+    <div class="small">FÜR HEUTE · FÜR MORGEN · FÜR EINE BESSERE WELT</div>
   </div>
-  <div class="lgcard">
-    <h3><span class="d2"></span>Schon Kunde? Direkt einloggen</h3>
-    <form class="lgform" onsubmit="return landingLogin(event)">
-      <input id="lgEmail" type="email" placeholder="E-Mail-Adresse" autocomplete="username" required>
-      <input id="lgPw" type="password" placeholder="Passwort" autocomplete="current-password" required>
-      <button class="btn pri" type="submit" id="lgBtn">Einloggen →</button>
-    </form>
-    <div class="lgmeta"><a href="app.html">Passwort vergessen?</a> &nbsp;·&nbsp; Noch kein Konto? <a href="app.html">Kostenlos testen →</a></div>
-    <div class="lgerr" id="lgErr"></div>
-  </div>
-  <div class="trust">Nimmt ab, wenn du gerade schraubst. Bucht Termine. Vergisst nichts.</div>
-
-  <!-- Mockup -->
-  <div class="shot">
-    <div class="bar"><i></i><i></i><i></i></div>
-    <div class="shotgrid">
-      <div class="sb">
-        <div class="b"><img src="/velqio-logo.png" alt="Velqio" style="height:34px;width:34px;border-radius:50%;object-fit:cover;vertical-align:middle">&nbsp;Velqio</div>
-        <a class="on">Übersicht</a><a>Anrufe</a><a>Aufträge</a><a>Kalender</a><a>Erinnerungen</a><a>Kasse</a>
+  <div class="wrap herogrid">
+    <div>
+      <div class="eyebrow"><span class="lf">◆</span> Die Software für moderne Reparaturbetriebe</div>
+      <h1>Ein System.<br>Alle Abläufe.<br><span class="g">Mehr Zeit</span> für das,<br>was zählt.</h1>
+      <p class="lead">Aufträge, Termine, Kunden, Ersatzteile, Kundenportal und KI – Velqio bündelt deinen ganzen Werkstattalltag in einer klaren, schnellen Oberfläche.</p>
+      <div class="cta">
+        <a class="btn pri big" href="app.html">Kostenlos starten →</a>
+        <a class="btn big" href="#preise">Preise ansehen</a>
       </div>
-      <div class="bd">
-        <div class="kpis">
-          <div class="k"><div class="n">€ 4.465</div><div class="l">Umsatz Monat</div></div>
-          <div class="k"><div class="n">7</div><div class="l">Offene Aufträge</div></div>
-          <div class="k"><div class="n">12</div><div class="l">Erinnerungen geplant</div></div>
+      <div class="microtrust"><span>✓ <b>14 Tage</b> gratis</span><span>✓ ohne Kreditkarte</span><span>✓ Server in Deutschland</span></div>
+      <div class="lgcard">
+        <h3><span class="d2"></span>Schon Kunde? Direkt einloggen</h3>
+        <form class="lgform" onsubmit="return landingLogin(event)">
+          <input id="lgEmail" type="email" placeholder="E-Mail-Adresse" autocomplete="username" required>
+          <input id="lgPw" type="password" placeholder="Passwort" autocomplete="current-password" required>
+          <button class="btn pri" type="submit" id="lgBtn">Einloggen →</button>
+        </form>
+        <div class="lgmeta"><a href="app.html">Passwort vergessen?</a> &nbsp;·&nbsp; Noch kein Konto? <a href="app.html">Kostenlos testen →</a></div>
+        <div class="lgerr" id="lgErr"></div>
+      </div>
+    </div>
+
+    <!-- device mockup -->
+    <div class="shot">
+      <div class="bar"><i></i><i></i><i></i><div class="u"></div></div>
+      <div class="shotgrid">
+        <div class="sb">
+          <div class="b"><span class="wm">VEL<span class="q">Q</span>IO</span></div>
+          <a class="on"><span class="dt"></span>Dashboard</a>
+          <a><span class="dt"></span>Aufträge</a>
+          <a><span class="dt"></span>Termine</a>
+          <a><span class="dt"></span>Kunden</a>
+          <a><span class="dt"></span>Ersatzteile</a>
+          <a><span class="dt"></span>Statistiken</a>
         </div>
-        <div style="margin-top:18px">
-          <div class="mockrow"><div class="av">PD</div><div style="flex:1"><b>Peter Durau · Galaxy A56</b><div style="color:var(--ink2);font-size:13px">Kameraglas · REP-1115</div></div><span class="pill"><span class="d"></span>Offen</span></div>
-          <div class="mockrow"><div class="av">DR</div><div style="flex:1"><b>Diana Roth · iPhone 13</b><div style="color:var(--ink2);font-size:13px">Akkutausch · REP-1111</div></div><span class="pill solid"><span class="d"></span>In Bearbeitung</span></div>
-          <div class="mockrow"><div class="av">ER</div><div style="flex:1"><b>Evie Rosner · Galaxy S22</b><div style="color:var(--ink2);font-size:13px">Display · REP-1108</div></div><span class="pill solid"><span class="d"></span>Abholbereit</span></div>
+        <div class="bd">
+          <div class="greet">Guten Tag, Devran!</div>
+          <div class="sm">Hier ist dein Überblick.</div>
+          <div class="kpis">
+            <div class="k"><div class="n">28</div><div class="l">Offene Aufträge</div></div>
+            <div class="k"><div class="n">12</div><div class="l">Heute Termine</div></div>
+            <div class="k"><div class="n">3</div><div class="l">Warten auf Teile</div></div>
+            <div class="k"><div class="n g">98%</div><div class="l">Zufriedenheit</div></div>
+          </div>
+          <div style="margin-top:14px">
+            <div class="mockrow"><div class="av">MM</div><div style="flex:1"><div class="nm">Max Müller · iPhone 15 Pro</div><div class="mt">A-1043 · Displaytausch</div></div><span class="pill solid"><span class="d"></span>In Bearbeitung</span></div>
+            <div class="mockrow"><div class="av">AD</div><div style="flex:1"><div class="nm">Ayşe Demir · Galaxy S24</div><div class="mt">A-1042 · Akkutausch</div></div><span class="pill amber"><span class="d"></span>Warten auf Teil</span></div>
+            <div class="mockrow"><div class="av">LW</div><div style="flex:1"><div class="nm">Lukas Weber · iPad</div><div class="mt">A-1041 · Diagnose</div></div><span class="pill blue"><span class="d"></span>Abholbereit</span></div>
+            <div class="mockrow"><div class="av">SK</div><div style="flex:1"><div class="nm">Sarah Koch · E-Scooter</div><div class="mt">A-1040 · Reifen</div></div><span class="pill"><span class="d"></span>Offen</span></div>
+          </div>
         </div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- KI-TELEFON -->
-<section id="telefon" class="wrap">
-  <div class="sec-h"><div class="t">Das Telefon klingelt. Du schraubst weiter.</div>
-    <div class="s">Die KI-Empfangskraft nimmt Anrufe <b>und WhatsApp</b> entgegen – auch nach Feierabend – und beantwortet die immer gleichen Fragen selbst, aus deinen echten Daten.</div></div>
-  <div class="remwrap">
+<!-- ===== VALUES ===== -->
+<div class="values wrap">
+  <div class="valgrid">
+    <div class="val"><div class="ic" data-ic="bolt"></div><div class="t">Schneller arbeiten</div><div class="s">Weniger Klicks, klare Abläufe.</div></div>
+    <div class="val"><div class="ic" data-ic="shield"></div><div class="t">Besseren Service</div><div class="s">Kunden immer auf dem Laufenden.</div></div>
+    <div class="val"><div class="ic" data-ic="chart"></div><div class="t">Intelligenter organisieren</div><div class="s">Alles an einem Ort, immer im Blick.</div></div>
+    <div class="val"><div class="ic" data-ic="leaf"></div><div class="t">Nachhaltiger wirtschaften</div><div class="s">Reparieren statt wegwerfen.</div></div>
+  </div>
+</div>
+
+<!-- ===== FEATURES ===== -->
+<section id="funktionen">
+ <div class="wrap">
+  <div class="sec-h">
+    <div class="kick">Alle Funktionen. Ein Design.</div>
+    <div class="t">Alles, was eine Werkstatt braucht.</div>
+    <div class="s">Ein System für den ganzen Ablauf – von der Annahme bis zur Abholung. Modern, klar, schnell.</div>
+  </div>
+  <div class="feat">
+    <div class="card"><div class="ic" data-ic="clip"></div><h3>Aufträge verwalten</h3><p>Gerät, Fehler, Preis – in Sekunden angelegt. Klarer Statusfluss mit Farb-Leitsystem.</p></div>
+    <div class="card"><div class="ic" data-ic="cal"></div><h3>Termine planen</h3><p>Kalender mit freien Slots aus deinen Öffnungszeiten. Kunden buchen selbst online.</p></div>
+    <div class="card"><div class="ic" data-ic="users"></div><h3>Kunden betreuen</h3><p>Kundenkartei, Historie und automatische Benachrichtigungen per E-Mail & WhatsApp.</p></div>
+    <div class="card"><div class="ic" data-ic="box"></div><h3>Ersatzteile organisieren</h3><p>Lager & Bestellungen hängen am Auftrag. Teil da? Auftrag läuft automatisch weiter.</p></div>
+    <div class="card"><div class="ic" data-ic="wrench"></div><h3>Reparaturen dokumentieren</h3><p>Mehrere Geräte, mehrere Fehler, Technikerzuweisung, Unterschrift & Kundenbeleg.</p></div>
+    <div class="card"><div class="ic" data-ic="chart"></div><h3>Auswertungen erhalten</h3><p>Umsatz, häufigste Reparaturen, Durchlaufzeiten – auf einen Blick, ohne Excel.</p></div>
+    <div class="card"><div class="ic" data-ic="pin"></div><h3>Standorte vernetzen</h3><p>Mehrere Filialen unter einem Dach, mit Rollen, Rechten und geteiltem Katalog.</p></div>
+    <div class="card"><div class="ic" data-ic="gear"></div><h3>Individuell erweiterbar</h3><p>Eigene Vorlagen, Etiketten, Kundenportal per QR und offene Schnittstellen.</p></div>
+  </div>
+ </div>
+</section>
+
+<!-- ===== PRICING ===== -->
+<section id="preise">
+ <div class="wrap">
+  <div class="sec-h">
+    <div class="kick">Preise</div>
+    <div class="t">Ein Paket für jede Werkstatt.</div>
+    <div class="s">Transparent, monatlich kündbar, ohne Kleingedrucktes. 14 Tage kostenlos testen – ohne Kreditkarte.</div>
+  </div>
+  <div class="prices">
+
+    <!-- BASIC -->
+    <div class="price">
+      <div class="plan"><span class="wm">VEL<span class="q">Q</span>IO</span> <span class="nm" style="color:var(--ink)">BASIC</span></div>
+      <div class="amt">49,90 € <small>/ Monat</small></div>
+      <div class="tl">Der perfekte Einstieg.</div>
+      <div class="desc">Alles, was du für deinen digitalen Werkstattalltag brauchst.</div>
+      <ul data-check>
+        <li>Auftragsverwaltung</li>
+        <li>Kundenverwaltung</li>
+        <li>Geräte- &amp; Fehlerdatenbank</li>
+        <li>Termine &amp; Kalender</li>
+        <li>Auftragsstatus &amp; Notizen</li>
+        <li>QR-Code für Kundenportal</li>
+        <li>E-Mail-Benachrichtigungen</li>
+        <li>Etiketten- / Barcode-Druck</li>
+        <li>Basis-Statistiken</li>
+        <li>1 Standort inklusive</li>
+        <li>Einfache Bedienung</li>
+      </ul>
+      <a class="btn block" href="app.html">Jetzt starten</a>
+    </div>
+
+    <!-- PRO -->
+    <div class="price hot">
+      <div class="tag">AM BELIEBTESTEN</div>
+      <div class="plan"><span class="wm">VEL<span class="q">Q</span>IO</span> <span class="nm" style="color:var(--green-d)">PRO</span></div>
+      <div class="amt">84,90 € <small>/ Monat</small></div>
+      <div class="tl">Mehr Möglichkeiten.</div>
+      <div class="desc">Für wachsende Betriebe mit höheren Ansprüchen.</div>
+      <ul data-check>
+        <li>Alle Basic-Funktionen</li>
+        <li>Erweiterte Statistiken &amp; Auswertungen</li>
+        <li>Ersatzteilverwaltung &amp; Lager</li>
+        <li>Rechnungen &amp; Buchhaltung (Export)</li>
+        <li>Mehrere Mitarbeiter / Rechte</li>
+        <li>Mehrere Standorte</li>
+        <li>Online-Self-Check / Website-Widget</li>
+        <li>B2B-Auftragseingang</li>
+        <li>Erweiterte Automatisierungen</li>
+        <li>Individuelle Vorlagen (KVA, Rechnung)</li>
+        <li>Priorisierter Support</li>
+      </ul>
+      <a class="btn pri block" href="app.html">Jetzt Pro wählen</a>
+    </div>
+
+    <!-- AI -->
+    <div class="price dark">
+      <div class="plan"><span class="aibadge">AI</span> <span class="wm on-green">VEL<span class="q">Q</span>IO</span> <span class="nm" style="color:#fff">AI</span></div>
+      <div class="amt">99,90 € <small>/ Monat</small></div>
+      <div class="tl">Deine Werkstatt denkt mit.</div>
+      <div class="desc">KI, WhatsApp &amp; Automatisierung. Die ganze Power von Velqio.</div>
+      <ul data-check-l>
+        <li>Alle Pro-Funktionen</li>
+        <li>WhatsApp-Anbindung</li>
+        <li>KI-Kundenkommunikation</li>
+        <li>Automatische Status-Nachrichten</li>
+        <li>KI-Zusammenfassungen &amp; Analysen</li>
+        <li>Intelligente Terminplanung</li>
+        <li>Sprach- &amp; Anrufassistent (optional)</li>
+        <li>Online-Bewertungen automatisieren</li>
+        <li>Individuelle KI-Workflows</li>
+        <li>Höchste Automatisierung</li>
+        <li>Premium-Support &amp; persönliche Beratung</li>
+      </ul>
+      <a class="btn pri block" href="app.html">Jetzt AI wählen</a>
+    </div>
+  </div>
+  <div class="pricenote">Alle Preise pro Monat, zzgl. gesetzlicher USt. · monatlich kündbar · Serverstandort Deutschland · DSGVO-konform</div>
+
+  <div class="chips" style="margin-top:40px">
+    <div class="chip" data-ic="clock">Zeit sparen</div>
+    <div class="chip" data-ic="coin">Kosten senken</div>
+    <div class="chip" data-ic="trend">Mehr Umsatz</div>
+    <div class="chip" data-ic="smile">Zufriedenere Kunden</div>
+    <div class="chip" data-ic="globe">Überall verfügbar</div>
+    <div class="chip" data-ic="lock">Sicher &amp; DSGVO-konform</div>
+    <div class="chip" data-ic="leaf">Nachhaltiger arbeiten</div>
+  </div>
+ </div>
+</section>
+
+<!-- ===== AI BAND ===== -->
+<section id="ki" class="aiband">
+ <div class="wrap">
+  <div class="sec-h">
+    <div class="kick">Velqio AI</div>
+    <div class="t">Das Telefon klingelt. Du schraubst weiter.</div>
+    <div class="s">Die KI beantwortet die immer gleichen Fragen selbst – am Telefon und per WhatsApp, aus deinen echten Daten. Auch nach Feierabend.</div>
+  </div>
+  <div class="airow">
     <div class="chat">
-      <div class="callbar"><span class="p"></span><div><b>Eingehender Anruf</b><div style="color:var(--ink2);font-size:13px">Unbekannter Anrufer · Empfangskraft übernimmt</div></div></div>
-      <div class="b ki"><small>KI-Empfangskraft</small>Dein Handy Doc, Sie sprechen mit der digitalen Assistentin. Wie kann ich helfen?</div>
+      <div class="callbar"><span class="p"></span><div><b style="color:#fff">Eingehender Anruf</b><div style="color:rgba(234,244,236,.7);font-size:13px">Unbekannt · Velqio AI übernimmt</div></div></div>
+      <div class="b ki"><small>Velqio AI</small>Dein Handy Doc, Sie sprechen mit der digitalen Assistentin. Wie kann ich helfen?</div>
       <div class="b an"><small>Anrufer</small>Hallo, ist mein Samsung schon fertig?</div>
-      <div class="b ki"><small>KI-Empfangskraft</small>Auf welchen Namen läuft der Auftrag?</div>
-      <div class="b an"><small>Anrufer</small>Rosner.</div>
-      <div class="b ki"><small>KI-Empfangskraft</small>Ihr Galaxy S22 ist abholbereit – Mo–Fr 9–18 Uhr. Endbetrag 250 €.</div>
+      <div class="b ki"><small>Velqio AI</small>Auf welchen Namen läuft der Auftrag?</div>
+      <div class="b an"><small>Anrufer</small>Koch.</div>
+      <div class="b ki"><small>Velqio AI</small>Ihr Galaxy ist abholbereit – Mo–Fr 9–18 Uhr. Endbetrag 189 €.</div>
       <div class="b an"><small>Anrufer</small>Perfekt, danke!</div>
     </div>
     <div>
-      <div style="font-size:26px;font-weight:900;letter-spacing:-1px;margin-bottom:12px">Nie wieder mitten in der Reparatur ans Telefon.</div>
-      <p style="color:var(--ink2);font-size:17px">„Ist mein Handy fertig?", „Was kostet ein Displaytausch?", „Habt ihr auf?" – die vier häufigsten Anrufe beantwortet die Empfangskraft aus deinen echten Daten. Sofort, auch nach Feierabend.</p>
-      <ul style="list-style:none;margin:18px 0;padding:0">
-        <li style="padding:8px 0;border-bottom:1px solid var(--line)">Liest den Reparaturstatus direkt vor – am Telefon und per WhatsApp</li>
-        <li style="padding:8px 0;border-bottom:1px solid var(--line)">Nennt Preise und Lagerbestand aus deinen Daten</li>
-        <li style="padding:8px 0;border-bottom:1px solid var(--line)">Bucht Termine direkt in deinen Kalender</li>
-        <li style="padding:8px 0;border-bottom:1px solid var(--line)">Übernimmt automatisch nach Feierabend, mit eigener Ansage</li>
-        <li style="padding:8px 0">Komplexe Fälle: nimmt Rückruf-Aufgabe für dich auf</li>
+      <div style="font-size:26px;font-weight:900;letter-spacing:-1px;margin-bottom:10px;color:#fff">Nie wieder mitten in der Reparatur ans Telefon.</div>
+      <p style="color:rgba(234,244,236,.8);font-size:17px">„Ist mein Handy fertig?", „Was kostet ein Displaytausch?", „Habt ihr auf?" – Velqio AI antwortet sofort aus deinen echten Daten und schreibt Status-Updates automatisch per WhatsApp.</p>
+      <ul class="ailist">
+        <li data-ic="check">Liest Reparaturstatus vor – Telefon &amp; WhatsApp</li>
+        <li data-ic="check">Nennt Preise &amp; Lagerbestand aus deinen Daten</li>
+        <li data-ic="check">Bucht Termine direkt in deinen Kalender</li>
+        <li data-ic="check">Fasst Aufträge zusammen &amp; wertet aus</li>
+        <li data-ic="check">Übernimmt automatisch nach Feierabend</li>
       </ul>
-      <p style="color:var(--ink2);font-size:15px">Du entscheidest, wann sie rangeht: nur im Überlauf, nur nach Feierabend oder immer. Alle Anrufe und Nachrichten laufen in einem Posteingang zusammen.</p>
-      <a class="btn pri" style="margin-top:16px" href="app.html">Empfangskraft live testen →</a>
+      <a class="btn pri big" style="margin-top:22px" href="app.html">Velqio AI testen →</a>
     </div>
-  </div>
-</section>
-
-<!-- FEATURES -->
-<section id="features" class="wrap">
-  <div class="sec-h"><div class="t">Alles, was eine Werkstatt braucht. Nichts, was sie bremst.</div>
-    <div class="s">Ein System für den ganzen Ablauf – von der Annahme bis zur Abholung.</div></div>
-  <div class="feat">
-    <div class="card"><div class="ic" data-ic="phone"></div><h3>KI-Empfangskraft am Telefon</h3><p>Nimmt Anrufe an, liest den Status vor, nennt Preise und bucht Termine – auch nach Feierabend. Komplexe Fälle landen als Rückruf-Aufgabe bei dir.</p></div>
-    <div class="card"><div class="ic" data-ic="clip"></div><h3>Aufträge in Sekunden</h3><p>Gerät, Fehler, Preis – fertig. Klarer Statusfluss von „Offen" über „In Bearbeitung" bis „Abholbereit". Jeder Kunde bekommt einen eigenen Status-Link.</p></div>
-    <div class="card"><div class="ic" data-ic="bell"></div><h3>Nie wieder nachtelefonieren</h3><p>Automatische Erinnerungen an Kunden (Termin, Abholung, Bewertung) und an das Team (Teil da, überfällig, Lager leer). Logisch getaktet.</p></div>
-    <div class="card"><div class="ic" data-ic="rcpt"></div><h3>Kasse, die sich anbindet</h3><p>Verbinden Sie SumUp, Zettle, HelloCash oder orderbird – Kartenzahlung und TSE-konforme Belege ohne neue Hardware.</p></div>
-    <div class="card"><div class="ic" data-ic="box"></div><h3>Lager & Ersatzteile</h3><p>Teile-Bestellungen hängen direkt am Auftrag. Kommt das Teil, geht der Auftrag automatisch weiter – und der Kunde wird informiert.</p></div>
-    <div class="card"><div class="ic" data-ic="tag"></div><h3>Preise & Online-Buchung</h3><p>Preiskatalog für tausende Modelle. Kunden buchen Termine und sehen Preise direkt auf Ihrer Website – per Widget oder WordPress-Plugin.</p></div>
-    <div class="card"><div class="ic" data-ic="chart"></div><h3>Zahlen, die zählen</h3><p>Umsatz, häufigste Reparaturen, Abschlüsse – auf einen Blick, ohne Excel. Sie wissen sofort, was läuft.</p></div>
-  </div>
-</section>
-
-<!-- REMINDERS -->
-<section id="reminders" class="wrap">
-  <div class="sec-h"><div class="t">Die richtige Nachricht. Automatisch. Zur richtigen Zeit.</div>
-    <div class="s">Velqio denkt an das, was im Alltag untergeht – für Kunden <b>und</b> für Sie.</div></div>
-  <div class="remwrap">
-    <div class="maillist">
-      <div class="m"><div class="ico" data-ic="chat"></div><div><b>Fertig und abholbereit</b><div class="sub">an den Kunden – sobald die Reparatur fertig ist</div></div><div class="when">sofort</div></div>
-      <div class="m"><div class="ico" data-ic="bell"></div><div><b>Abhol-Erinnerung</b><div class="sub">an den Kunden – wenn das Gerät 3 Tage liegt</div></div><div class="when">Tag 3</div></div>
-      <div class="m"><div class="ico" data-ic="mail"></div><div><b>Bewertungsanfrage</b><div class="sub">an den Kunden – 1 Tag nach der Abholung</div></div><div class="when">Tag +1</div></div>
-      <div class="m w"><div class="ico" data-ic="tool"></div><div><b>Ersatzteil eingetroffen</b><div class="sub">an das Team – Auftrag kann weiter</div></div><div class="when">sofort</div></div>
-      <div class="m w"><div class="ico" data-ic="arch"></div><div><b>Lagerbestand niedrig</b><div class="sub">an das Team – rechtzeitig nachbestellen</div></div><div class="when">auto</div></div>
-    </div>
-    <div>
-      <div style="font-size:26px;font-weight:900;letter-spacing:-1px;margin-bottom:12px">Kunden fühlen sich betreut.<br>Sie vergessen nichts mehr.</div>
-      <p style="color:var(--ink2);font-size:17px">Terminbestätigung, Vortags-Erinnerung, Abgabe-Checkliste, Kostenvoranschlag-Freigabe, „fertig", Abholung, Bewertung – alle Nachrichten sind fertig vorformuliert und lassen sich mit einem Klick anpassen.</p>
-      <p style="color:var(--ink2);font-size:17px;margin-top:14px">Ihr Team bekommt eigene Erinnerungen: Tagesüberblick, überfällige Aufträge, gelieferte Teile, leeres Lager.</p>
-      <a class="btn pri" style="margin-top:20px" href="app.html">Alle Vorlagen ansehen →</a>
-    </div>
-  </div>
-</section>
-
-<!-- HOW -->
-<section id="how" class="alt">
- <div class="wrap">
-  <div class="sec-h"><div class="t" style="color:#fff">So einfach wie Zettel – nur besser.</div>
-    <div class="s">Vier Schritte. Keine Schulung. Kein Handbuch.</div></div>
-  <div class="steps">
-    <div class="step"><div class="num">1</div><h4>Auftrag annehmen</h4><p>Kunde, Gerät, Fehler, Preis. Kunde bekommt automatisch die Bestätigung.</p></div>
-    <div class="step"><div class="num">2</div><h4>Reparieren</h4><p>Status ziehen. Teil fehlt? Bestellung hängt am Auftrag, Kunde wird informiert.</p></div>
-    <div class="step"><div class="num">3</div><h4>„Fertig" tippen</h4><p>Der Kunde bekommt sofort die Abhol-Nachricht – ganz ohne Anruf.</p></div>
-    <div class="step"><div class="num">4</div><h4>Kassieren</h4><p>An der angebundenen Kasse bezahlen, Beleg drucken, Bewertung folgt automatisch.</p></div>
   </div>
  </div>
 </section>
 
-<!-- PRICING -->
-<section id="preise" class="wrap">
-  <div class="sec-h"><div class="t">Ein fairer Preis. Kein Kleingedrucktes.</div>
-    <div class="s">Monatlich kündbar. 14 Tage kostenlos testen – ohne Kreditkarte. KI-Empfangskraft optional zubuchbar (Aufpreis + Minutenpreis).</div></div>
-  <div class="prices">
-    <div class="price"><div class="name">Solo</div><div class="amt">29€ <small>/ Monat</small></div>
-      <p style="color:var(--ink2)">Für die Ein-Personen-Werkstatt.</p>
-      <ul><li>Aufträge & Kunden unbegrenzt</li><li>Kunden-Erinnerungen</li><li>Kalender & Status-Link</li><li>1 Benutzer</li></ul>
-      <a class="btn" href="app.html">Testen</a></div>
-    <div class="price hot"><div class="tag">Beliebt</div><div class="name">Werkstatt</div><div class="amt">49€ <small>/ Monat</small></div>
-      <p style="color:var(--ink2)">Der Standard für laufende Läden.</p>
-      <ul><li>Alles aus Solo</li><li>Team-Erinnerungen & Tagesüberblick</li><li>Lager, Bestellungen & Ankauf</li><li>Kassen-Anbindung (SumUp, HelloCash …)</li><li>Online-Buchungswidget</li><li>KI-Empfangskraft zubuchbar</li><li>bis 3 Benutzer</li></ul>
-      <a class="btn pri" href="app.html">Kostenlos starten →</a></div>
-    <div class="price"><div class="name">Filiale</div><div class="amt">99€ <small>/ Monat</small></div>
-      <p style="color:var(--ink2)">Für mehrere Standorte & größere Teams.</p>
-      <ul><li>Alles aus Werkstatt</li><li>Mehrere Standorte</li><li>Rollen & Rechte</li><li>Lexware / lexoffice Export</li><li>unbegrenzte Benutzer</li></ul>
-      <a class="btn" href="app.html">Testen</a></div>
+<!-- ===== BRANCHEN ===== -->
+<section id="branchen">
+ <div class="wrap">
+  <div class="sec-h">
+    <div class="kick">Für jede Reparatur. Für jede Branche.</div>
+    <div class="t">Ein Werkzeug für alles, was repariert wird.</div>
   </div>
+  <div class="cats">
+    <div class="cat"><div class="ic" data-ic="phone"></div><div class="t">Smartphone</div><div class="s">Reparatur</div></div>
+    <div class="cat"><div class="ic" data-ic="tablet"></div><div class="t">Tablet</div><div class="s">Reparatur</div></div>
+    <div class="cat"><div class="ic" data-ic="laptop"></div><div class="t">Laptop</div><div class="s">Reparatur</div></div>
+    <div class="cat"><div class="ic" data-ic="scooter"></div><div class="t">E-Scooter</div><div class="s">Reparatur</div></div>
+    <div class="cat"><div class="ic" data-ic="devices"></div><div class="t">Kleingeräte</div><div class="s">Reparatur</div></div>
+    <div class="cat"><div class="ic" data-ic="case"></div><div class="t">Zubehör</div><div class="s">&amp; Cases</div></div>
+  </div>
+  <div class="catsmore">… und vieles mehr. Velqio passt sich deinem Betrieb an.</div>
+ </div>
 </section>
 
-<!-- FINAL -->
-<div class="final wrap">
-  <div class="t">Weniger Nachfragen. Mehr fertige Geräte. Zufriedenere Kunden.</div>
-  <div class="cta" style="margin-top:30px"><a class="btn pri big" href="app.html">Jetzt kostenlos testen →</a></div>
-  <div class="trust">14 Tage gratis · keine Kreditkarte · in Minuten startklar</div>
+<!-- ===== TESTIMONIAL ===== -->
+<section style="background:var(--soft)">
+ <div class="wrap quote">
+   <div class="mk">&ldquo;</div>
+   <blockquote>Velqio hat unseren Werkstattalltag komplett verändert – einfach zu bedienen und der Kunde hat mehr Überblick. Weniger Stress und zufriedene Kunden. Genau das, was wir gebraucht haben.</blockquote>
+   <div class="who">
+     <div class="av">DO</div>
+     <div>
+       <div class="nm">Devran Oral</div>
+       <div class="rl">Dein Handy Doc · Balingen</div>
+     </div>
+   </div>
+ </div>
+</section>
+
+<!-- ===== FINAL ===== -->
+<div class="final">
+  <div class="wrap">
+    <div class="t">Heute reparieren. Morgen leben.</div>
+    <div class="s">Starte deinen digitalen Werkstattalltag – in wenigen Minuten startklar.</div>
+    <div class="cta" style="justify-content:center;margin-top:28px"><a class="btn big" href="app.html">Jetzt 14 Tage kostenlos testen →</a></div>
+  </div>
 </div>
 
+<!-- ===== FOOTER ===== -->
 <footer>
- <div class="wrap footgrid">
-   <div><div class="logo"><img src="/velqio-logo.png" alt="Velqio" style="height:34px;width:34px;border-radius:50%;object-fit:cover;vertical-align:middle">&nbsp;Velqio</div><div style="font-size:12px;color:var(--green);font-weight:700;margin-top:4px;letter-spacing:.02em">Reparieren statt Wegwerfen.</div><div style="font-size:11px;color:var(--ink2);letter-spacing:.14em;margin-top:2px">PEOPLE · REPAIR · PLANET</div></div>
-   <div style="display:flex;gap:22px;flex-wrap:wrap"><a href="#features">Funktionen</a><a href="#preise">Preise</a><a href="app.html">Anmelden</a><a href="booking.html">Online-Termin (Kunden)</a><a href="/datenschutz.html">Datenschutz</a><a href="/impressum.html">Impressum</a><a href="/nutzungsbedingungen.html">Nutzungsbedingungen</a><a href="/avv.html">AVV</a></div>
-   <div>© 2026 Velqio · ein Produkt der Margency UG</div>
+ <div class="wrap">
+  <div class="footgrid">
+    <div>
+      <div class="lockup on-green">
+        <span class="wm on-green">VEL<span class="q">Q</span>IO<sup>®</sup></span>
+        <span class="sub">Service einfach organisiert</span>
+      </div>
+      <div style="margin-top:14px;max-width:300px">Die Software für moderne Reparaturbetriebe. Reparieren statt Wegwerfen.</div>
+      <div class="rpp"><span>REPAIR</span><span>PEOPLE</span><span>PLANET</span></div>
+    </div>
+    <div class="footcol">
+      <h5>Produkt</h5>
+      <a href="#funktionen">Funktionen</a>
+      <a href="#preise">Preise</a>
+      <a href="#ki">Velqio AI</a>
+      <a href="app.html">Anmelden</a>
+      <a href="booking.html">Online-Termin (Kunden)</a>
+    </div>
+    <div class="footcol">
+      <h5>Kontakt &amp; Recht</h5>
+      <a href="mailto:info@velqio.de">info@velqio.de</a>
+      <a href="https://velqio.de/">www.velqio.de</a>
+      <a href="/datenschutz.html">Datenschutz</a>
+      <a href="/impressum.html">Impressum</a>
+      <a href="/nutzungsbedingungen.html">Nutzungsbedingungen</a>
+      <a href="/avv.html">AVV</a>
+    </div>
+  </div>
+  <div class="footbar">
+    <div class="claim">DIGITAL · EFFIZIENT · NACHHALTIG</div>
+    <div>© 2026 Velqio · ein Produkt der Margency UG (haftungsbeschränkt)</div>
+  </div>
  </div>
 </footer>
+
 <script>
 const ICONS={
  clip:'<rect x="8" y="3" width="8" height="4" rx="1"/><path d="M9 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3"/><path d="M9 12h6M9 16h4"/>',
- bell:'<path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>',
- rcpt:'<rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 8h6M9 12h6M9 16h4"/>',
+ cal:'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/><rect x="7" y="13" width="3" height="3" rx=".5"/>',
+ users:'<circle cx="9" cy="8" r="3.4"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0"/><path d="M16 5.2a3.2 3.2 0 0 1 0 6.2M20.5 20a4.8 4.8 0 0 0-3.2-4.4"/>',
  box:'<path d="M21 8v8l-9 5-9-5V8l9-5 9 5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
- tag:'<path d="M3 3h8l10 10-8 8L3 11V3z"/><circle cx="7.5" cy="7.5" r="1.4"/>',
- chart:'<path d="M3 21h18"/><rect x="6" y="10" width="3" height="8"/><rect x="11" y="6" width="3" height="12"/><rect x="16" y="13" width="3" height="5"/>',
- phone:'<path d="M6.6 10.8a15 15 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.24 11 11 0 0 0 3.5.56 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.6a1 1 0 0 1 1 1 11 11 0 0 0 .56 3.5 1 1 0 0 1-.24 1z"/>',
- chat:'<path d="M4 4h16v12H8l-4 4V4z"/>',
- mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
- tool:'<path d="M14.5 5.5a4 4 0 0 0 5 5L21 12l-8 8-2-2 8-8-1.5-1.5-2 2-2-2 2-2z"/>',
- arch:'<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/>',
+ wrench:'<path d="M14.5 5.5a4 4 0 0 0 5 5L21 12l-8 8-2-2 8-8-1.5-1.5-2 2-2-2 2-2z"/>',
+ chart:'<path d="M3 21h18"/><rect x="6" y="10" width="3" height="8" rx=".6"/><rect x="11" y="6" width="3" height="12" rx=".6"/><rect x="16" y="13" width="3" height="5" rx=".6"/>',
+ pin:'<path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/>',
+ gear:'<circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-2.7-1.1l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.6 1.6 0 0 0 4.6 15H4.5a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 6.3 8.3l-.1-.1A2 2 0 1 1 9 5.4l.1.1a1.6 1.6 0 0 0 2.7-1.1V4.5a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0 1.1 2.7h.1a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.7 1z"/>',
+ bolt:'<path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/>',
+ shield:'<path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/><path d="M9 12l2 2 4-4"/>',
+ leaf:'<path d="M4 20c0-9 7-15 16-15 0 9-6 16-15 16-1 0-1 0-1-1z"/><path d="M4 20c4-5 8-7 12-8"/>',
+ phone:'<rect x="6" y="2" width="12" height="20" rx="3"/><path d="M10 18h4"/>',
+ tablet:'<rect x="4" y="3" width="16" height="18" rx="2.5"/><path d="M11 18h2"/>',
+ laptop:'<rect x="4" y="5" width="16" height="10" rx="1.6"/><path d="M2 19h20l-2-2H4l-2 2z"/>',
+ scooter:'<circle cx="6" cy="18" r="2.4"/><circle cx="18" cy="18" r="2.4"/><path d="M8.4 18h6l3-11h2"/><path d="M14.4 7 12 18"/>',
+ devices:'<rect x="3" y="5" width="12" height="10" rx="1.6"/><path d="M6 19h6"/><rect x="16" y="9" width="5" height="11" rx="1.4"/>',
+ case:'<rect x="7" y="3" width="10" height="18" rx="3"/><circle cx="12" cy="7" r="1.3"/>',
+ clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+ coin:'<ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/>',
+ trend:'<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>',
+ smile:'<circle cx="12" cy="12" r="9"/><path d="M8 14a5 5 0 0 0 8 0"/><circle cx="9" cy="10" r="1"/><circle cx="15" cy="10" r="1"/>',
+ globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>',
+ lock:'<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
+ check:'<path d="M20 6 9 17l-5-5"/>',
 };
-document.querySelectorAll('[data-ic]').forEach(e=>{e.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">'+(ICONS[e.dataset.ic]||'')+'</svg>';});
+document.querySelectorAll('[data-ic]').forEach(function(e){
+  var k=e.dataset.ic; if(!ICONS[k])return;
+  e.insertAdjacentHTML('afterbegin','<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">'+ICONS[k]+'</svg>');
+});
+// Häkchen in Preis-Listen
+var chk='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+document.querySelectorAll('[data-check] li, [data-check-l] li').forEach(function(li){ li.insertAdjacentHTML('afterbegin',chk); });
 
 /* Direkt-Login von der Marketing-Seite (gleiche Domain -> Token teilt sich mit /app.html) */
 function landingLogin(e){ if(e&&e.preventDefault) e.preventDefault();

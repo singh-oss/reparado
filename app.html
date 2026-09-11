@@ -11,7 +11,7 @@
   :root{
     --bg:#ffffff; --ink:#0f2318; --ink2:#5f6b64; --line:#eaedeb; --line2:#f1f3f2;
     --soft:#f5f8f6; --soft2:#eef2ef; --white:#fff;
-    --green:#0e7a3c; --green-d:#0b6733; --green-tint:#eaf4ee; --black:#0e7a3c;
+    --green:#34a24a; --green-d:#2a8b3d; --green-tint:#e9f5ec; --black:#34a24a;
     --radius:16px;
     --shadow:0 1px 2px rgba(16,40,27,.04),0 6px 16px rgba(16,40,27,.05),0 18px 40px rgba(16,40,27,.04);
     --shadow-sm:0 1px 2px rgba(16,40,27,.05),0 4px 12px rgba(16,40,27,.05);
@@ -75,9 +75,9 @@
   .kpi .n{font-size:31px;font-weight:800;letter-spacing:-.035em;font-variant-numeric:tabular-nums}
   .kpi .l{color:var(--ink2);font-size:13px;margin-top:3px}
   .kpi .t{font-size:12px;font-weight:700;margin-top:8px;color:var(--green)}
-  .pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px;border:1px solid #0e7a3c;white-space:nowrap}
-  .pill .d{width:7px;height:7px;border-radius:50%;background:#0e7a3c}
-  .pill.solid{background:#0e7a3c;color:#fff}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px;border:1px solid #34a24a;white-space:nowrap}
+  .pill .d{width:7px;height:7px;border-radius:50%;background:#34a24a}
+  .pill.solid{background:#34a24a;color:#fff}
   .pill.solid .d{background:#fff}
   .pill.soft{border-color:var(--line);color:var(--ink2)}
   .pill.soft .d{background:#bdbdbd}
@@ -89,18 +89,18 @@
   tbody tr{cursor:pointer}
   tbody tr:hover{background:var(--soft)}
   .tag{font-size:11px;font-weight:700;background:var(--soft2);border-radius:7px;padding:3px 8px;color:var(--ink2)}
-  .avatar{width:34px;height:34px;border-radius:9px;background:#0e7a3c;color:#fff;display:grid;place-items:center;font-weight:700;font-size:13px;flex:none}
-  .avatar.out{background:#fff;color:#0e7a3c;border:1px solid #0e7a3c}
+  .avatar{width:34px;height:34px;border-radius:9px;background:#34a24a;color:#fff;display:grid;place-items:center;font-weight:700;font-size:13px;flex:none}
+  .avatar.out{background:#fff;color:#34a24a;border:1px solid #34a24a}
   .seg{display:inline-flex;background:var(--soft);border-radius:10px;padding:3px;gap:2px;flex-wrap:wrap}
   .seg button{border:0;background:transparent;padding:7px 13px;border-radius:8px;font-weight:600;color:var(--ink2)}
-  .seg button.on{background:#0e7a3c;color:#fff}
+  .seg button.on{background:#34a24a;color:#fff}
   label.f{display:block;font-size:12px;font-weight:700;color:#333;margin:0 0 5px}
   .in{width:100%;border:1px solid var(--line);border-radius:11px;padding:10px 12px;outline:0;background:#fff;transition:.14s;color:var(--ink)}
   .in:focus{border-color:var(--green);box-shadow:var(--ring)}
   .divider{height:1px;background:var(--line);margin:16px 0}
   .empty{text-align:center;color:var(--ink2);padding:40px 10px}
   .switch{width:42px;height:24px;border-radius:20px;background:#d9d9d9;position:relative;transition:.15s;flex:none;border:0}
-  .switch.on{background:#0e7a3c}
+  .switch.on{background:#34a24a}
   .switch i{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.15s}
   .switch.on i{left:21px}
 
@@ -114,7 +114,7 @@
   .modal{position:fixed;inset:0;z-index:60;display:none;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;-webkit-overflow-scrolling:touch}
   .modal.show{display:flex}
   .modal .box{background:#fff;border-radius:16px;max-width:580px;width:100%;max-height:calc(100vh - 40px);overflow:auto;margin:auto;box-shadow:var(--shadow)}
-  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:#0e7a3c;color:#fff;
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:#34a24a;color:#fff;
          padding:12px 18px;border-radius:12px;font-weight:600;z-index:80;opacity:0;transition:.2s;pointer-events:none;box-shadow:var(--shadow)}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
@@ -122,32 +122,32 @@
   .listitem:last-child{border-bottom:0}
   .mono{font-variant-numeric:tabular-nums}
   .chip{border:1px solid var(--line);border-radius:20px;padding:6px 12px;font-weight:600;font-size:13px;cursor:pointer}
-  .chip.on{background:#0e7a3c;color:#fff;border-color:#0e7a3c}
+  .chip.on{background:#34a24a;color:#fff;border-color:#34a24a}
   .bar{height:8px;background:var(--soft2);border-radius:20px;overflow:hidden}
-  .bar > i{display:block;height:100%;background:#0e7a3c;border-radius:20px}
+  .bar > i{display:block;height:100%;background:#34a24a;border-radius:20px}
   .integ{display:flex;align-items:center;gap:14px;padding:14px;border:1px solid var(--line);border-radius:12px}
   .integ .lg{width:44px;height:44px;border-radius:10px;background:var(--soft);display:grid;place-items:center;font-weight:800;flex:none;font-size:13px}
   .note{background:var(--soft);border-radius:12px;padding:12px 14px;font-size:13px;color:#444}
-  .note b{color:#0e7a3c}
+  .note b{color:#34a24a}
 
   .mailprev{border:1px solid var(--line);border-radius:12px;overflow:hidden}
   .mailprev .mh{background:var(--soft);padding:12px 16px;border-bottom:1px solid var(--line);font-size:13px}
   .mailprev .mb{padding:18px 16px;white-space:pre-wrap;font-size:14px;line-height:1.6}
 
-  .democtl{position:fixed;left:50%;top:74px;transform:translateX(-50%);background:#0e7a3c;color:#fff;border-radius:14px;padding:12px 16px;z-index:85;display:flex;gap:16px;align-items:center;max-width:92vw;box-shadow:var(--shadow)}
+  .democtl{position:fixed;left:50%;top:74px;transform:translateX(-50%);background:#34a24a;color:#fff;border-radius:14px;padding:12px 16px;z-index:85;display:flex;gap:16px;align-items:center;max-width:92vw;box-shadow:var(--shadow)}
   .democtl .txt b{font-weight:800}
   .democtl .stop{border:1px solid #fff;background:transparent;color:#fff;border-radius:9px;padding:7px 12px;font-weight:700;cursor:pointer;flex:none}
-  .democtl .stop:hover{background:#fff;color:#0e7a3c}
+  .democtl .stop:hover{background:#fff;color:#34a24a}
   .callhdr{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--soft)}
-  .dotpulse{width:12px;height:12px;border-radius:50%;background:#0e7a3c;flex:none;animation:pulse 1.2s infinite}
+  .dotpulse{width:12px;height:12px;border-radius:50%;background:#34a24a;flex:none;animation:pulse 1.2s infinite}
   @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(0,0,0,.35)}70%{box-shadow:0 0 0 8px rgba(0,0,0,0)}100%{box-shadow:0 0 0 0 rgba(0,0,0,0)}}
   .callchat{display:flex;flex-direction:column;gap:9px;max-height:46vh;overflow:auto;padding:4px}
   .cb{max-width:82%;padding:9px 13px;border-radius:14px;font-size:14px;line-height:1.5;animation:cbin .25s ease}
   @keyframes cbin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-  .cb.ki{align-self:flex-end;background:#0e7a3c;color:#fff;border-bottom-right-radius:4px}
+  .cb.ki{align-self:flex-end;background:#34a24a;color:#fff;border-bottom-right-radius:4px}
   .cb.anr{align-self:flex-start;background:var(--soft);border-bottom-left-radius:4px}
   .cb .lbl{font-size:11px;font-weight:700;opacity:.6;margin-bottom:2px}
-  #loginScreen{position:fixed;inset:0;z-index:200;background:linear-gradient(160deg,#eaf4ee,#fff 60%);display:none;align-items:center;justify-content:center;padding:20px}
+  #loginScreen{position:fixed;inset:0;z-index:200;background:linear-gradient(160deg,#e9f5ec,#fff 60%);display:none;align-items:center;justify-content:center;padding:20px}
   #loginScreen.show{display:flex}
   .loginbox{background:#fff;border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);padding:34px 30px;width:100%;max-width:420px;text-align:center}
   .loginbrand{display:inline-flex;align-items:center;gap:10px;font-weight:800;font-size:22px;letter-spacing:-.5px;margin-bottom:2px}
@@ -182,7 +182,7 @@
 <body>
 <div class="app">
   <aside class="side" id="side">
-    <div class="brand"><span class="dot">V</span> Velqio</div>
+    <div class="brand"><span style="font-family:Inter,-apple-system,sans-serif;font-weight:900;letter-spacing:-.02em;font-size:23px;color:#12261a">VEL<span style="color:var(--green)">Q</span>IO<sup style="font-size:.36em;font-weight:700;color:#8a938d;top:-.9em;position:relative">&reg;</sup></span></div>
     <div class="nav" id="nav">
       <a data-view="dashboard" class="active"><span class="ic" data-ic="grid"></span> Übersicht</a>
       <a data-view="anrufe"><span class="ic" data-ic="phone"></span> Empfang <span class="badge" id="bg-call">0</span></a>
@@ -226,7 +226,7 @@
 </div>
 
 <div id="loginScreen"><div class="loginbox">
-  <div class="loginbrand"><span class="dot">V</span> Velqio</div>
+  <div class="loginbrand"><span style="font-family:Inter,-apple-system,sans-serif;font-weight:900;letter-spacing:-.02em;font-size:26px;color:#12261a">VEL<span style="color:var(--green)">Q</span>IO<sup style="font-size:.36em;font-weight:700;color:#8a938d;top:-.9em;position:relative">&reg;</sup></span></div>
   <div class="muted" style="margin-bottom:20px" id="loginWs">Anmeldung</div>
   <div id="loginStep"></div>
   <div class="loginhint">Demo-PINs · Geschäftsführung <b>1234</b> · Mitarbeiter <b>0000</b></div>
@@ -381,7 +381,7 @@ const Sync={
   rerender(){ try{ if(typeof current!=='undefined' && current!=='neworder' && typeof views!=='undefined' && views[current]){ views[current](); if(typeof paintIcons==='function')paintIcons(); if(typeof refreshBadges==='function')refreshBadges(); } }catch(e){} },
   setState(s){ this.state=s; this._paint(); },
   _paint(){ let el=document.getElementById('syncDot'); if(!el){ el=document.createElement('div'); el.id='syncDot'; el.style.cssText='position:fixed;bottom:12px;left:12px;z-index:6000;font:600 12px Inter,-apple-system,sans-serif;padding:6px 11px;border-radius:999px;box-shadow:0 2px 8px rgba(0,0,0,.15);display:flex;align-items:center;gap:6px;transition:.25s;pointer-events:none;opacity:.96'; document.body.appendChild(el); }
-    const map={online:['#0e7a3c','#eaf4ee','● Verbunden'], saving:['#8a6d00','#fff7e6','⟳ Speichere…'], saved:['#0e7a3c','#eaf4ee','✓ Gespeichert'], offline:['#b4231a','#fdecea','⚠ Nicht verbunden']};
+    const map={online:['#34a24a','#e9f5ec','● Verbunden'], saving:['#8a6d00','#fff7e6','⟳ Speichere…'], saved:['#34a24a','#e9f5ec','✓ Gespeichert'], offline:['#b4231a','#fdecea','⚠ Nicht verbunden']};
     const m=map[this.state]||map.online; el.style.color=m[0]; el.style.background=m[1]; el.textContent=m[2];
     if(this.state==='saved'){ clearTimeout(this._savedT); const self=this; this._savedT=setTimeout(function(){ if(self.state==='saved') self.setState('online'); }, 1600); }
   }
@@ -605,7 +605,7 @@ function ensureStatuses(){ if(!S.statuses){
       tpl:(k==='fertig'?'Guten Tag {kunde}, Ihr {geraet} ist abholbereit. Auftrag {auftrag}, Endbetrag {preis}. Öffnungszeiten: {oeffnung}. Status verfolgen: {tracking}':'')}));
     save();
   }
-  if(!S._stColMig){ const oldC={offen:'#6b7280',bearbeitung:'#d99a00',warten:'#e2681c',fertig:'#0e7a3c',abgeholt:'#64748b'}; let ch=false; S.statuses.forEach(s=>{ if(s.sys&&oldC[s.key]&&String(s.color||'').toLowerCase()===oldC[s.key]&&STATUS_COLOR[s.key]){ s.color=STATUS_COLOR[s.key]; ch=true; } }); S._stColMig=1; if(ch)save(); }
+  if(!S._stColMig){ const oldC={offen:'#6b7280',bearbeitung:'#d99a00',warten:'#e2681c',fertig:'#34a24a',abgeholt:'#64748b'}; let ch=false; S.statuses.forEach(s=>{ if(s.sys&&oldC[s.key]&&String(s.color||'').toLowerCase()===oldC[s.key]&&STATUS_COLOR[s.key]){ s.color=STATUS_COLOR[s.key]; ch=true; } }); S._stColMig=1; if(ch)save(); }
   return S.statuses; }
 function statusList(){return ensureStatuses();}
 function statusDef(k){const l=ensureStatuses();return l.find(s=>s.key===k)||l[0]||{key:k,label:k,color:'#6b7280'};}
@@ -824,7 +824,7 @@ function playbook(id){const o=S.ord.find(x=>x.id===id);if(!o)return;const dev=oD
 /* ---- Self-Check-in-Terminal (L14) ---- */
 function selfCheckin(){ensureCat();const ov=document.createElement('div');ov.id='checkinOv';ov.style.cssText='position:fixed;inset:0;z-index:300;background:#f5f8f6;overflow:auto;padding:24px';
   ov.innerHTML=`<div style="max-width:560px;margin:0 auto">
-   <div style="text-align:center;margin-bottom:18px"><div style="font-size:24px;font-weight:800;color:#0e7a3c">${esc(SHOP.name)}</div><div class="muted">Gerät selbst anmelden</div></div>
+   <div style="text-align:center;margin-bottom:18px"><div style="font-size:24px;font-weight:800;color:#34a24a">${esc(SHOP.name)}</div><div class="muted">Gerät selbst anmelden</div></div>
    <div class="card"><label class="f">Ihr Name</label><input class="in" id="ci_name">
      <div class="grid g2" style="margin-top:10px"><div><label class="f">Telefon</label><input class="in" id="ci_tel" value="+49 "></div><div><label class="f">E-Mail (optional)</label><input class="in" id="ci_mail"></div></div>
      <label class="f" style="margin-top:10px">Gerät auswählen</label>
@@ -846,7 +846,7 @@ function updateCiSelected(){var el=document.getElementById('ci_selected');if(el)
 const BRAND_STYLE={Apple:'#1d1d1f',Samsung:'#1428a0',Xiaomi:'#ff6900',Redmi:'#ff6900',POCO:'#111827',Google:'#1a73e8',Huawei:'#c7000b',Honor:'#1b6fff',Motorola:'#3a7bd5',OnePlus:'#eb0028',Oppo:'#0a7b3e',Nothing:'#111827',Nokia:'#124191',Sony:'#111827',Realme:'#f5a623',Sonstige:'#6b7280'};
 function _brandColor(b){if(BRAND_STYLE[b])return BRAND_STYLE[b];var s=0;b=b||'';for(var i=0;i<b.length;i++)s=(s*31+b.charCodeAt(i))>>>0;return 'hsl('+(s%360)+',52%,42%)';}
 function brandMonogram(b,px){px=px||30;var col=_brandColor(b);var ini=(b||'?').replace(/[^A-Za-z0-9]/g,'').slice(0,2).toUpperCase()||'?';return '<span style="width:'+px+'px;height:'+px+'px;border-radius:'+Math.round(px*0.3)+'px;background:linear-gradient(145deg,'+col+',rgba(0,0,0,.28)),'+col+';color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:'+Math.round(px*0.4)+'px;letter-spacing:.3px;flex:none;box-shadow:0 1px 2px rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.2);font-family:-apple-system,Segoe UI,Arial,sans-serif">'+esc(ini)+'</span>';}
-function _ciStyleInject(){if(document.getElementById('ciStyle'))return;var s=document.createElement('style');s.id='ciStyle';s.textContent='.cibr-wrap{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px}.cibr{display:flex;align-items:center;gap:8px;border:2px solid #e3e8e4;background:#fff;border-radius:12px;padding:9px 10px;cursor:pointer;font-weight:700;font-size:14px;transition:.15s;color:#0f2318;width:100%}.cibr:hover{border-color:#0e7a3c}.cibr.on{border-color:#0e7a3c;background:#eaf4ee}.cimod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:10px;margin-top:12px;max-height:360px;overflow:auto;padding:2px}.cimod{position:relative;border:2px solid #e3e8e4;border-radius:14px;background:#fff;padding:12px 8px;display:flex;flex-direction:column;align-items:center;gap:7px;cursor:pointer;transition:.15s;min-height:108px;justify-content:center}.cimod:hover{border-color:#0e7a3c;transform:translateY(-1px);box-shadow:0 5px 14px rgba(14,122,60,.13)}.cimod.on{border-color:#0e7a3c;background:#eaf4ee}.cimod-nm{font-size:12px;text-align:center;line-height:1.2;font-weight:700;color:#0f2318}.cimod-br{font-size:10px;color:#6b7280}.cimod-chk{position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:50%;background:#0e7a3c;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800}';document.head.appendChild(s);}
+function _ciStyleInject(){if(document.getElementById('ciStyle'))return;var s=document.createElement('style');s.id='ciStyle';s.textContent='.cibr-wrap{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px}.cibr{display:flex;align-items:center;gap:8px;border:2px solid #e3e8e4;background:#fff;border-radius:12px;padding:9px 10px;cursor:pointer;font-weight:700;font-size:14px;transition:.15s;color:#0f2318;width:100%}.cibr:hover{border-color:#34a24a}.cibr.on{border-color:#34a24a;background:#e9f5ec}.cimod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:10px;margin-top:12px;max-height:360px;overflow:auto;padding:2px}.cimod{position:relative;border:2px solid #e3e8e4;border-radius:14px;background:#fff;padding:12px 8px;display:flex;flex-direction:column;align-items:center;gap:7px;cursor:pointer;transition:.15s;min-height:108px;justify-content:center}.cimod:hover{border-color:#34a24a;transform:translateY(-1px);box-shadow:0 5px 14px rgba(14,122,60,.13)}.cimod.on{border-color:#34a24a;background:#e9f5ec}.cimod-nm{font-size:12px;text-align:center;line-height:1.2;font-weight:700;color:#0f2318}.cimod-br{font-size:10px;color:#6b7280}.cimod-chk{position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:50%;background:#34a24a;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800}';document.head.appendChild(s);}
 function renderCiPicker(){var el=document.getElementById('ci_picker');if(!el)return;_ciStyleInject();
   var brands=catBrands();var q=(ciSel.search||'').toLowerCase().trim();var models=[];
   if(q){brands.forEach(function(b){catModelNames(b).forEach(function(m){if((b+' '+m).toLowerCase().indexOf(q)>=0)models.push({b:b,m:m});});});models=models.slice(0,60);}
@@ -862,7 +862,7 @@ function checkinDo(){const g=id=>(document.getElementById(id)||{}).value||'';con
   const price=priceFor(brand,model,issue);const devs=[{typ:'Smartphone',brand,model,imei:'',fach:'',ref:'',reparatur:issue,qual:'Original',price:+price||0,warranty:6}];
   const nr=nextOrderNr();const o=Object.assign({id:uid('o'),nr,cid:c.id,devices:devs,lock:'Keine',lockval:'',status:'offen',prio:'Standard',created:today(),due:dPlus(3),appt:'',notes:'Self-Check-in am Terminal',readyAt:'',sig,source:'checkin',technikerId:''},noMirror(devs));
   S.ord.unshift(o);save();refreshBadges();
-  document.getElementById('checkinOv').innerHTML=`<div style="max-width:560px;margin:60px auto;text-align:center"><div style="width:70px;height:70px;border-radius:50%;background:#0e7a3c;color:#fff;display:grid;place-items:center;margin:0 auto 18px;font-size:32px">✓</div><div style="font-size:24px;font-weight:800">Danke, ${esc(name.split(' ')[0])}!</div><p class="muted" style="margin:8px 0 4px">Ihr Gerät ist angemeldet.</p><div style="font-weight:800;font-size:20px">${nr}</div><p class="muted" style="font-size:13px;margin-top:8px">Status verfolgen: ${location.host}/status.html?nr=${nr}</p><button class="btn pri" style="margin-top:18px" onclick="checkinCancel()">Fertig</button></div>`;}
+  document.getElementById('checkinOv').innerHTML=`<div style="max-width:560px;margin:60px auto;text-align:center"><div style="width:70px;height:70px;border-radius:50%;background:#34a24a;color:#fff;display:grid;place-items:center;margin:0 auto 18px;font-size:32px">✓</div><div style="font-size:24px;font-weight:800">Danke, ${esc(name.split(' ')[0])}!</div><p class="muted" style="margin:8px 0 4px">Ihr Gerät ist angemeldet.</p><div style="font-weight:800;font-size:20px">${nr}</div><p class="muted" style="font-size:13px;margin-top:8px">Status verfolgen: ${location.host}/status.html?nr=${nr}</p><button class="btn pri" style="margin-top:18px" onclick="checkinCancel()">Fertig</button></div>`;}
 /* ============================ DASHBOARD ============================ */
 /* ---- P13: Aufgaben-System (zuweisen / Status / abhaken / Protokoll) ---- */
 function ensureTasks(){ if(!Array.isArray(S.tasks))S.tasks=[]; return S.tasks; }
@@ -928,7 +928,7 @@ views.dashboard=function(){
   m.innerHTML=`
    <div class="between"><div><h1 class="h1">Guten Tag</h1><p class="sub">${SHOP.name} · ${fmtDate(today())}</p></div>
      <div class="row"><button class="btn" onclick="newOrder()">Neuer Auftrag</button><button class="btn" onclick="newQuote()">Angebot</button><button class="btn" onclick="selfCheckin()">Self-Check-in</button><button class="btn" onclick="go('kasse')">Kasse öffnen</button><button class="btn pri" onclick="startDemo()">Demo-Tour</button></div></div>
-   ${curRole()==='inhaber'?(function(){const b=dailyBriefing();return `<div class="card" style="margin-top:16px;background:#0e7a3c;color:#fff">
+   ${curRole()==='inhaber'?(function(){const b=dailyBriefing();return `<div class="card" style="margin-top:16px;background:#34a24a;color:#fff">
      <div class="between"><b style="font-size:16px">Dein Tagesbriefing</b><span style="opacity:.8;font-size:12px">${fmtDate(today())}</span></div>
      <div style="margin-top:8px">${b.items.length?b.items.map(it=>`<div class="row" style="padding:7px 0;border-bottom:1px solid rgba(255,255,255,.18);cursor:pointer" onclick="${it.go}"><span style="flex:1">${it.lvl==='warn'?'⚠ ':'• '}${esc(it.txt)}</span><span style="opacity:.7">›</span></div>`).join(''):'<div style="opacity:.85">Alles im grünen Bereich – nichts Dringendes heute.</div>'}</div>
      <div style="margin-top:10px;opacity:.9;font-size:13px">Diese Woche: ${b.count} Reparaturen erledigt · Marge ${eur(b.margeW)}</div></div>`;})():''}
@@ -938,9 +938,9 @@ views.dashboard=function(){
      <div class="card kpi" onclick="go('kalender')" style="cursor:pointer"><div class="n">${heute}</div><div class="l">Termine heute</div><div class="t">Kalender ansehen</div></div>
      <div class="card kpi"><div class="n">${q.length}</div><div class="l">Geplante Erinnerungen</div><div class="t">Kunde &amp; Werkstatt</div></div>
    </div>
-   <div class="card" style="background:#0e7a3c;color:#fff;margin-top:16px">
+   <div class="card" style="background:#34a24a;color:#fff;margin-top:16px">
      <div class="between"><div><b style="font-size:16px">Deine KI-Empfangskraft</b><div style="opacity:.8;font-size:13px;margin-top:2px">Nimmt Anrufe und WhatsApp entgegen, auch nach Feierabend – bucht Termine, beantwortet Fragen, trägt alles ein.</div></div>
-       <div class="row"><button class="btn" style="background:transparent;color:#fff;border-color:rgba(255,255,255,.35)" onclick="simMenu()">Gespräch simulieren</button><button class="btn" style="background:#fff;color:#0e7a3c;border-color:#fff" onclick="go('anrufe')">Empfang öffnen</button></div></div>
+       <div class="row"><button class="btn" style="background:transparent;color:#fff;border-color:rgba(255,255,255,.35)" onclick="simMenu()">Gespräch simulieren</button><button class="btn" style="background:#fff;color:#34a24a;border-color:#fff" onclick="go('anrufe')">Empfang öffnen</button></div></div>
      <div class="grid g4" style="margin-top:14px">
        <div><div style="font-size:22px;font-weight:800">${S.calls.length}</div><div style="opacity:.7;font-size:12px">Gespräche heute</div></div>
        <div><div style="font-size:22px;font-weight:800">${S.calls.filter(c=>!c.task).length}</div><div style="opacity:.7;font-size:12px">automatisch beantwortet</div></div>
@@ -1038,10 +1038,10 @@ views.auftraege=function(){
      <select class="in" style="width:auto;padding:6px 10px" onchange="aufSort=this.value;views.auftraege();paintIcons()">${[['neu','Neueste zuerst'],['alt','Älteste zuerst'],['preis','Preis: hoch → niedrig'],['faellig','Fällig zuerst']].map(o=>`<option value="${o[0]}" ${aufSort===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select>
    </div>
    ${(aufView==='aktiv'&&aufLayout==='list')?`<div class="row" style="margin-bottom:14px;flex-wrap:wrap;gap:8px">${['alle',...statusFlow()].map(s=>`<button class="chip ${aufFilter===s?'on':''}" onclick="aufFilter='${s}';views.auftraege();paintIcons()">${s==='alle'?'Alle':esc(statusLabel(s))} · ${s==='alle'?(counts.__all||0):(counts[s]||0)}</button>`).join('')}</div>`:''}
-   ${(aufView==='aktiv'&&S.drafts&&S.drafts.length)?`<div class="card" style="margin-bottom:14px;border:1px dashed var(--green);background:var(--green-tint,#eaf4ee)"><div class="between"><b>Entwürfe (${S.drafts.length})</b><span class="muted" style="font-size:12px">Nicht abgeschlossene Aufträge – jederzeit fortsetzen</span></div>
+   ${(aufView==='aktiv'&&S.drafts&&S.drafts.length)?`<div class="card" style="margin-bottom:14px;border:1px dashed var(--green);background:var(--green-tint,#e9f5ec)"><div class="between"><b>Entwürfe (${S.drafts.length})</b><span class="muted" style="font-size:12px">Nicht abgeschlossene Aufträge – jederzeit fortsetzen</span></div>
      <div style="margin-top:8px">${S.drafts.map(d=>`<div class="listitem"><div class="lg">${ic('clip')}</div><div style="flex:1;min-width:0"><b>${esc(d.title||'Entwurf')}</b><div class="muted" style="font-size:12px">Zuletzt bearbeitet ${fmtDateTime(d.updatedAt)}</div></div>
        <button class="btn sm pri" onclick="resumeDraft('${d.id}')">Weiter bearbeiten</button><button class="btn sm gho" onclick="discardDraft('${d.id}')">Verwerfen</button></div>`).join('')}</div></div>`:''}
-   ${selN?`<div class="card" style="margin-bottom:12px;background:var(--green-tint,#eaf4ee);border:1px solid var(--green)"><div class="row" style="flex-wrap:wrap;gap:8px;align-items:center"><b>${selN} ausgewählt</b><span style="flex:1"></span>
+   ${selN?`<div class="card" style="margin-bottom:12px;background:var(--green-tint,#e9f5ec);border:1px solid var(--green)"><div class="row" style="flex-wrap:wrap;gap:8px;align-items:center"><b>${selN} ausgewählt</b><span style="flex:1"></span>
      ${aufView==='aktiv'?`<select class="in" style="width:auto;padding:6px 10px" onchange="if(this.value)aufBulkStatus(this.value)"><option value="">Status ändern…</option>${statusFlow().map(s=>`<option value="${s}">${esc(statusLabel(s))}</option>`).join('')}</select><button class="btn sm" onclick="aufBulk('archive')">Archivieren</button><button class="btn sm gho" onclick="aufBulk('trash')">In Papierkorb</button>`:''}
      ${aufView==='archiv'?`<button class="btn sm" onclick="aufBulk('restore')">Wiederherstellen</button><button class="btn sm gho" onclick="aufBulk('trash')">In Papierkorb</button>`:''}
      ${aufView==='papierkorb'?`<button class="btn sm" onclick="aufBulk('restore')">Wiederherstellen</button><button class="btn sm gho" onclick="aufBulk('delete')">Endgültig löschen</button>`:''}
@@ -1238,7 +1238,7 @@ function signOrder(id){
 }
 function initSig(){
   const c=document.getElementById('sig'); if(!c)return; const ctx=c.getContext('2d');
-  ctx.lineWidth=2.4;ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle='#0e7a3c';
+  ctx.lineWidth=2.4;ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle='#34a24a';
   let drawing=false,last=null; window.__sigDirty=false;
   const pos=e=>{const r=c.getBoundingClientRect();const t=e.touches?e.touches[0]:e;return {x:(t.clientX-r.left)*(c.width/r.width),y:(t.clientY-r.top)*(c.height/r.height)};};
   const start=e=>{drawing=true;last=pos(e);e.preventDefault();};
@@ -1504,7 +1504,7 @@ function qrSVG(str,px){px=px||170;const cells=25;let x=2166136261>>>0;const grid
   finder(0,0);finder(0,cells-7);finder(cells-7,0);
   const s=px/cells;let rects='';for(let r=0;r<cells;r++)for(let c=0;c<cells;c++){if(grid[r*cells+c])rects+=`<rect x="${(c*s).toFixed(1)}" y="${(r*s).toFixed(1)}" width="${Math.ceil(s)}" height="${Math.ceil(s)}"/>`;}
   return `<svg width="${px}" height="${px}" viewBox="0 0 ${px} ${px}" style="background:#fff;border-radius:8px" fill="#0f2318">${rects}</svg>`;}
-function makeSigStamp(text){const c=document.createElement('canvas');c.width=520;c.height=150;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,520,150);x.fillStyle='#0e7a3c';x.font='600 22px Inter,sans-serif';x.fillText(text,20,72);x.fillStyle='#5f6b64';x.font='13px Inter,sans-serif';x.fillText(new Date().toLocaleString('de-DE'),20,102);return c.toDataURL('image/png');}
+function makeSigStamp(text){const c=document.createElement('canvas');c.width=520;c.height=150;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,520,150);x.fillStyle='#34a24a';x.font='600 22px Inter,sans-serif';x.fillText(text,20,72);x.fillStyle='#5f6b64';x.font='13px Inter,sans-serif';x.fillText(new Date().toLocaleString('de-DE'),20,102);return c.toDataURL('image/png');}
 /* P7: Snapshot für die mobile Signatur-Seite (nur kundenrelevante Daten) */
 function noSignSnapshot(){
   const devs=NO.devices.filter(d=>d.brand||d.model).map(d=>({
@@ -1739,7 +1739,7 @@ views.angebote=function(){
    </div>
    ${reqs.length?`<div class="card" style="margin-top:16px"><div class="between"><b>Anfragen von der Website</b><span class="pill soft"><span class="d"></span>${reqs.length} neu</span></div>
      <p class="muted" style="font-size:13px;margin:4px 0 12px">Rückruf-/Angebotsanfragen über deine Website. „Angebot erstellen" öffnet das Formular mit vorausgefüllten Daten.</p>
-     ${reqs.map(r=>`<div class="listitem"><div class="avatar out">${initials(r.name)}</div><div style="flex:1;min-width:0"><b>${esc(r.name)}</b> ${r.source==='vorab'?`<span class="tag" style="border-color:#16a34a;color:#0e7a3c">Vorab · ${esc(HERKUNFT_LABEL[r.herkunft]||r.herkunft||'Online')}${r.via?(' ('+esc(r.via.toUpperCase())+')'):''}</span>`:`<span class="tag">${esc(r.contact||'Rückruf')}</span>`}<div class="muted" style="font-size:12px">${esc([r.brand,r.model].filter(Boolean).join(' '))} · ${esc(r.issue||'')}${r.problem?' · '+esc(r.problem):''} · ${esc(r.tel)}${r.besttime?' · '+esc(r.besttime):''}</div></div>
+     ${reqs.map(r=>`<div class="listitem"><div class="avatar out">${initials(r.name)}</div><div style="flex:1;min-width:0"><b>${esc(r.name)}</b> ${r.source==='vorab'?`<span class="tag" style="border-color:#16a34a;color:#34a24a">Vorab · ${esc(HERKUNFT_LABEL[r.herkunft]||r.herkunft||'Online')}${r.via?(' ('+esc(r.via.toUpperCase())+')'):''}</span>`:`<span class="tag">${esc(r.contact||'Rückruf')}</span>`}<div class="muted" style="font-size:12px">${esc([r.brand,r.model].filter(Boolean).join(' '))} · ${esc(r.issue||'')}${r.problem?' · '+esc(r.problem):''} · ${esc(r.tel)}${r.besttime?' · '+esc(r.besttime):''}</div></div>
        <button class="btn sm pri" onclick="requestToQuote('${r.id}')">Angebot erstellen</button><button class="btn sm" onclick="requestToOrder('${r.id}')">Auftrag anlegen</button><button class="btn sm gho" onclick="dismissRequest('${r.id}')">Erledigt</button></div>`).join('')}
    </div>`:''}
    <div class="card" style="margin-top:16px;padding:0;overflow:auto"><table>
@@ -1905,23 +1905,23 @@ function pullWarranty(){let arr=[];try{arr=JSON.parse(localStorage.getItem('repa
 function dismissWarranty(id){S.warrantyClaims=(S.warrantyClaims||[]).filter(w=>w.id!==id);save();views.dashboard();paintIcons();toast('Erledigt');}
 
 /* ============================ DRUCK (Etikett, Beleg, Garantie, KVA) ============================ */
-const PRINTCSS=`*{box-sizing:border-box;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#0e7a3c}
+const PRINTCSS=`*{box-sizing:border-box;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#34a24a}
  body{margin:0;padding:22px}
  .doc{max-width:520px;margin:0 auto}
- .hd{display:flex;justify-content:space-between;border-bottom:2px solid #0e7a3c;padding-bottom:10px;margin-bottom:14px}
+ .hd{display:flex;justify-content:space-between;border-bottom:2px solid #34a24a;padding-bottom:10px;margin-bottom:14px}
  .hd .n{font-weight:800;font-size:18px}
  .muted{color:#555;font-size:12px}
  h2{font-size:20px;margin:0 0 4px}
  table{width:100%;border-collapse:collapse;margin:12px 0}
  td,th{text-align:left;padding:8px 6px;border-bottom:1px solid #ddd;font-size:14px}
  th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#666}
- .tot{display:flex;justify-content:space-between;font-weight:800;font-size:18px;border-top:2px solid #0e7a3c;padding-top:10px;margin-top:6px}
+ .tot{display:flex;justify-content:space-between;font-weight:800;font-size:18px;border-top:2px solid #34a24a;padding-top:10px;margin-top:6px}
  .foot{margin-top:20px;font-size:12px;color:#555;border-top:1px solid #ddd;padding-top:10px}
- .label{border:2px solid #0e7a3c;border-radius:10px;padding:14px;text-align:center}
+ .label{border:2px solid #34a24a;border-radius:10px;padding:14px;text-align:center}
  .label .big{font-size:30px;font-weight:900;letter-spacing:-1px}
- .bc{height:44px;margin:10px 0;background:repeating-linear-gradient(90deg,#0e7a3c 0 2px,#fff 2px 4px,#0e7a3c 4px 7px,#fff 7px 10px,#0e7a3c 10px 12px,#fff 12px 16px)}
+ .bc{height:44px;margin:10px 0;background:repeating-linear-gradient(90deg,#34a24a 0 2px,#fff 2px 4px,#34a24a 4px 7px,#fff 7px 10px,#34a24a 10px 12px,#fff 12px 16px)}
  .lrow{font-size:13px;text-align:left;margin:3px 0}
- .box{border:1px solid #0e7a3c;border-radius:10px;padding:16px;margin-top:12px}
+ .box{border:1px solid #34a24a;border-radius:10px;padding:16px;margin-top:12px}
  @media print{body{padding:0}.doc{max-width:none}}`;
 function printHTML(title,body){ showDoc(title,body); }
 function showDoc(title,body){
@@ -1997,10 +1997,10 @@ function printReceipt(id){const o=S.ord.find(x=>x.id===id); if(!o)return; const 
   const st=`<style>
    .rcpt,.rcpt *{color:#1f2937 !important;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif}
    .rcpt{max-width:540px;margin:0 auto;font-size:13px;line-height:1.45}
-   .rc-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:2px solid #0e7a3c;padding-bottom:12px}
+   .rc-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:2px solid #34a24a;padding-bottom:12px}
    .rc-co{font-weight:900;font-size:23px;letter-spacing:-.3px;color:#0f2318 !important}.rc-co-sub{color:#6b7280 !important;font-size:11px;line-height:1.55}
    .rc-code{text-align:right;flex:none}.rc-code .lbl{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#6b7280 !important}
-   .rc-code .no{font-weight:900;font-size:29px;letter-spacing:-.5px;color:#0e7a3c !important;line-height:1}
+   .rc-code .no{font-weight:900;font-size:29px;letter-spacing:-.5px;color:#34a24a !important;line-height:1}
    .rc-cust-name{font-weight:900;font-size:17px;color:#0f2318 !important;margin-bottom:2px}
    .rc-dev{border:1px solid #e3e8e4;border-radius:10px;padding:10px 12px;margin-top:8px}
    .rc-dev-idx{font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:#6b7280 !important;font-weight:700}
@@ -2014,7 +2014,7 @@ function printReceipt(id){const o=S.ord.find(x=>x.id===id); if(!o)return; const 
    .rc-tbl{width:100%;border-collapse:collapse;margin-top:8px}
    .rc-tbl td,.rc-tbl th{text-align:left;padding:6px 4px;border-bottom:1px solid #eee;font-size:12px}
    .rc-tbl th{font-size:10px;text-transform:uppercase;color:#6b7280 !important}
-   .rc-price{display:flex;justify-content:flex-end;gap:20px;align-items:baseline;border-top:2px solid #0e7a3c;margin-top:8px;padding-top:8px}
+   .rc-price{display:flex;justify-content:flex-end;gap:20px;align-items:baseline;border-top:2px solid #34a24a;margin-top:8px;padding-top:8px}
    .rc-price .big{font-size:20px;font-weight:900}.rc-sub{color:#6b7280 !important;font-size:11px}
    .rc-bottom{display:flex;gap:16px;margin-top:16px;align-items:stretch}
    .rc-qr{flex:none;text-align:center}.rc-sign{flex:1;border:1px solid #e3e8e4;border-radius:10px;padding:10px}
@@ -2268,9 +2268,9 @@ views.kalender=function(){
   for(let dnum=1;dnum<=dim;dnum++){
     const ds=`${y}-${String(mo+1).padStart(2,'0')}-${String(dnum).padStart(2,'0')}`;
     const ev=evByDay[ds]||[]; const isToday=ds===today();
-    cells+=`<div onclick="terminModal({date:'${ds}'})" title="Klicken: Termin an diesem Tag anlegen" style="border:1px solid var(--line);border-radius:10px;padding:8px;min-height:92px;cursor:pointer;${isToday?'outline:2px solid #0e7a3c;outline-offset:-2px':''}">
+    cells+=`<div onclick="terminModal({date:'${ds}'})" title="Klicken: Termin an diesem Tag anlegen" style="border:1px solid var(--line);border-radius:10px;padding:8px;min-height:92px;cursor:pointer;${isToday?'outline:2px solid #34a24a;outline-offset:-2px':''}">
       <div style="font-weight:700;font-size:13px;${isToday?'':'color:#888'}">${dnum}</div>
-      ${ev.slice(0,3).map(e=>{ if(e.termin){const tc=cust(e.termin.cid);return `<div onclick="event.stopPropagation();terminModal({id:'${e.termin.id}'})" style="cursor:pointer;font-size:11px;margin-top:3px;padding:2px 5px;border-radius:5px;background:#0e7a3c;color:#fff">${esc(e.termin.start)} ${esc((tc.name||'').split(' ')[0])}</div>`;} return `<div onclick="event.stopPropagation();openOrder('${e.o.id}')" style="cursor:pointer;font-size:11px;margin-top:3px;padding:2px 5px;border-radius:5px;${e.t==='Termin'?'background:#0e7a3c;color:#fff':'background:var(--soft);color:#0e7a3c'}">${esc(cust(e.o.cid).name.split(' ')[0])}</div>`;}).join('')}
+      ${ev.slice(0,3).map(e=>{ if(e.termin){const tc=cust(e.termin.cid);return `<div onclick="event.stopPropagation();terminModal({id:'${e.termin.id}'})" style="cursor:pointer;font-size:11px;margin-top:3px;padding:2px 5px;border-radius:5px;background:#34a24a;color:#fff">${esc(e.termin.start)} ${esc((tc.name||'').split(' ')[0])}</div>`;} return `<div onclick="event.stopPropagation();openOrder('${e.o.id}')" style="cursor:pointer;font-size:11px;margin-top:3px;padding:2px 5px;border-radius:5px;${e.t==='Termin'?'background:#34a24a;color:#fff':'background:var(--soft);color:#34a24a'}">${esc(cust(e.o.cid).name.split(' ')[0])}</div>`;}).join('')}
       ${ev.length>3?`<div class="muted" style="font-size:11px;margin-top:2px">+${ev.length-3} mehr</div>`:''}
     </div>`;
   }
@@ -2303,7 +2303,7 @@ function reactivationOps(){
 function reactOutreach(cid,type){const c=cust(cid);S.reactDone=S.reactDone||[];S.reactDone.push(cid+':'+type);S.mailLog.unshift({t:new Date().toISOString(),to:c.name,ch:'E-Mail',rule:'Reaktivierung ('+type+')',subj:'Wir denken an Sie – '+SHOP.name,how:'manuell'});save();views.kunden();paintIcons();toast('Kunde angeschrieben (Demo): '+c.name);}
 function reactDismiss(cid,type){S.reactDone=S.reactDone||[];S.reactDone.push(cid+':'+type);save();views.kunden();paintIcons();}
 function reactAll(){const ops=reactivationOps();ops.forEach(o=>{S.reactDone=S.reactDone||[];S.reactDone.push(o.cid+':'+o.type);S.mailLog.unshift({t:new Date().toISOString(),to:o.name,ch:'E-Mail',rule:'Reaktivierung ('+o.type+')',subj:'Wir denken an Sie',how:'manuell'});});save();views.kunden();paintIcons();toast(ops.length+' Kunden angeschrieben (Demo)');}
-const REACT_COL={garantie:'#0e7a3c',akku:'#d99a00',winback:'#6b7280'};
+const REACT_COL={garantie:'#34a24a',akku:'#d99a00',winback:'#6b7280'};
 function reactCard(){const ops=reactivationOps();if(!ops.length)return '';
   return `<div class="card" style="margin-top:16px;border:1px solid var(--green)"><div class="between"><b>Reaktivierungs-Chancen (KI)</b><div class="row"><span class="muted" style="font-size:12px;align-self:center">${ops.length} Kunden ansprechbar</span><button class="btn sm pri" onclick="reactAll()">Alle anschreiben</button></div></div>
     <p class="muted" style="font-size:13px;margin:4px 0 10px">Kunden, bei denen sich ein Kontakt lohnt – Akku am Lebensende, Garantie läuft aus oder lange nicht mehr da. Wiederkehr-Umsatz aus Bestandsdaten.</p>
@@ -2516,7 +2516,7 @@ function fonedayOrderAll(){const a=ensureSupApi();if(!a.connected){toast(a.provi
   save();views.bestellungen();paintIcons();refreshBadges();toast(low.length+' Positionen an '+a.provider+' übermittelt');}
 function supApiCard(){const a=ensureSupApi();const low=lowParts();
   const sups=(S.suppliers||[]).map(s=>s.name);
-  return `<div class="card" style="margin-bottom:14px;border:1px solid ${a.connected?'var(--green,#0e7a3c)':'var(--line)'}">
+  return `<div class="card" style="margin-bottom:14px;border:1px solid ${a.connected?'var(--green,#34a24a)':'var(--line)'}">
      <div class="between" style="flex-wrap:wrap;gap:10px"><div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><div class="lg">${esc((a.provider||'?').slice(0,2).toUpperCase())}</div>
        <div><b>Lieferanten-Anbindung</b> ${a.connected?'<span class="tag">verbunden</span>':'<span class="tag">getrennt</span>'}
          <div class="muted" style="font-size:12px">${a.connected?('Preise täglich abgeglichen · zuletzt '+fmtDate(a.lastSync)+' · 1-Klick-Bestellung aktiv'):'Nicht verbunden – 1-Klick-Bestellung &amp; Preis-Sync inaktiv'}</div></div>
@@ -2605,9 +2605,9 @@ function genOffers(p){const base=Math.max(1,p.price||10);const sups=(S.suppliers
 function partOffers(p){if(!p.offers||!p.offers.length){p.offers=genOffers(p);save();}return p.offers;}
 function partCompare(id){ensureInv();const p=S.parts.find(x=>x.id===id);if(!p)return;const offers=partOffers(p).slice().sort((a,b)=>a.price-b.price);const min=offers.length?offers[0].price:0;
   openModal(`<div class="dhead"><b style="flex:1">Preisvergleich · ${esc(p.name)}</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
-   <div class="dbody"><div class="muted" style="font-size:13px">Aktueller EK: <b>${eur(p.price)}</b> · Lieferant ${esc(p.supplier||'—')}${min<p.price?` · günstigster Anbieter spart <b style="color:#0e7a3c">${eur(p.price-min)}</b>`:''}</div>
+   <div class="dbody"><div class="muted" style="font-size:13px">Aktueller EK: <b>${eur(p.price)}</b> · Lieferant ${esc(p.supplier||'—')}${min<p.price?` · günstigster Anbieter spart <b style="color:#34a24a">${eur(p.price-min)}</b>`:''}</div>
    <div class="card" style="padding:0;overflow:auto;margin-top:10px"><table><thead><tr><th>Lieferant</th><th style="text-align:right">Preis</th><th style="text-align:right">vs. EK</th><th></th></tr></thead><tbody>
-   ${offers.map(o=>{const dc=o.price<p.price?'#0e7a3c':(o.price>p.price?'#c0392b':'#888');const dt=o.price<p.price?'− '+eur(p.price-o.price):(o.price>p.price?'+ '+eur(o.price-p.price):'±0');return `<tr><td><b>${esc(o.supplier)}</b>${o.price===min?' <span class="tag">günstigster</span>':''}</td><td style="text-align:right" class="mono">${eur(o.price)}</td><td style="text-align:right;color:${dc}" class="mono">${dt}</td><td style="text-align:right"><button class="btn sm ${o.price===min?'pri':'gho'}" onclick="partChooseOffer('${id}','${qa(o.supplier)}',${o.price})">Übernehmen</button></td></tr>`;}).join('')}
+   ${offers.map(o=>{const dc=o.price<p.price?'#34a24a':(o.price>p.price?'#c0392b':'#888');const dt=o.price<p.price?'− '+eur(p.price-o.price):(o.price>p.price?'+ '+eur(o.price-p.price):'±0');return `<tr><td><b>${esc(o.supplier)}</b>${o.price===min?' <span class="tag">günstigster</span>':''}</td><td style="text-align:right" class="mono">${eur(o.price)}</td><td style="text-align:right;color:${dc}" class="mono">${dt}</td><td style="text-align:right"><button class="btn sm ${o.price===min?'pri':'gho'}" onclick="partChooseOffer('${id}','${qa(o.supplier)}',${o.price})">Übernehmen</button></td></tr>`;}).join('')}
    </tbody></table></div>
    <div class="row" style="margin-top:12px;gap:8px"><button class="btn" onclick="partRefreshOffers('${id}')">Preise aktualisieren (Demo)</button><button class="btn gho" onclick="partAddOffer('${id}')">+ Angebot</button></div>
    ${(p.hist&&p.hist.length>1)?`<label class="f" style="margin-top:14px">Preisverlauf (EK)</label><div class="muted" style="font-size:12px;line-height:1.7">${p.hist.slice(-6).map(h=>fmtDate(h.date)+': '+eur(h.price)+(h.supplier?' ('+esc(h.supplier)+')':'')).join(' · ')}</div>`:''}
@@ -2641,9 +2641,9 @@ views.lager=function(){
        </tr>`).join(''):`<tr><td colspan="8"><div class="empty">Keine Teile in dieser Kategorie. „+ Neues Teil" anlegen.</div></td></tr>`}</tbody></table></div>`;
   } else if(lagerTab==='bewegungen'){
     const mv=(S.stockMoves||[]).slice(0,200);
-    const tl={zugang:['Zugang','#0e7a3c'],abgang:['Abgang','#c0392b'],inventur:['Inventur','#6b7280'],korrektur:['Korrektur','#d99a00']};
+    const tl={zugang:['Zugang','#34a24a'],abgang:['Abgang','#c0392b'],inventur:['Inventur','#6b7280'],korrektur:['Korrektur','#d99a00']};
     body=`<div class="card" style="margin-top:14px;padding:0;overflow:auto"><table><thead><tr><th>Zeitpunkt</th><th>Teil</th><th>Art</th><th>Menge</th><th>Bestand</th><th>Grund</th></tr></thead>
-      <tbody>${mv.length?mv.map(x=>{const t=tl[x.type]||['—','#888'];return `<tr><td class="muted mono" style="font-size:12px">${fmtDateTime(x.ts)}</td><td>${esc(x.name)}</td><td><span class="pill" style="border-color:${t[1]};color:${t[1]}"><span class="d" style="background:${t[1]}"></span>${t[0]}</span></td><td class="mono" style="color:${x.qty>=0?'#0e7a3c':'#c0392b'}">${x.qty>=0?'+':''}${x.qty}</td><td class="mono">${x.before}→${x.after}</td><td class="muted" style="font-size:13px">${esc(x.reason||'')}</td></tr>`;}).join(''):`<tr><td colspan="6"><div class="empty">Noch keine Lagerbewegungen.</div></td></tr>`}</tbody></table></div>`;
+      <tbody>${mv.length?mv.map(x=>{const t=tl[x.type]||['—','#888'];return `<tr><td class="muted mono" style="font-size:12px">${fmtDateTime(x.ts)}</td><td>${esc(x.name)}</td><td><span class="pill" style="border-color:${t[1]};color:${t[1]}"><span class="d" style="background:${t[1]}"></span>${t[0]}</span></td><td class="mono" style="color:${x.qty>=0?'#34a24a':'#c0392b'}">${x.qty>=0?'+':''}${x.qty}</td><td class="mono">${x.before}→${x.after}</td><td class="muted" style="font-size:13px">${esc(x.reason||'')}</td></tr>`;}).join(''):`<tr><td colspan="6"><div class="empty">Noch keine Lagerbewegungen.</div></td></tr>`}</tbody></table></div>`;
   } else {
     body=`<div class="between" style="margin:14px 0"><b>Lieferanten</b><button class="btn sm pri" onclick="supAdd()">+ Lieferant</button></div>
      <div class="card" style="padding:0;overflow:auto"><table><thead><tr><th>Name</th><th>Kontakt</th><th>Notiz</th><th>Teile</th><th></th></tr></thead>
@@ -2668,7 +2668,7 @@ views.lager=function(){
 /* ---- Marge-Karte + Teile-Zuweisung im Auftrag (L9) ---- */
 function margeCard(o){
   const rev=oTotal(o), pc=orderPartsCost(o), lc=orderLaborCost(o), mg=orderMargin(o), pct=orderMarginPct(o);
-  const col=mg<0?'#c0392b':(rev>0&&mg<rev*0.2?'#d99a00':'#0e7a3c');
+  const col=mg<0?'#c0392b':(rev>0&&mg<rev*0.2?'#d99a00':'#34a24a');
   return `<div class="card" style="margin-top:14px;border:1px solid var(--line)"><div class="between"><b>Wirtschaftlichkeit</b><span class="muted" style="font-size:12px">nur intern</span></div>
     <div class="between" style="padding:6px 0"><span>Umsatz</span><b class="mono">${eur(rev)}</b></div>
     <div style="padding:6px 0;border-top:1px solid var(--line)">
@@ -2776,7 +2776,7 @@ function contractOpen(id){const c=ensureContracts().find(x=>x.id===id);if(!c)ret
      ${(c.pool||[]).length?(c.pool.map((p,i)=>`<div class="listitem"><div style="flex:1"><b>${esc(p.model)}</b><div class="muted" style="font-size:12px">${esc(p.note||'')}${p.imei&&p.imei!=='—'?' · IMEI '+esc(p.imei):''}</div></div><button class="btn sm gho" onclick="contractDelDevice('${c.id}',${i})">×</button></div>`).join('')):'<div class="empty" style="padding:12px">Noch keine Geräte im Pool.</div>'}
      <div class="between" style="margin-top:16px"><b>Abrechnung</b><button class="btn sm pri" onclick="contractBill('${c.id}')" ${hasThis?'disabled title="Rechnung für diesen Monat existiert"':''}>Monatsrechnung ${ym}</button></div>
      ${!hasThis&&preview.length?`<div class="note" style="margin-top:8px">Diesen Monat abrechenbar: Pauschale ${eur(d.rate)} + ${preview.length} Reparatur(en) (${d.discount}% Rabatt) = <b>${eur(d.rate+preview.reduce((s,r)=>s+r.amount,0))}</b></div>`:''}
-     ${(c.bills||[]).length?(c.bills.map(b=>`<div class="listitem"><div style="flex:1"><b>${b.ym} · ${eur(b.total)}</b><div class="muted" style="font-size:12px">Pauschale ${eur(b.base)}${b.repairs.length?' + '+b.repairs.length+' Reparatur(en)':''} · <span style="color:${b.status==='bezahlt'?'#0e7a3c':'#b45309'}">${b.status}</span></div></div><button class="btn sm gho" onclick="contractBillPrint('${c.id}','${b.ym}')">Drucken</button>${b.status!=='bezahlt'?`<button class="btn sm" onclick="contractBillPaid('${c.id}','${b.ym}')">Bezahlt</button>`:''}</div>`).join('')):'<div class="empty" style="padding:12px;margin-top:8px">Noch keine Rechnungen.</div>'}
+     ${(c.bills||[]).length?(c.bills.map(b=>`<div class="listitem"><div style="flex:1"><b>${b.ym} · ${eur(b.total)}</b><div class="muted" style="font-size:12px">Pauschale ${eur(b.base)}${b.repairs.length?' + '+b.repairs.length+' Reparatur(en)':''} · <span style="color:${b.status==='bezahlt'?'#34a24a':'#b45309'}">${b.status}</span></div></div><button class="btn sm gho" onclick="contractBillPrint('${c.id}','${b.ym}')">Drucken</button>${b.status!=='bezahlt'?`<button class="btn sm" onclick="contractBillPaid('${c.id}','${b.ym}')">Bezahlt</button>`:''}</div>`).join('')):'<div class="empty" style="padding:12px;margin-top:8px">Noch keine Rechnungen.</div>'}
      <div class="row" style="margin-top:16px;gap:8px;flex-wrap:wrap">${c.status==='aktiv'?`<button class="btn sm gho" onclick="contractStatus('${c.id}','pausiert')">Pausieren</button><button class="btn sm gho" onclick="contractStatus('${c.id}','gekuendigt')">Kündigen</button>`:`<button class="btn sm" onclick="contractStatus('${c.id}','aktiv')">Reaktivieren</button>`}<button class="btn sm gho" onclick="contractDel('${c.id}')">Löschen</button></div>
    </div>`);
 }
@@ -2805,7 +2805,7 @@ views.vertraege=function(){
 };
 /* ============================ VERSANDREPARATUR (L20) ============================ */
 const SHIP_CARRIERS=['DHL','DPD','GLS','Hermes','UPS'];
-const SHIP_ST={label:{lbl:'Label erstellt',color:'#6b7280'},transit_in:{lbl:'Unterwegs zu uns',color:'#2563eb'},received:{lbl:'Eingegangen',color:'#7c3aed'},repair:{lbl:'In Reparatur',color:'#b45309'},transit_out:{lbl:'Rückversand',color:'#0891b2'},delivered:{lbl:'Zugestellt',color:'#0e7a3c'}};
+const SHIP_ST={label:{lbl:'Label erstellt',color:'#6b7280'},transit_in:{lbl:'Unterwegs zu uns',color:'#2563eb'},received:{lbl:'Eingegangen',color:'#7c3aed'},repair:{lbl:'In Reparatur',color:'#b45309'},transit_out:{lbl:'Rückversand',color:'#0891b2'},delivered:{lbl:'Zugestellt',color:'#34a24a'}};
 function ensureShip(){ if(!S.shipments){ S.shipCounter=1003;
     S.shipments=S.__clean?[]:[
       {id:'sh_d1',nr:'VS-1001',name:'Tobias Renz',tel:'+49 170 5551234',mail:'t.renz@mail.de',adr:'Lindenweg 8, 72379 Hechingen',brand:'Apple',model:'iPhone 13',issue:'Displaytausch',carrier:'DHL',tracking:'DH472819336104',status:'transit_in',created:dPlus(-1),ref:'',retTracking:'',history:[{s:'transit_in',t:new Date().toISOString()},{s:'label',t:new Date().toISOString()}]},
@@ -2925,7 +2925,7 @@ views.ankauf=function(){
    <div class="grid g4" style="margin-top:16px">
      <div class="card kpi"><div class="n">${avail.length}</div><div class="l">Verfügbar</div><div class="t">${res.length} reserviert</div></div>
      <div class="card kpi"><div class="n">${eur(lagerwert)}</div><div class="l">Lagerwert</div><div class="t">Ankauf im Bestand</div></div>
-     <div class="card kpi"><div class="n" style="color:${marge<0?'#c0392b':'#0e7a3c'}">${eur(marge)}</div><div class="l">Marge (verkauft)</div><div class="t">${sold.length} verkauft</div></div>
+     <div class="card kpi"><div class="n" style="color:${marge<0?'#c0392b':'#34a24a'}">${eur(marge)}</div><div class="l">Marge (verkauft)</div><div class="t">${sold.length} verkauft</div></div>
      <div class="card kpi"><div class="n">${all.length}</div><div class="l">Geräte gesamt</div></div>
    </div>
    <div class="row" style="margin:14px 0;flex-wrap:wrap;gap:8px">${tab('alle','Alle',all.length)}${tab('verfuegbar','Verfügbar',avail.length)}${tab('reserviert','Reserviert',res.length)}${tab('verkauft','Verkauft',sold.length)}</div>
@@ -2935,7 +2935,7 @@ views.ankauf=function(){
        <td><span class="tag">${esc(x.cond||'—')}</span></td>
        <td class="mono">${eur(x.buy)}<div class="muted" style="font-size:11px">${fmtDate(x.buyDate)}</div></td>
        <td class="mono">${x.sellPrice?eur(x.sellPrice):'—'}</td>
-       <td class="mono" style="color:${x.sellPrice?(prof>=0?'#0e7a3c':'#c0392b'):'#888'}">${x.sellPrice?(eur(prof)+' · '+ppct+'%'):'—'}</td>
+       <td class="mono" style="color:${x.sellPrice?(prof>=0?'#34a24a':'#c0392b'):'#888'}">${x.sellPrice?(eur(prof)+' · '+ppct+'%'):'—'}</td>
        <td><span class="pill" style="border-color:${col[1]};color:${col[1]}"><span class="d" style="background:${col[1]}"></span>${col[0]}</span></td>
        <td style="text-align:right;white-space:nowrap">${x.status!=='verkauft'?`<button class="btn sm pri" onclick="sellDevice('${x.id}')">Verkaufen</button>`:''}${x.status==='verfuegbar'?`<button class="btn sm gho" onclick="reserveDevice('${x.id}',1)">Reservieren</button>`:''}${x.status==='reserviert'?`<button class="btn sm gho" onclick="reserveDevice('${x.id}',0)">Freigeben</button>`:''}<button class="btn sm gho" onclick="delSold('${x.id}')">Löschen</button></td>
      </tr>`;}).join(''):`<tr><td colspan="7"><div class="empty">Keine Geräte in dieser Ansicht.</div></td></tr>`}</tbody></table></div>
@@ -2962,7 +2962,7 @@ function wishCard(){ensureWishes();const ws=S.wishes||[];const waiting=ws.filter
   </div>`;
 }
 let ankaufTab='alle';
-const TRADE_ST={verfuegbar:['Verfügbar','#0e7a3c'],reserviert:['Reserviert','#8b5cf6'],verkauft:['Verkauft','#6b7280']};
+const TRADE_ST={verfuegbar:['Verfügbar','#34a24a'],reserviert:['Reserviert','#8b5cf6'],verkauft:['Verkauft','#6b7280']};
 function ensureTrade(){ let ch=false; if(!S.sold)S.sold=[];
   if(!S.tradeInit){ S.tradeInit=true; ch=true; if(!S.sold.length&&!S.__clean){S.sold=[
     {id:'sd1',model:'iPhone 11 128GB',imei:'356789112233',cond:'Gut',buy:120,buyDate:today(),from:'Laufkundschaft',sellPrice:0,sellDate:'',to:'',status:'verfuegbar'},
@@ -3100,7 +3100,7 @@ views.preise=function(){
          <td><b>${esc(mo.name)}</b></td>
          <td><select class="in" style="padding:6px 10px;width:auto" onchange="catSetModelType('${qa(catBrand)}','${qa(mo.name)}',this.value)">${c.types.map(t=>`<option ${mo.type===t?'selected':''}>${t}</option>`).join('')}</select></td>
          <td style="text-align:right;white-space:nowrap"><label class="btn sm" style="cursor:pointer">${mo.img?'Bild ändern':'Bild'}<input type="file" accept="image/*" style="display:none" onchange="catImgUpload('${qa(catBrand)}','${qa(mo.name)}',this)"></label>${mo.img?`<button class="btn sm gho" onclick="catImgClear('${qa(catBrand)}','${qa(mo.name)}')">Bild ✕</button>`:''}<button class="btn sm gho" onclick="catRenameModel('${qa(catBrand)}','${qa(mo.name)}')">Umbenennen</button><button class="btn sm gho" onclick="catDelModel('${qa(catBrand)}','${qa(mo.name)}')">Löschen</button></td></tr>`).join(''):`<tr><td colspan="4"><div class="empty">Keine Modelle. „+ Modell" hinzufügen.</div></td></tr>`}</tbody></table></div>
-     <div class="note" style="margin-top:12px">Gerätetypen: ${c.types.map(t=>esc(t)).join(' · ')} &nbsp;<a onclick="catAddType()" style="color:var(--green,#0e7a3c);cursor:pointer;font-weight:700">+ Gerätetyp</a><br>Das hinterlegte Bild erscheint beim Modell-Auswählen im Auftrag/Angebot.</div>`;
+     <div class="note" style="margin-top:12px">Gerätetypen: ${c.types.map(t=>esc(t)).join(' · ')} &nbsp;<a onclick="catAddType()" style="color:var(--green,#34a24a);cursor:pointer;font-weight:700">+ Gerätetyp</a><br>Das hinterlegte Bild erscheint beim Modell-Auswählen im Auftrag/Angebot.</div>`;
   } else if(catTab==='reparaturarten'){
     body=`<div class="between" style="margin:14px 0"><b>Reparaturarten &amp; Basispreise</b><button class="btn sm" onclick="catAddRepair()">+ Reparaturart</button></div>
      <div class="card" style="padding:0;overflow:auto"><table><thead><tr><th>Reparaturart</th><th>Basispreis (€)</th><th></th></tr></thead>
@@ -3162,7 +3162,7 @@ views.kasse=function(){
   } else if(kasseTab==='pos'){
     body.innerHTML=`<div class="grid g2" style="grid-template-columns:1.4fr 1fr">
       <div class="card">
-        ${cart.some(i=>/REP-/.test(i.name))?`<div class="note" style="margin-bottom:12px;border:1px solid var(--green);background:var(--green-tint,#eaf4ee)"><b>Upsell-Tipp:</b> Nach der Reparatur freut sich der Kunde über Schutz.
+        ${cart.some(i=>/REP-/.test(i.name))?`<div class="note" style="margin-bottom:12px;border:1px solid var(--green);background:var(--green-tint,#e9f5ec)"><b>Upsell-Tipp:</b> Nach der Reparatur freut sich der Kunde über Schutz.
           <div class="row" style="margin-top:8px;flex-wrap:wrap;gap:8px">${[['Panzerglas',25],['Hülle',12],['Displayschutz',15]].map(x=>`<button class="btn sm pri" onclick="posAdd('${esc(x[0])}',${x[1]})">+ ${esc(x[0])} ${eur(x[1])}</button>`).join('')}</div></div>`:''}
         <div class="search" style="background:var(--soft)"><span class="ic" data-ic="search"></span><input placeholder="Artikel suchen …" oninput="posSearch(this.value)"></div>
         <div class="row" style="flex-wrap:wrap;gap:6px;margin-top:12px;align-items:center">${posCats().map(c=>`<button class="chip ${posCat===c?'on':''}" onclick="posCat='${esc(c)}';views.kasse();paintIcons()">${c==='alle'?'Alle':esc(c)}</button>`).join('')}<span style="flex:1"></span><button class="btn sm gho" onclick="posManage()">Artikel verwalten</button></div>
@@ -3330,7 +3330,7 @@ views.statistik=function(){
      <div class="card kpi"><div class="n">${S.ord.filter(o=>o.status==='abgeholt').length}</div><div class="l">Abgeschlossen</div></div>
    </div>
    <div class="grid g4" style="margin-top:16px">
-     <div class="card kpi"><div class="n" style="color:${mMargin<0?'#c0392b':'#0e7a3c'}">${eur(mMargin)}</div><div class="l">Marge (Gewinn)</div><div class="t">${mPct}% vom Reparatur-Umsatz</div></div>
+     <div class="card kpi"><div class="n" style="color:${mMargin<0?'#c0392b':'#34a24a'}">${eur(mMargin)}</div><div class="l">Marge (Gewinn)</div><div class="t">${mPct}% vom Reparatur-Umsatz</div></div>
      <div class="card kpi"><div class="n">${eur(mMaterial)}</div><div class="l">Materialkosten</div><div class="t">verbaute Teile (EK)</div></div>
      <div class="card kpi"><div class="n">${eur(mLabor)}</div><div class="l">Arbeitskosten</div><div class="t">erfasste Zeit</div></div>
      <div class="card kpi"><div class="n" style="${mLoss?'color:#e2681c':''}">${mLoss}</div><div class="l">Verlust-Reparaturen</div><div class="t">Preis unter Kosten</div></div>
@@ -3348,11 +3348,11 @@ views.statistik=function(){
      ${(function(){const repL=S.ord.filter(o=>(o.status==='abgeholt'||o.status==='fertig')&&isLastMonth(o.pickedAt||o.readyAt||o.created)).reduce((s,o)=>s+oTotal(o),0);const saleL=S.sales.filter(x=>isLastMonth(x.t)).reduce((s,x)=>s+x.total,0);const totL=repL+saleL;const chg=totL?Math.round((total-totL)/totL*100):(total?100:0);const up=total>=totL;return `<div class="card"><b>Monatsvergleich</b>
        <div class="between" style="margin-top:14px"><span>Dieser Monat</span><b>${eur(total)}</b></div><div class="bar"><i style="width:${Math.max(total,totL)?total/Math.max(total,totL)*100:0}%"></i></div>
        <div class="between" style="margin:14px 0 4px"><span>Vormonat</span><b>${eur(totL)}</b></div><div class="bar"><i style="width:${Math.max(total,totL)?totL/Math.max(total,totL)*100:0}%;background:#bbb"></i></div>
-       <div class="note" style="margin-top:12px;color:${up?'#0e7a3c':'#c0392b'}">${up?'▲':'▼'} ${Math.abs(chg)}% ${up?'mehr':'weniger'} als im Vormonat</div></div>`;})()}
+       <div class="note" style="margin-top:12px;color:${up?'#34a24a':'#c0392b'}">${up?'▲':'▼'} ${Math.abs(chg)}% ${up?'mehr':'weniger'} als im Vormonat</div></div>`;})()}
      ${(function(){const buyM=(S.sold||[]).filter(x=>isThisMonth(x.buyDate)).reduce((s,x)=>s+(+x.buy||0),0);const sellM=(S.sold||[]).filter(x=>x.sellDate&&isThisMonth(x.sellDate)).reduce((s,x)=>s+(+x.sellPrice||0),0);const mg=(S.sold||[]).filter(x=>x.sellDate&&isThisMonth(x.sellDate)).reduce((s,x)=>s+((+x.sellPrice||0)-(+x.buy||0)),0);return `<div class="card"><b>Ankauf / Verkauf (Monat)</b>
        <div class="between" style="padding:8px 0;border-bottom:1px solid var(--line)"><span>Angekauft</span><b class="mono">${eur(buyM)}</b></div>
        <div class="between" style="padding:8px 0;border-bottom:1px solid var(--line)"><span>Verkauft</span><b class="mono">${eur(sellM)}</b></div>
-       <div class="between" style="padding:8px 0"><span>Handels-Marge</span><b class="mono" style="color:${mg<0?'#c0392b':'#0e7a3c'}">${eur(mg)}</b></div></div>`;})()}
+       <div class="between" style="padding:8px 0"><span>Handels-Marge</span><b class="mono" style="color:${mg<0?'#c0392b':'#34a24a'}">${eur(mg)}</b></div></div>`;})()}
    </div>
    <div class="grid g2" style="margin-top:16px">
      ${(function(){const now=new Date();const dom=now.getDate();const dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
@@ -3362,7 +3362,7 @@ views.statistik=function(){
        <div class="between" style="margin-top:14px"><span>Bis heute (Tag ${dom}/${dim})</span><b>${eur(total)}</b></div><div class="bar"><i style="width:${pct}%"></i></div>
        <div class="between" style="margin:16px 0 4px"><span>Hochrechnung Monatsende</span><b style="font-size:18px">${eur(proj)}</b></div>
        <div class="between" style="margin-top:10px"><span class="muted">3-Monats-Schnitt</span><b class="mono">${eur(avg3)}</b></div>
-       <div class="note" style="margin-top:12px;color:${good?'#0e7a3c':'#c0392b'}">${good?'▲':'▼'} Prognose liegt ${Math.abs(vsAvg)}% ${good?'über':'unter'} dem 3-Monats-Schnitt</div>
+       <div class="note" style="margin-top:12px;color:${good?'#34a24a':'#c0392b'}">${good?'▲':'▼'} Prognose liegt ${Math.abs(vsAvg)}% ${good?'über':'unter'} dem 3-Monats-Schnitt</div>
        <div class="muted" style="font-size:12px;margin-top:8px">Lineare Hochrechnung aus dem bisherigen Monatsverlauf.</div></div>`;})()}
      ${(function(){ensureBranches();const now=new Date();const dom=now.getDate();const dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();const proj=dom>0?total/dom*dim:total;
        const projOrders=dom>0?Math.round(doneM.length/dom*dim):doneM.length;
@@ -3371,7 +3371,7 @@ views.statistik=function(){
        return `<div class="card"><div class="between"><b>🏢 Filial-Benchmark</b><span class="pill soft"><span class="d"></span>Platz ${myRank} von ${rows.length}</span></div>
        <p class="muted" style="font-size:12px;margin:4px 0 12px">Hochgerechneter Monatsumsatz im Franchise-Netz.</p>
        ${rows.map((r,i)=>`<div style="margin-bottom:12px">
-         <div class="between" style="margin-bottom:4px"><span${r.me?' style="font-weight:800;color:#0e7a3c"':''}>${i+1}. ${esc(r.name)}${r.me?' ◄':''}</span><b class="mono">${eur(r.rev)}</b></div>
+         <div class="between" style="margin-bottom:4px"><span${r.me?' style="font-weight:800;color:#34a24a"':''}>${i+1}. ${esc(r.name)}${r.me?' ◄':''}</span><b class="mono">${eur(r.rev)}</b></div>
          <div class="bar"><i style="width:${r.rev/maxR*100}%${r.me?'':';background:#bbb'}"></i></div>
          <div class="muted" style="font-size:11px;margin-top:2px">${r.orders} Reparaturen · ⌀ ${eur(r.rev/Math.max(1,r.orders))}/Auftrag · ★ ${r.rating.toFixed(1)}</div></div>`).join('')}
        <div class="muted" style="font-size:12px">Filialen verwalten: über die Franchise-Zentrale (Prototyp – Demo-Filialen).</div></div>`;})()}
@@ -3383,7 +3383,7 @@ views.einstellungen=function(){
   const m=document.getElementById('main');
   const cashConn=S.cash.connected;
   m.innerHTML=`<div class="between"><div><h1 class="h1">Einstellungen</h1><p class="sub">Stammdaten, Kassen und Integrationen</p></div></div>
-   ${(function(){const w=ensureWorkshop();const members=(S.users||[]).length;return `<div class="card" style="margin-top:16px;border:1px solid var(--green,#0e7a3c)">
+   ${(function(){const w=ensureWorkshop();const members=(S.users||[]).length;return `<div class="card" style="margin-top:16px;border:1px solid var(--green,#34a24a)">
      <div class="between" style="flex-wrap:wrap;gap:10px"><div><b>Werkstatt-Account</b> <span class="tag">${esc(PLAN_LBL[w.plan]||w.plan)}</span> <span class="pill ${w.status==='active'?'soft':'dash'}"><span class="d"></span>${w.status==='active'?'Aktiv':(w.status==='trial'?'Testphase':'Gesperrt')}</span>
        <div class="muted" style="font-size:12px;margin-top:2px">Werkstatt-ID <span class="mono">${esc(w.id)}</span> · Kürzel <span class="mono">${esc(w.slug)}</span> · ${members} Nutzer · seit ${fmtDate(w.createdAt)}</div></div>
        <span class="pill soft" title="Datenschicht bereit für Server-Anbindung"><span class="d"></span>Läuft lokal · server-bereit</span></div>
@@ -4070,7 +4070,7 @@ function diagCardHTML(d){
       <div class="card" style="padding:14px"><div class="muted" style="font-size:12px">Reparaturwahrscheinlichkeit</div><div style="font-size:20px;font-weight:800">${pct(d.repairProb)}</div></div>
     </div>
 
-    ${d.safety.length?`<div class="note" style="margin-top:14px;border:1px solid #0e7a3c"><b>⚠ Sicherheitshinweise</b><ul style="margin:6px 0 0;padding-left:18px">${d.safety.map(s=>`<li>${esc(s)}</li>`).join('')}</ul></div>`:''}
+    ${d.safety.length?`<div class="note" style="margin-top:14px;border:1px solid #34a24a"><b>⚠ Sicherheitshinweise</b><ul style="margin:6px 0 0;padding-left:18px">${d.safety.map(s=>`<li>${esc(s)}</li>`).join('')}</ul></div>`:''}
 
     <div class="row" style="margin-top:16px;flex-wrap:wrap;gap:8px">
       <button class="btn pri cta" onclick="diagToQuote()">⚡ Angebot erstellen</button>
@@ -4117,7 +4117,7 @@ function addDaysStr(n){const x=new Date();x.setDate(x.getDate()+n);return x.toIS
 
 let empfFilter='alle', simChannel='anruf', simAfter=false;
 /* P10 – Website-Widget: Embed-Code, Konfiguration & WordPress-Plugin */
-function ensureWidget(){ if(!S.widget){ S.widget={slug:'meine-werkstatt',accent:'#0e7a3c',show:{preise:true,buchung:true,anfrage:true},height:900,autoresize:true,embedBase:''}; save(); } if(S.widget.embedBase===undefined){S.widget.embedBase='';save();} return S.widget; }
+function ensureWidget(){ if(!S.widget){ S.widget={slug:'meine-werkstatt',accent:'#34a24a',show:{preise:true,buchung:true,anfrage:true},height:900,autoresize:true,embedBase:''}; save(); } if(S.widget.embedBase===undefined){S.widget.embedBase='';save();} return S.widget; }
 function widgetBase(){ const w=ensureWidget(); if(w.embedBase&&w.embedBase.trim()) return w.embedBase.trim().replace(/\/+$/,''); try{ return new URL('.',location.href).href.replace(/\/+$/,''); }catch(e){ return location.origin; } }
 function widgetUrl(typ){ const w=ensureWidget(); const page=(typ==='anfrage'?'anfrage':'booking')+'.html'; return widgetBase()+'/'+page+'?embed=1&accent='+encodeURIComponent(w.accent.replace('#',''))+'&ws='+encodeURIComponent(SHOP.name)+(SHOP.phone?'&tel='+encodeURIComponent(SHOP.phone):''); }
 function widgetEmbed(typ){ const w=ensureWidget(); const id='reparado-'+typ; const url=widgetUrl(typ);
@@ -4220,7 +4220,7 @@ views.anrufe=function(){
      <div class="card kpi"><div class="n">${booked}</div><div class="l">Termine gebucht</div></div>
      <div class="card kpi"><div class="n">~${handled*3}</div><div class="l">Minuten gespart</div></div>
    </div>
-   ${proac.length?`<div class="card" style="margin-top:16px;border:1px solid #0e7a3c">
+   ${proac.length?`<div class="card" style="margin-top:16px;border:1px solid #34a24a">
      <div class="between"><div><b style="font-size:15px">Proaktiv vorgeschlagen (${proac.length})</b><div class="muted" style="font-size:12px;margin-top:2px">Die KI-Empfangskraft würde jetzt von sich aus auf diese Kunden zugehen.</div></div>
        <button class="btn sm pri" onclick="proacAll()">Alle senden</button></div>
      ${proac.map(op=>`<div class="listitem"><div style="flex:1"><b>${esc(op.txt)}</b><div class="muted" style="font-size:13px">${esc(op.name)} · <span class="tag">${op.ch}</span></div></div>
@@ -4228,7 +4228,7 @@ views.anrufe=function(){
        <button class="btn sm pri" onclick="proacDo('${op.key}')">Senden</button>
        <button class="btn sm gho" onclick="proacDismiss('${op.key}')">×</button></div>`).join('')}
    </div>`:''}
-   ${openTasks.length?`<div class="card" style="margin-top:16px;border:1px solid #0e7a3c">
+   ${openTasks.length?`<div class="card" style="margin-top:16px;border:1px solid #34a24a">
      <b>Für dich zu erledigen (${openTasks.length})</b>
      ${openTasks.map(c=>`<div class="listitem"><div style="flex:1"><b>Rückruf: ${esc(c.name||c.from)}</b><div class="muted" style="font-size:13px">${esc(c.result)} · ${c.time} Uhr</div></div>
        <button class="btn sm" onclick="callDone('${c.id}')">Erledigt</button></div>`).join('')}
@@ -4254,7 +4254,7 @@ function callDetail(id){
   const isWa=c.channel==='whatsapp';
   openDrawerHTML(`<div class="dhead"><b style="flex:1">${isWa?'WhatsApp':'Anruf'} · ${c.time} Uhr</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
    <div class="dbody">
-     <div class="callhdr"><div style="width:34px;height:34px;border-radius:50%;background:#0e7a3c;color:#fff;display:grid;place-items:center;flex:none">${(c.name?initials(c.name):(isWa?'W':'A'))}</div>
+     <div class="callhdr"><div style="width:34px;height:34px;border-radius:50%;background:#34a24a;color:#fff;display:grid;place-items:center;flex:none">${(c.name?initials(c.name):(isWa?'W':'A'))}</div>
        <div style="flex:1"><b>${esc(c.name||(isWa?'WhatsApp-Kontakt':'Unbekannter Anrufer'))}</b><div class="muted" style="font-size:13px">${esc(c.from)} · <span class="tag">${CH[c.channel]}</span> · ${INTENTS[c.intent].lbl}${c.dur&&c.dur!=='—'?' · '+c.dur+' Min':''}${c.after?' · nach Feierabend':''}</div></div></div>
      <label class="f" style="margin-top:16px">Verlauf</label>
      <div class="callchat">${callBubbles(c.transcript,c.channel)}</div>
@@ -4405,24 +4405,24 @@ function serverLoginOverlay(err){
   let btn, fields;
   if(reset){
     fields=`<label style="font-size:12px;font-weight:700;color:#5f6b64">Neues Passwort</label><input id="sbPw" type="password" style="${inp}" placeholder="mind. 6 Zeichen">`;
-    btn=`<button onclick="sbDoReset()" style="width:100%;padding:12px;border:0;border-radius:10px;background:#0e7a3c;color:#fff;font-weight:700;cursor:pointer">Passwort speichern</button>`;
+    btn=`<button onclick="sbDoReset()" style="width:100%;padding:12px;border:0;border-radius:10px;background:#34a24a;color:#fff;font-weight:700;cursor:pointer">Passwort speichern</button>`;
   } else if(forgot){
     fields=`<div style="color:#5f6b64;font-size:13px;margin-bottom:10px">Gib deine E-Mail ein – wir senden dir einen Link zum Zurücksetzen.</div><label style="font-size:12px;font-weight:700;color:#5f6b64">E-Mail</label><input id="sbEmail" type="email" style="${inp}" placeholder="werkstatt@mail.de">`;
-    btn=`<button onclick="sbDoForgot()" style="width:100%;padding:12px;border:0;border-radius:10px;background:#0e7a3c;color:#fff;font-weight:700;cursor:pointer">Link senden</button>`;
+    btn=`<button onclick="sbDoForgot()" style="width:100%;padding:12px;border:0;border-radius:10px;background:#34a24a;color:#fff;font-weight:700;cursor:pointer">Link senden</button>`;
   } else {
     fields=`${signup?`<label style="font-size:12px;font-weight:700;color:#5f6b64">Werkstatt-Name</label><input id="sbWs" style="${inp}" placeholder="z. B. Handy Klinik Musterstadt">`:''}
      <label style="font-size:12px;font-weight:700;color:#5f6b64">E-Mail</label><input id="sbEmail" type="email" style="${inp}" placeholder="werkstatt@mail.de">
      <label style="font-size:12px;font-weight:700;color:#5f6b64">Passwort</label><input id="sbPw" type="password" style="${inp}" placeholder="${signup?'mind. 6 Zeichen':'••••••'}">
-     ${signup?`<label style="display:flex;gap:9px;align-items:flex-start;margin:2px 0 12px;font-size:12px;color:#5f6b64;line-height:1.5;cursor:pointer"><input type="checkbox" id="sbConsent" style="margin-top:2px;flex:none;width:16px;height:16px">Ich akzeptiere die <a href="/nutzungsbedingungen.html" target="_blank" style="color:#0e7a3c;font-weight:700">Nutzungsbedingungen (AGB)</a> und den <a href="/avv.html" target="_blank" style="color:#0e7a3c;font-weight:700">Auftragsverarbeitungsvertrag (AVV)</a> und habe die <a href="/datenschutz.html" target="_blank" style="color:#0e7a3c;font-weight:700">Datenschutzerklärung</a> zur Kenntnis genommen.</label>`:''}
-     ${signup?'':`<div style="text-align:right;margin:-6px 0 12px"><a onclick="sbSwitch('forgot')" style="color:#0e7a3c;font-size:12px;font-weight:700;cursor:pointer">Passwort vergessen?</a></div>`}`;
-    btn=`<button onclick="${signup?'sbDoSignup()':'sbDoLogin()'}" style="width:100%;padding:12px;border:0;border-radius:10px;background:#0e7a3c;color:#fff;font-weight:700;cursor:pointer">${signup?'Konto anlegen &amp; starten':'Anmelden'}</button>`;
+     ${signup?`<label style="display:flex;gap:9px;align-items:flex-start;margin:2px 0 12px;font-size:12px;color:#5f6b64;line-height:1.5;cursor:pointer"><input type="checkbox" id="sbConsent" style="margin-top:2px;flex:none;width:16px;height:16px">Ich akzeptiere die <a href="/nutzungsbedingungen.html" target="_blank" style="color:#34a24a;font-weight:700">Nutzungsbedingungen (AGB)</a> und den <a href="/avv.html" target="_blank" style="color:#34a24a;font-weight:700">Auftragsverarbeitungsvertrag (AVV)</a> und habe die <a href="/datenschutz.html" target="_blank" style="color:#34a24a;font-weight:700">Datenschutzerklärung</a> zur Kenntnis genommen.</label>`:''}
+     ${signup?'':`<div style="text-align:right;margin:-6px 0 12px"><a onclick="sbSwitch('forgot')" style="color:#34a24a;font-size:12px;font-weight:700;cursor:pointer">Passwort vergessen?</a></div>`}`;
+    btn=`<button onclick="${signup?'sbDoSignup()':'sbDoLogin()'}" style="width:100%;padding:12px;border:0;border-radius:10px;background:#34a24a;color:#fff;font-weight:700;cursor:pointer">${signup?'Konto anlegen &amp; starten':'Anmelden'}</button>`;
   }
-  const backLink=(forgot||reset)?`<div style="text-align:center;margin-top:14px;font-size:13px;color:#5f6b64"><a onclick="sbSwitch('login')" style="color:#0e7a3c;font-weight:700;cursor:pointer">← Zurück zur Anmeldung</a></div>`
-    :`<div style="text-align:center;margin-top:14px;font-size:13px;color:#5f6b64">${signup?`Schon registriert? <a onclick="sbSwitch('login')" style="color:#0e7a3c;font-weight:700;cursor:pointer">Anmelden</a>`:`Noch kein Konto? <a onclick="sbSwitch('signup')" style="color:#0e7a3c;font-weight:700;cursor:pointer">Werkstatt anlegen</a>`}</div>`;
+  const backLink=(forgot||reset)?`<div style="text-align:center;margin-top:14px;font-size:13px;color:#5f6b64"><a onclick="sbSwitch('login')" style="color:#34a24a;font-weight:700;cursor:pointer">← Zurück zur Anmeldung</a></div>`
+    :`<div style="text-align:center;margin-top:14px;font-size:13px;color:#5f6b64">${signup?`Schon registriert? <a onclick="sbSwitch('login')" style="color:#34a24a;font-weight:700;cursor:pointer">Anmelden</a>`:`Noch kein Konto? <a onclick="sbSwitch('signup')" style="color:#34a24a;font-weight:700;cursor:pointer">Werkstatt anlegen</a>`}</div>`;
   ov.innerHTML=`<div style="background:#fff;border-radius:16px;padding:28px;max-width:390px;width:100%;font-family:Inter,sans-serif">
-     <div style="display:flex;gap:10px;align-items:center;margin-bottom:4px"><img src="/velqio-logo.png" alt="Velqio" style="width:40px;height:40px;border-radius:50%;object-fit:cover"><b style="font-size:18px">Velqio</b></div>
+     <div style="display:flex;align-items:baseline;margin-bottom:4px"><span style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-weight:900;font-size:28px;letter-spacing:-.02em;color:#12261a;line-height:1">VEL<span style="color:#34a24a">Q</span>IO<sup style="font-size:.36em;font-weight:700;color:#5f6b64;top:-.9em;position:relative">&reg;</sup></span></div>
      <div style="color:#5f6b64;font-size:13px;margin-bottom:16px">${sub}</div>
-     ${_sbMsg?`<div style="background:#eaf4ee;color:#0e7a3c;border-radius:8px;padding:10px;font-size:13px;margin-bottom:12px">${esc(_sbMsg)}</div>`:''}
+     ${_sbMsg?`<div style="background:#e9f5ec;color:#34a24a;border-radius:8px;padding:10px;font-size:13px;margin-bottom:12px">${esc(_sbMsg)}</div>`:''}
      ${fields}
      ${err?`<div style="color:#c0392b;font-size:13px;margin-bottom:10px">${esc(err)}</div>`:''}
      ${btn}
