@@ -631,6 +631,8 @@ class H(BaseHTTPRequestHandler):
             p = self._auth()
             if not p:
                 return self._send(401, {"error": "unauthorized"})
+            if billing_info(p["wid"]).get("locked"):
+                return self._send(402, {"error": "billing_locked", "message": "Testphase abgelaufen – bitte Tarif buchen."})
             val = body.get("value")
             if val is None:
                 return self._send(400, {"error": "value fehlt"})
@@ -646,6 +648,8 @@ class H(BaseHTTPRequestHandler):
             p = self._auth()
             if not p:
                 return self._send(401, {"error": "unauthorized"})
+            if billing_info(p["wid"]).get("locked"):
+                return self._send(402, {"error": "billing_locked", "message": "Testphase abgelaufen – bitte Tarif buchen."})
             items = body.get("items") or []
             if not isinstance(items, list):
                 return self._send(400, {"error": "items fehlt"})
@@ -702,6 +706,8 @@ class H(BaseHTTPRequestHandler):
             p = self._auth()
             if not p:
                 return self._send(401, {"error": "unauthorized"})
+            if billing_info(p["wid"]).get("locked"):
+                return self._send(402, {"error": "billing_locked"})
             kind = str(body.get("kind") or "order")
             if kind not in ("order", "quote"):
                 kind = "order"

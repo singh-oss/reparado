@@ -340,7 +340,7 @@ const DB = {
   _push(x,keepalive){ if(!this.token) return; const self=this;
     /* Blob bleibt vollständige Sicherungskopie (inkl. Aufträge/Kunden); der Einzeldatensatz-Sync ist maßgeblich für Mehrplatz. */
     fetch(API+'/api/state', {method:'POST', headers:this._hdr(), body:JSON.stringify({value:x}), keepalive:!!keepalive})
-      .then(function(r){ if(r.ok){ self._dirty=false; } else console.warn('DB push', r.status); }).catch(function(e){ console.warn('DB push offline', e); }); },
+      .then(function(r){ if(r.ok){ self._dirty=false; } else { if(r.status===402&&typeof fetchBilling==='function'){ try{fetchBilling();}catch(e){} } console.warn('DB push', r.status); } }).catch(function(e){ console.warn('DB push offline', e); }); },
   /* ausstehende Änderung sofort hochladen (z. B. beim Verlassen/Neuladen) – verhindert Verlust bei schnellem Reload */
   flush(keepalive){ if(this.backend!=='server' || !this.token) return; clearTimeout(this._pt); if(this._dirty && this._lastVal!=null){ this._push(this._lastVal, keepalive); } },
   hydrate(){ const self=this; if(!this.token) return Promise.resolve(false);
@@ -412,7 +412,8 @@ const Sync={
   schedulePush(){ if(!this.active())return; clearTimeout(this._pt); const self=this; this._pt=setTimeout(function(){ self.pushChanges(); }, 500); },
   pushChanges(keepalive){ if(!this.active())return Promise.resolve(); const items=this.collectChanges(); if(!items.length) return Promise.resolve();
     const self=this; this.setState('saving');
-    return this._api('/api/sync/push',{method:'POST',body:JSON.stringify({items:items}),keepalive:!!keepalive}).then(function(r){ return r.ok?r.json():null; }).then(function(d){
+    return this._api('/api/sync/push',{method:'POST',body:JSON.stringify({items:items}),keepalive:!!keepalive}).then(function(r){ if(r.status===402){ if(typeof fetchBilling==='function'){try{fetchBilling();}catch(e){}} return {__locked:true}; } return r.ok?r.json():null; }).then(function(d){
+      if(d&&d.__locked){ self.setState('offline'); return; }
       if(!d||!d.ok){ self.setState('offline'); return; }
       items.forEach(function(it){ const sh=self.shadow[it.coll]=self.shadow[it.coll]||{}; if(it.deleted) delete sh[it.id]; else sh[it.id]=self._snap(it.data); });
       (d.saved||[]).forEach(function(s){ if(s.updated_at>self.since) self.since=s.updated_at; });
