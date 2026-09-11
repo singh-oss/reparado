@@ -21,6 +21,7 @@ import json, os, sqlite3, hmac, hashlib, base64, time, smtplib, ssl, threading
 from email.message import EmailMessage
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
+import urllib.request as _urlreq, urllib.parse as _urlparse, urllib.error as _urlerr, calendar as _cal
 
 # ---------- Konfiguration ----------
 try:
@@ -45,6 +46,69 @@ def _cfg(name, default=None):
 DB_PATH = _cfg("DB_PATH", os.path.join(os.path.dirname(__file__), "reparado.db"))
 SECRET = str(_cfg("SECRET_KEY", "dev-secret")).encode()
 _lock = threading.Lock()
+
+# ---------- Stripe / Abrechnung (nur Stdlib via Stripe-REST) ----------
+def _iso(ts=None):
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(ts if ts is not None else time.time()))
+def _iso_epoch(s):
+    try: return _cal.timegm(time.strptime(str(s), "%Y-%m-%dT%H:%M:%SZ"))
+    except Exception: return 0
+def _stripe(method, path, params=None):
+    key = str(_cfg("STRIPE_SECRET_KEY", "") or "")
+    if not key: raise RuntimeError("stripe_not_configured")
+    data = _urlparse.urlencode(params, doseq=True).encode() if params is not None else None
+    req = _urlreq.Request("https://api.stripe.com/v1/" + path, data=data, method=method)
+    req.add_header("Authorization", "Bearer " + key)
+    if data is not None: req.add_header("Content-Type", "application/x-www-form-urlencoded")
+    try:
+        with _urlreq.urlopen(req, timeout=25) as r:
+            return json.loads(r.read().decode())
+    except _urlerr.HTTPError as e:
+        try: return json.loads(e.read().decode())
+        except Exception: return {"error": {"message": "stripe_http_%s" % e.code}}
+PLAN_PRICE = {"basic": "STRIPE_PRICE_BASIC", "pro": "STRIPE_PRICE_PRO", "ai": "STRIPE_PRICE_AI"}
+def _price_for_plan(plan): return str(_cfg(PLAN_PRICE.get(plan, ""), "") or "")
+def _plan_for_price(pid):
+    for pl, cfgk in PLAN_PRICE.items():
+        if pid and str(_cfg(cfgk, "") or "") == pid: return pl
+    return ""
+def _ws_get(wid):
+    with db() as c:
+        return c.execute("SELECT * FROM workshops WHERE id=?", (wid,)).fetchone()
+def _ws_set(wid, **f):
+    if not f: return
+    cols = ",".join(k + "=?" for k in f); vals = list(f.values()) + [wid]
+    with _lock, db() as c:
+        c.execute("UPDATE workshops SET " + cols + " WHERE id=?", vals)
+def _ws_by_customer(cust):
+    if not cust: return None
+    with db() as c:
+        return c.execute("SELECT id FROM workshops WHERE stripe_customer=?", (cust,)).fetchone()
+def billing_info(wid):
+    r = _ws_get(wid); now = time.time()
+    if not r: return {"plan": "trial", "status": "none", "locked": True, "trialEnd": "", "trialDaysLeft": 0, "currentPeriodEnd": ""}
+    try: plan = r["plan"] or "trial"
+    except Exception: plan = "trial"
+    try: status = r["sub_status"] or "trial"
+    except Exception: status = "trial"
+    try: te = r["trial_end"] or ""
+    except Exception: te = ""
+    try: cpe = r["current_period_end"] or ""
+    except Exception: cpe = ""
+    paid = status in ("active", "trialing")           # echtes Stripe-Abo
+    trial_ok = bool(te) and _iso_epoch(te) > now
+    locked = (not paid) and (not trial_ok)
+    days = 0
+    if te and _iso_epoch(te) > now: days = int((_iso_epoch(te) - now) // 86400) + 1
+    return {"plan": plan, "status": status, "locked": locked, "trialEnd": te, "trialDaysLeft": days, "currentPeriodEnd": cpe}
+def _wh_verify(payload, sig, secret):
+    try:
+        parts = dict(p.split("=", 1) for p in (sig or "").split(","))
+        signed = (parts.get("t", "") + "." + payload.decode()).encode()
+        mac = hmac.new(secret.encode(), signed, hashlib.sha256).hexdigest()
+        return hmac.compare_digest(mac, parts.get("v1", ""))
+    except Exception:
+        return False
 
 # ---------- Datenbank ----------
 class _DBCtx:
@@ -111,6 +175,14 @@ def init_db():
           entry_id TEXT, user_id TEXT, user_name TEXT, action TEXT, detail TEXT, at TEXT);
         CREATE UNIQUE INDEX IF NOT EXISTS ux_activity_entry ON activity_log(workshop_id, entry_id);
         """)
+        # Abo/Stripe-Spalten (idempotent nachrüsten)
+        for col in ("plan", "sub_status", "trial_end", "stripe_customer", "stripe_sub", "current_period_end"):
+            try: c.execute("ALTER TABLE workshops ADD COLUMN %s TEXT" % col)
+            except Exception: pass
+        # Bestehende Werkstätten (Pilot) NICHT aussperren: großzügige Testphase nachtragen
+        far = _iso(time.time() + 30 * 86400)
+        try: c.execute("UPDATE workshops SET trial_end=?, plan=COALESCE(NULLIF(plan,''),'trial'), sub_status=COALESCE(NULLIF(sub_status,''),'trial') WHERE trial_end IS NULL OR trial_end=''", (far,))
+        except Exception: pass
 
 # ---------- Passwort & Token ----------
 def hash_pw(pw, salt=None):
@@ -390,9 +462,48 @@ class H(BaseHTTPRequestHandler):
                                  (p["wid"],)).fetchall()
             return self._send(200, {"ok": True, "items": [{"id": r["id"], "token": r["token"], "orderId": r["order_id"],
                                                            "text": r["text"], "at": r["at"]} for r in rows]})
+        if self.path == "/api/billing/status":
+            p = self._auth()
+            if not p:
+                return self._send(401, {"error": "unauthorized"})
+            return self._send(200, billing_info(p["wid"]))
         return self._send(404, {"error": "not found"})
 
+    def _webhook(self):
+        secret = str(_cfg("STRIPE_WEBHOOK_SECRET", "") or "")
+        n = int(self.headers.get("Content-Length", 0) or 0)
+        raw = self.rfile.read(n) if n else b""
+        if not secret or not _wh_verify(raw, self.headers.get("Stripe-Signature", ""), secret):
+            return self._send(400, {"error": "bad signature"})
+        try: evt = json.loads(raw.decode() or "{}")
+        except Exception: return self._send(400, {"error": "bad json"})
+        typ = evt.get("type", ""); obj = (evt.get("data") or {}).get("object") or {}
+        try:
+            if typ == "checkout.session.completed":
+                wid = obj.get("client_reference_id") or (obj.get("metadata") or {}).get("wid")
+                plan = (obj.get("metadata") or {}).get("plan") or ""
+                if wid:
+                    _ws_set(wid, stripe_customer=obj.get("customer") or "", stripe_sub=obj.get("subscription") or "",
+                            plan=(plan or "pro"), sub_status="active")
+            elif typ in ("customer.subscription.updated", "customer.subscription.created"):
+                row = _ws_by_customer(obj.get("customer"))
+                if row:
+                    items = (obj.get("items") or {}).get("data") or []
+                    pid = ((items[0].get("price") or {}).get("id")) if items else ""
+                    f = {"sub_status": obj.get("status") or "", "current_period_end": _iso(obj.get("current_period_end")), "stripe_sub": obj.get("id") or ""}
+                    pl = _plan_for_price(pid)
+                    if pl: f["plan"] = pl
+                    _ws_set(row["id"], **f)
+            elif typ == "customer.subscription.deleted":
+                row = _ws_by_customer(obj.get("customer"))
+                if row: _ws_set(row["id"], sub_status="canceled")
+        except Exception:
+            pass
+        return self._send(200, {"received": True})
+
     def do_POST(self):
+        if self.path == "/api/stripe/webhook":
+            return self._webhook()
         body = self._body()
 
         if self.path == "/api/auth/login":
@@ -404,7 +515,58 @@ class H(BaseHTTPRequestHandler):
                 return self._send(401, {"error": "E-Mail oder Passwort falsch"})
             token = make_token(u["id"], u["workshop_id"])
             return self._send(200, {"token": token, "workshopId": u["workshop_id"],
-                                    "name": u["name"], "role": u["role"]})
+                                    "name": u["name"], "role": u["role"], "billing": billing_info(u["workshop_id"])})
+
+        if self.path == "/api/billing/checkout":
+            p = self._auth()
+            if not p:
+                return self._send(401, {"error": "unauthorized"})
+            plan = (body.get("plan") or "").lower()
+            price = _price_for_plan(plan)
+            if not price:
+                return self._send(400, {"error": "Unbekannter Tarif oder Preis nicht konfiguriert"})
+            base = str(_cfg("APP_BASE_URL", "https://velqio.de")).rstrip("/")
+            ws = _ws_get(p["wid"])
+            params = {"mode": "subscription", "line_items[0][price]": price, "line_items[0][quantity]": 1,
+                      "client_reference_id": p["wid"], "metadata[wid]": p["wid"], "metadata[plan]": plan,
+                      "subscription_data[metadata][wid]": p["wid"], "allow_promotion_codes": "true",
+                      "success_url": base + "/app.html?billing=success", "cancel_url": base + "/app.html?billing=cancel"}
+            cust = ""
+            try: cust = ws["stripe_customer"] if ws else ""
+            except Exception: cust = ""
+            if cust:
+                params["customer"] = cust
+            else:
+                with db() as c:
+                    u2 = c.execute("SELECT email FROM users WHERE workshop_id=? ORDER BY created ASC LIMIT 1", (p["wid"],)).fetchone()
+                if u2 and u2["email"]:
+                    params["customer_email"] = u2["email"]
+            try:
+                sess = _stripe("POST", "checkout/sessions", params)
+            except Exception:
+                return self._send(500, {"error": "Stripe nicht erreichbar / nicht konfiguriert"})
+            if sess.get("url"):
+                return self._send(200, {"url": sess["url"]})
+            return self._send(500, {"error": (sess.get("error") or {}).get("message") or "Checkout fehlgeschlagen"})
+
+        if self.path == "/api/billing/portal":
+            p = self._auth()
+            if not p:
+                return self._send(401, {"error": "unauthorized"})
+            ws = _ws_get(p["wid"])
+            cust = ""
+            try: cust = ws["stripe_customer"] if ws else ""
+            except Exception: cust = ""
+            if not cust:
+                return self._send(400, {"error": "Noch kein Abo vorhanden"})
+            base = str(_cfg("APP_BASE_URL", "https://velqio.de")).rstrip("/")
+            try:
+                sess = _stripe("POST", "billing_portal/sessions", {"customer": cust, "return_url": base + "/app.html"})
+            except Exception:
+                return self._send(500, {"error": "Stripe nicht erreichbar"})
+            if sess.get("url"):
+                return self._send(200, {"url": sess["url"]})
+            return self._send(500, {"error": (sess.get("error") or {}).get("message") or "Portal fehlgeschlagen"})
 
         if self.path == "/api/auth/signup":
             # Öffentliche Selbst-Registrierung: Werkstatt legt ihr eigenes Konto an.
@@ -422,13 +584,14 @@ class H(BaseHTTPRequestHandler):
             wid = uid("ws"); usr = uid("u"); ph, salt = hash_pw(pw)
             try:
                 with _lock, db() as c:
-                    c.execute("INSERT INTO workshops(id,name,created) VALUES(?,?,?)", (wid, wname, now))
+                    c.execute("INSERT INTO workshops(id,name,created,plan,sub_status,trial_end) VALUES(?,?,?,?,?,?)",
+                              (wid, wname, now, "trial", "trial", _iso(time.time() + 14 * 86400)))
                     c.execute("INSERT INTO users(id,workshop_id,email,pw_hash,pw_salt,role,name,created) VALUES(?,?,?,?,?,?,?,?)",
                               (usr, wid, email, ph, salt, "inhaber", uname, now))
             except sqlite3.IntegrityError:
                 return self._send(409, {"error": "Diese E-Mail ist bereits registriert"})
             token = make_token(usr, wid)
-            return self._send(200, {"token": token, "workshopId": wid, "name": uname, "role": "inhaber"})
+            return self._send(200, {"token": token, "workshopId": wid, "name": uname, "role": "inhaber", "billing": billing_info(wid)})
 
         if self.path == "/api/auth/reset":
             # Passwort-Reset anfordern: schickt Link per E-Mail. Antwort immer generisch (kein Konto-Leak).
@@ -725,7 +888,8 @@ class H(BaseHTTPRequestHandler):
             wid = uid("ws"); usr = uid("u"); ph, salt = hash_pw(pw)
             try:
                 with _lock, db() as c:
-                    c.execute("INSERT INTO workshops(id,name,created) VALUES(?,?,?)", (wid, wname, now))
+                    c.execute("INSERT INTO workshops(id,name,created,plan,sub_status,trial_end) VALUES(?,?,?,?,?,?)",
+                              (wid, wname, now, "trial", "trial", _iso(time.time() + 14 * 86400)))
                     c.execute("INSERT INTO users(id,workshop_id,email,pw_hash,pw_salt,role,name,created) VALUES(?,?,?,?,?,?,?,?)",
                               (usr, wid, email, ph, salt, "inhaber", uname, now))
             except sqlite3.IntegrityError:

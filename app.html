@@ -122,6 +122,24 @@
   .field-missing{border-color:#e05b4d !important;box-shadow:0 0 0 3px rgba(224,91,77,.15) !important}
   .zmiss{color:#c0392b;font-size:12px;font-weight:600;margin-top:6px}
   .missbanner{background:#fdecea;border:1px solid #f5b7b1;color:#922b21;border-radius:12px;padding:14px 16px;margin-bottom:14px;font-size:14px;line-height:1.55}
+  /* Abo-Sperre (harte Sperre nach Testphase) */
+  #billLock{position:fixed;inset:0;z-index:9999;background:rgba(15,35,24,.72);backdrop-filter:blur(6px);display:grid;place-items:center;padding:20px;overflow:auto}
+  #billLock .bl-box{background:#fff;border-radius:20px;max-width:760px;width:100%;padding:34px 30px;text-align:center;box-shadow:0 30px 80px rgba(0,0,0,.35)}
+  #billLock .bl-logo{margin-bottom:14px}
+  #billLock h2{font-family:var(--font-head);font-size:26px;font-weight:900;margin:0 0 8px;color:var(--ink)}
+  #billLock p{color:var(--ink2);margin:0 auto 20px;max-width:480px}
+  #billLock .bl-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:0 0 18px}
+  @media(max-width:620px){#billLock .bl-cards{grid-template-columns:1fr}}
+  #billLock .bl-card{border:1.5px solid var(--line);border-radius:16px;padding:20px 14px;background:#fff;cursor:pointer;transition:.14s;text-align:center}
+  #billLock .bl-card:hover{border-color:var(--green);transform:translateY(-2px);box-shadow:0 12px 26px rgba(52,162,74,.18)}
+  #billLock .bl-card.hot{border-color:var(--green);box-shadow:0 8px 22px rgba(52,162,74,.16)}
+  #billLock .bl-nm{font-family:var(--font-head);font-weight:800;font-size:15px;letter-spacing:.02em}
+  #billLock .bl-pr{font-family:var(--font-head);font-weight:900;font-size:26px;margin:8px 0 2px}
+  #billLock .bl-pr span{font-size:13px;font-weight:700;color:var(--ink2)}
+  #billLock .bl-go{color:var(--green-d);font-weight:700;font-size:13px;margin-top:8px}
+  #billLock .bl-foot{font-size:13px;color:var(--ink2)}
+  #billLock .bl-foot a{color:var(--green-d);font-weight:600;cursor:pointer}
+  #billLock .bl-note{font-size:12px;color:var(--ink2);margin-top:10px}
   .empty{text-align:center;color:var(--ink2);padding:40px 10px}
   .switch{width:42px;height:24px;border-radius:20px;background:#d9d9d9;position:relative;transition:.15s;flex:none;border:0}
   .switch.on{background:#34a24a}
@@ -329,7 +347,7 @@ const DB = {
     return fetch(API+'/api/state', {headers:this._hdr()})
       .then(function(r){ if(r.status===401){ self.logoutServer(); throw new Error('Sitzung abgelaufen'); } return r.ok? r.json() : {}; })
       .then(function(d){ if(d && d.value){ let v=d.value; try{ if(typeof SYNC_COLLS!=='undefined'){ const loc=JSON.parse(localStorage.getItem(self.key)||'null')||{}; SYNC_COLLS.forEach(function(k){ if(v[k]===undefined && loc[k]!==undefined) v[k]=loc[k]; }); } }catch(e){} localStorage.setItem(self.key, JSON.stringify(v)); return true; } return false; }); },
-  _setSession(d){ this.token=d.token; this.tenant=d.workshopId; this.name=d.name; this.role=d.role; try{localStorage.setItem('reparado_token', d.token);}catch(e){} },
+  _setSession(d){ this.token=d.token; this.tenant=d.workshopId; this.name=d.name; this.role=d.role; if(d.billing)window.__billing=d.billing; try{localStorage.setItem('reparado_token', d.token);}catch(e){} },
   login(email,pw){ const self=this; if(!CFG) return Promise.reject(new Error('Keine Server-Config'));
     return fetch(API+'/api/auth/login', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email:email,password:pw})})
       .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, d:d}; }); })
@@ -768,6 +786,34 @@ function renderSideUser(){const el=document.getElementById('sideUser');if(!el)re
   el.innerHTML=`<div class="row" style="min-width:0;gap:10px"><div class="avatar">${initials(u?u.name:'—')}</div><div style="min-width:0"><div style="font-weight:700;font-size:13px">${esc(u?u.name:'—')}</div><div class="muted" style="font-size:12px">${u?ROLE_LABEL[u.role]:''}</div></div></div><button class="btn sm gho" title="Abmelden / Benutzer wechseln" onclick="logout()"><span style="width:16px;height:16px">${ic('logout',16)}</span></button>`;
 }
 function logout(){S.userId=null;try{localStorage.removeItem('rep_user_dev');}catch(e){}save();showLogin();}
+/* ===== Abo / Stripe (Doc: Sofort-Zahlung + harte Sperre nach Testphase) ===== */
+const BILL_PRICE={basic:'49,90',pro:'84,90',ai:'99,90'}; const BILL_NAME={basic:'Basic',pro:'Pro',ai:'AI'};
+function billHdr(){return {'Content-Type':'application/json','Authorization':'Bearer '+DB.token};}
+function fetchBilling(cb){ if(DB.backend!=='server'||!DB.token){if(cb)cb(null);return;} fetch(API+'/api/billing/status',{headers:billHdr()}).then(r=>r.ok?r.json():null).then(b=>{ if(b)window.__billing=b; applyBillingLock(); if(cb)cb(b); }).catch(()=>{if(cb)cb(null);}); }
+function billCheckout(plan){ if(DB.backend!=='server'){toast('Nur im Online-Betrieb verfügbar');return;} toast('Weiterleitung zu Stripe…'); fetch(API+'/api/billing/checkout',{method:'POST',headers:billHdr(),body:JSON.stringify({plan:plan})}).then(r=>r.json()).then(d=>{ if(d&&d.url){location.href=d.url;} else toast(d&&d.error?d.error:'Checkout nicht möglich'); }).catch(()=>toast('Netzwerkfehler')); }
+function billPortal(){ if(DB.backend!=='server')return; fetch(API+'/api/billing/portal',{method:'POST',headers:billHdr()}).then(r=>r.json()).then(d=>{ if(d&&d.url){location.href=d.url;} else toast(d&&d.error?d.error:'Kein Abo vorhanden'); }).catch(()=>toast('Netzwerkfehler')); }
+function billLogout(){ try{DB.logoutServer();}catch(e){} location.href='/app.html'; }
+function applyBillingLock(){ let ov=document.getElementById('billLock'); const b=window.__billing;
+  if(!(b&&b.locked)){ if(ov)ov.remove(); return; }
+  if(!ov){ ov=document.createElement('div'); ov.id='billLock'; document.body.appendChild(ov); }
+  const cards=['basic','pro','ai'].map(pl=>`<button class="bl-card ${pl==='pro'?'hot':''}" onclick="billCheckout('${pl}')"><div class="bl-nm">Velqio ${BILL_NAME[pl]}</div><div class="bl-pr">${BILL_PRICE[pl]} €<span>/Monat</span></div><div class="bl-go">Jetzt buchen →</div></button>`).join('');
+  ov.innerHTML=`<div class="bl-box"><div class="bl-logo"><img src="/velqio-wordmark.png" alt="Velqio" style="height:34px"></div>
+    <h2>Deine Testphase ist abgelaufen</h2>
+    <p>Wähle einen Tarif, um Velqio weiter zu nutzen. Deine Daten bleiben vollständig erhalten und sind sofort wieder da.</p>
+    <div class="bl-cards">${cards}</div>
+    <div class="bl-foot"><a onclick="billPortal()">Bereits gebucht? Abo verwalten</a> &nbsp;·&nbsp; <a onclick="billLogout()">Abmelden</a></div>
+    <div class="bl-note">Sichere Zahlung über Stripe · monatlich kündbar · Preise zzgl. gesetzl. USt.</div></div>`;
+}
+function billPanel(){ if(DB.backend!=='server')return '';
+  const b=window.__billing||{plan:'trial',status:'trial',locked:false,trialDaysLeft:0};
+  const active=(b.status==='active'||b.status==='trialing');
+  const statusTxt=active?('Aktiv – Velqio '+(BILL_NAME[b.plan]||b.plan)):(b.locked?'Gesperrt – Testphase abgelaufen':('Testphase – noch '+(b.trialDaysLeft||0)+' Tage'));
+  const color=active?'var(--green-d)':(b.locked?'#c0392b':'#a9600a');
+  const btns=['basic','pro','ai'].map(pl=>`<button class="btn ${pl==='pro'?'pri':''}" onclick="billCheckout('${pl}')">${BILL_NAME[pl]} · ${BILL_PRICE[pl]} €/Mon${(b.plan===pl&&active)?' ✓':''}</button>`).join('');
+  return `<div class="card" style="margin-top:16px"><div class="between" style="flex-wrap:wrap;gap:10px"><div><b>Abo &amp; Abrechnung</b><div style="font-weight:700;color:${color};margin-top:2px">${statusTxt}</div></div>${active?`<button class="btn" onclick="billPortal()">Abo verwalten / kündigen</button>`:''}</div>
+    <div class="row" style="margin-top:12px;flex-wrap:wrap">${btns}</div>
+    <div class="muted" style="font-size:12px;margin-top:8px">Sichere Zahlung über Stripe. Monatlich kündbar. Preise zzgl. gesetzl. USt.</div></div>`;
+}
 let _loginPin='', _loginUser=null;
 function showLogin(){_loginUser=null;_loginPin='';const w=ensureWorkshop();const el=document.getElementById('loginWs');if(el)el.textContent='Anmeldung · '+(w.name||'Werkstatt');loginRenderUsers();document.getElementById('loginScreen').classList.add('show');}
 function hideLogin(){document.getElementById('loginScreen').classList.remove('show');}
@@ -3545,7 +3591,7 @@ views.statistik=function(){
 views.einstellungen=function(){
   const m=document.getElementById('main');
   const cashConn=S.cash.connected;
-  m.innerHTML=`<div class="between"><div><h1 class="h1">Einstellungen</h1><p class="sub">Stammdaten, Kassen und Integrationen</p></div></div>
+  m.innerHTML=`<div class="between"><div><h1 class="h1">Einstellungen</h1><p class="sub">Stammdaten, Kassen und Integrationen</p></div></div>${billPanel()}
    ${(function(){const w=ensureWorkshop();const members=(S.users||[]).length;return `<div class="card" style="margin-top:16px;border:1px solid var(--green,#34a24a)">
      <div class="between" style="flex-wrap:wrap;gap:10px"><div><b>Werkstatt-Account</b> <span class="tag">${esc(PLAN_LBL[w.plan]||w.plan)}</span> <span class="pill ${w.status==='active'?'soft':'dash'}"><span class="d"></span>${w.status==='active'?'Aktiv':(w.status==='trial'?'Testphase':'Gesperrt')}</span>
        <div class="muted" style="font-size:12px;margin-top:2px">Werkstatt-ID <span class="mono">${esc(w.id)}</span> · Kürzel <span class="mono">${esc(w.slug)}</span> · ${members} Nutzer · seit ${fmtDate(w.createdAt)}</div></div>
@@ -4556,7 +4602,13 @@ function bootApp(){ensureWorkshop(); ensureMaster(); applyMaster(); ensureAcct()
 }
 /* Frischer, komplett leerer Zustand für ein neu registriertes Konto (keine Demo-Daten). */
 function blankState(){ return {v:11, __clean:true, cust:[], ord:[], parts:[], orders:[], sold:[], counter:1000, rules:defaultRules(), sales:[], cash:{connected:''}, mailLog:[], calls:[], phone:defaultPhone(), users:[{id:'u1',name:'Inhaber',role:'inhaber',pin:'1234'}], userId:'u1', insurance:defaultInsurance(), wgLeads:[], drafts:[], quotes:[], requests:[], quoteCounter:1000, feedback:[], reactDone:[], termine:[]}; }
-function finishServerBoot(hadState){ const ov=document.getElementById('sbLogin'); if(ov)ov.remove(); if(!hadState){ try{ localStorage.setItem(KEY, JSON.stringify(blankState())); }catch(e){} } S=load(); if(DB.backend==='server' && typeof Sync!=='undefined'){ try{ Sync.ensureArrays(); }catch(e){} } try{ const _du=localStorage.getItem('rep_user_dev'); if(_du && (S.users||[]).some(u=>u.id===_du)) S.userId=_du; }catch(e){} bootApp(); if(DB.backend==='server' && typeof Sync!=='undefined'){ try{ Sync.start(); }catch(e){} try{ seqReserve('order'); seqReserve('quote'); }catch(e){} } }
+function finishServerBoot(hadState){ const ov=document.getElementById('sbLogin'); if(ov)ov.remove(); if(!hadState){ try{ localStorage.setItem(KEY, JSON.stringify(blankState())); }catch(e){} } S=load(); if(DB.backend==='server' && typeof Sync!=='undefined'){ try{ Sync.ensureArrays(); }catch(e){} } try{ const _du=localStorage.getItem('rep_user_dev'); if(_du && (S.users||[]).some(u=>u.id===_du)) S.userId=_du; }catch(e){} bootApp(); if(DB.backend==='server' && typeof Sync!=='undefined'){ try{ Sync.start(); }catch(e){} try{ seqReserve('order'); seqReserve('quote'); }catch(e){} }
+  if(DB.backend==='server'){ try{ applyBillingLock(); }catch(e){}
+    var _bp=null; try{_bp=new URLSearchParams(location.search).get('billing');}catch(e){}
+    if(_bp==='success'){ toast('Zahlung wird bestätigt…'); var _n=0; var _poll=function(){ fetchBilling(function(b){ _n++; if(b&&!b.locked&&(b.status==='active'||b.status==='trialing')){ toast('✓ Abo aktiv – vielen Dank!'); try{views.einstellungen();paintIcons();}catch(e){} } else if(_n<6){ setTimeout(_poll,2500); } }); }; _poll(); try{history.replaceState({},'',location.pathname);}catch(e){} }
+    else if(_bp==='cancel'){ toast('Buchung abgebrochen'); try{history.replaceState({},'',location.pathname);}catch(e){} fetchBilling(); }
+    else { fetchBilling(); }
+  } }
 /* Server-Modus: Anmeldung / Selbst-Registrierung an der echten Datenbank (nur mit config.js) */
 let _sbMode='login'; let _sbResetToken=''; let _sbMsg='';
 function sbSwitch(m){ _sbMode=m; _sbMsg=''; serverLoginOverlay(); }
