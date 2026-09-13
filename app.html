@@ -3984,7 +3984,7 @@ let buchTab='overview';
 const KONTEN={erloese:{nr:'8400',label:'Erlöse 19%'},wareneinkauf:{nr:'3400',label:'Wareneingang'},miete:{nr:'4210',label:'Raum/Miete'},telefon:{nr:'4920',label:'Telefon/Internet'},buero:{nr:'4930',label:'Bürobedarf'},versicherung:{nr:'4360',label:'Versicherungen'},werbung:{nr:'4600',label:'Werbung'},kfz:{nr:'4530',label:'Kfz-Kosten'},bank:{nr:'1200',label:'Bank'},kasse:{nr:'1000',label:'Kasse'},kreditor:{nr:'1600',label:'Verbindlichk.'},ust:{nr:'1776',label:'USt 19%'},vst:{nr:'1576',label:'Vorsteuer 19%'}};
 const CAT_LABEL={erloese:'Erlöse',wareneinkauf:'Wareneinkauf',miete:'Miete',telefon:'Telefon/Internet',buero:'Bürobedarf',versicherung:'Versicherung',werbung:'Werbung',kfz:'Kfz'};
 function defaultAcct(){return {mode:'euer',skr:'SKR03',datev:{connected:false,beraterNr:'',mandantNr:''},mailConnected:true,autoBook:true,autoThreshold:95,seeded:false};}
-function ensureAcct(){ if(!S.acct){S.acct=defaultAcct();save();} if(!S.acct.seeded){ if(S.__clean){S.acct.seeded=true;save();} else seedAcct(); } return S.acct; }
+function ensureAcct(){ if(!S.acct){S.acct=defaultAcct();save();} if(!Array.isArray(S.belege))S.belege=[]; if(!Array.isArray(S.proacDone))S.proacDone=[]; if(!S.acct.seeded){ if(S.__clean){S.acct.seeded=true;save();} else seedAcct(); } return S.acct; }
 function seedAcct(){
   const a=S.acct; const dm=(o)=>{const x=new Date();x.setDate(x.getDate()+o);return x.toISOString().slice(0,10);};
   const B=[]; let n=1;
@@ -4607,7 +4607,7 @@ function bootApp(){ensureWorkshop(); ensureMaster(); applyMaster(); ensureAcct()
   if(DB.backend==='server'){ setTimeout(()=>intakeImport(false),1500); setTimeout(()=>portalPollReplies(),2200); if(!window.__intakePoll)window.__intakePoll=setInterval(()=>intakeImport(false),90000); if(!window.__portalPoll)window.__portalPoll=setInterval(()=>portalPollReplies(),90000); }
 }
 /* Frischer, komplett leerer Zustand für ein neu registriertes Konto (keine Demo-Daten). */
-function blankState(){ return {v:11, __clean:true, cust:[], ord:[], parts:[], orders:[], sold:[], counter:1000, rules:defaultRules(), sales:[], cash:{connected:''}, mailLog:[], calls:[], phone:defaultPhone(), users:[{id:'u1',name:'Inhaber',role:'inhaber',pin:'1234'}], userId:'u1', insurance:defaultInsurance(), wgLeads:[], drafts:[], quotes:[], requests:[], quoteCounter:1000, feedback:[], reactDone:[], termine:[]}; }
+function blankState(){ return {v:11, __clean:true, cust:[], ord:[], parts:[], orders:[], sold:[], counter:1000, rules:defaultRules(), sales:[], cash:{connected:''}, mailLog:[], calls:[], phone:defaultPhone(), users:[{id:'u1',name:'Inhaber',role:'inhaber',pin:'1234'}], userId:'u1', insurance:defaultInsurance(), wgLeads:[], drafts:[], quotes:[], requests:[], quoteCounter:1000, feedback:[], reactDone:[], termine:[], belege:[], proacDone:[]}; }
 function finishServerBoot(hadState){ const ov=document.getElementById('sbLogin'); if(ov)ov.remove(); if(!hadState){ try{ localStorage.setItem(KEY, JSON.stringify(blankState())); }catch(e){} } S=load(); if(DB.backend==='server' && typeof Sync!=='undefined'){ try{ Sync.ensureArrays(); }catch(e){} } try{ const _du=localStorage.getItem('rep_user_dev'); if(_du && (S.users||[]).some(u=>u.id===_du)) S.userId=_du; }catch(e){} bootApp(); if(DB.backend==='server' && typeof Sync!=='undefined'){ try{ Sync.start(); }catch(e){} try{ seqReserve('order'); seqReserve('quote'); }catch(e){} }
   if(DB.backend==='server'){ try{ applyBillingLock(); }catch(e){}
     var _bp=null; try{_bp=new URLSearchParams(location.search).get('billing');}catch(e){}
