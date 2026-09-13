@@ -2004,14 +2004,16 @@ function ensureComms(o){ if(!Array.isArray(o.comms))o.comms=[]; return o.comms; 
 /* ===== Weg 2: WhatsApp per Klick-Link (wa.me) – für jede Werkstatt, ohne API ===== */
 function waNorm(tel){ let d=String(tel||'').trim(); const plus=d.replace(/[^\d+]/g,''); if(plus.startsWith('+'))d=plus.slice(1); else if(plus.startsWith('00'))d=plus.slice(2); else if(plus.startsWith('0'))d='49'+plus.slice(1); else d=plus; return d.replace(/\D/g,''); }
 function waLink(tel,text){ return 'https://wa.me/'+waNorm(tel)+'?text='+encodeURIComponent(text); }
-function waTemplate(kind,o){ const c=cust(o.cid); const fn=((c.name||'').trim().split(' ')[0])||''; const dev=oDevLabel(o)||'Ihr Gerät'; const link=orderPortalUrl(o); const shop=(typeof SHOP!=='undefined'&&SHOP.name)||'Ihre Werkstatt'; const price=eur(oTotal(o));
-  const T={
-   fertig:'Hallo '+fn+',\n\nIhr '+dev+' ist fertig und abholbereit. Endbetrag: '+price+'.\nStatus & Details: '+link+'\n\nViele Grüße\n'+shop,
-   termin:'Hallo '+fn+',\n\nkurze Erinnerung an Ihren Termin für '+dev+'. Bitte Sperrcode/Face-ID deaktivieren und wichtige Daten sichern.\nInfos: '+link+'\n\nViele Grüße\n'+shop,
-   kva:'Hallo '+fn+',\n\nfür Ihr '+dev+' liegt ein Kostenvoranschlag über '+price+' vor. Dürfen wir mit der Reparatur beginnen?\nFreigabe & Details: '+link+'\n\nViele Grüße\n'+shop,
-   status:'Hallo '+fn+',\n\nkurzes Update zu Ihrer Reparatur ('+dev+'): '+statusLabel(o.status)+'.\nLive-Status: '+link+'\n\nViele Grüße\n'+shop
-  };
-  return T[kind]||T.status; }
+const WA_TPL_DEFAULT={
+  fertig:'Hallo {kunde},\n\nIhr {geraet} ist fertig und abholbereit. Endbetrag: {preis}.\nStatus & Details: {link}\n\nViele Grüße\n{werkstatt}',
+  termin:'Hallo {kunde},\n\nkurze Erinnerung an Ihren Termin für {geraet}. Bitte Sperrcode/Face-ID deaktivieren und wichtige Daten sichern.\nInfos: {link}\n\nViele Grüße\n{werkstatt}',
+  kva:'Hallo {kunde},\n\nfür Ihr {geraet} liegt ein Kostenvoranschlag über {preis} vor. Dürfen wir mit der Reparatur beginnen?\nFreigabe & Details: {link}\n\nViele Grüße\n{werkstatt}',
+  status:'Hallo {kunde},\n\nkurzes Update zu Ihrer Reparatur ({geraet}): {status}.\nLive-Status: {link}\n\nViele Grüße\n{werkstatt}'
+};
+function waTemplate(kind,o){ const c=cust(o.cid); const st=(typeof ensureSettings==='function'?ensureSettings():{}); const tpls=(st&&st.waTpl)||{};
+  let t=tpls[kind]||WA_TPL_DEFAULT[kind]||WA_TPL_DEFAULT.status;
+  const map={'{kunde}':((c.name||'').trim().split(' ')[0])||'', '{geraet}':oDevLabel(o)||'Ihr Gerät', '{preis}':eur(oTotal(o)), '{status}':statusLabel(o.status), '{link}':orderPortalUrl(o), '{werkstatt}':((typeof SHOP!=='undefined'&&SHOP.name)||'Ihre Werkstatt')};
+  return t.replace(/\{kunde\}|\{geraet\}|\{preis\}|\{status\}|\{link\}|\{werkstatt\}/g, function(m){return map[m];}); }
 function waDialog(id){ const o=S.ord.find(x=>x.id===id); if(!o)return; const c=cust(o.cid);
   if(DB.backend==='server' && !o.portalToken){ try{ portalSync(o, function(){ waDialog(id); }); }catch(e){} }
   const kinds=[['fertig','Fertig / Abholbereit'],['termin','Termin-Erinnerung'],['kva','KVA-Freigabe'],['status','Status-Update']];
@@ -3786,6 +3788,10 @@ views.einstellungen=function(){
        ${nt.waOn?`<div class="grid g2" style="margin-top:10px"><div><label class="f">WhatsApp-Business-Nummer</label><input class="in" value="${esc(nt.waNumber||'')}" placeholder="+49 …" onchange="ensureSettings().notify.waNumber=this.value;save()"></div><div><label class="f">Business-API-Token</label><input class="in" type="password" placeholder="EAAG… (Meta Cloud API)" onchange="ensureSettings().notify.waToken=this.value;save()"></div></div>`:''}
        <div class="note" style="margin-top:10px">Kanäle je Status (E-Mail/SMS/<b>WhatsApp</b>) schaltest du unter „Status &amp; Automatisierungen"; Vorlagen im Reiter „Erinnerungen".</div>
        <div class="row" style="margin-top:12px"><button class="btn" onclick="toast('Testnachricht gesendet (Demo)')">Testnachricht senden</button></div>`;})()}
+     </div>
+     <div class="card" style="grid-column:1/-1"><b>WhatsApp-Vorlagen</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Texte für „📲 Per WhatsApp". Diese Platzhalter werden automatisch ersetzt: <b>{kunde} {geraet} {preis} {status} {link} {werkstatt}</b>. Der <b>{link}</b> führt den Kunden zum Live-Status im Portal.</p>
+       ${[['fertig','Fertig / Abholbereit'],['termin','Termin-Erinnerung'],['kva','KVA-Freigabe'],['status','Status-Update']].map(function(k){return `<label class="f" style="margin-top:8px">${k[1]}</label><textarea class="in" rows="3" onchange="ensureSettings().waTpl=ensureSettings().waTpl||{};ensureSettings().waTpl['${k[0]}']=this.value;save();toast('WhatsApp-Vorlage gespeichert')">${esc((ensureSettings().waTpl&&ensureSettings().waTpl[k[0]])||WA_TPL_DEFAULT[k[0]])}</textarea>`;}).join('')}
+       <div class="row" style="margin-top:12px"><button class="btn gho" onclick="if(confirm('Alle WhatsApp-Vorlagen auf Standard zurücksetzen?')){ensureSettings().waTpl={};save();views.einstellungen();paintIcons();toast('Vorlagen zurückgesetzt');}">Auf Standard zurücksetzen</button></div>
      </div>
      <div class="card"><b>Hardware & Drucker</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Barcode-Scanner, Etiketten- und Bondrucker anbinden. Prototyp – Druck läuft über den Browser (echte Anbindung via QZ Tray beim Live-Schalten).</p>
        ${(function(){const h=ensureHardware();return `
