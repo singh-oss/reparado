@@ -3534,7 +3534,7 @@ views.statistik=function(){
   const total=rep+sale;
   const doneM=S.ord.filter(o=>(o.status==='abgeholt'||o.status==='fertig')&&isThisMonth(o.pickedAt||o.readyAt||o.created));
   const mMargin=doneM.reduce((s,o)=>s+orderMargin(o),0), mMaterial=doneM.reduce((s,o)=>s+orderPartsCost(o),0), mLabor=doneM.reduce((s,o)=>s+orderLaborCost(o),0), mLoss=doneM.filter(o=>orderMargin(o)<0).length, mPct=rep>0?Math.round(mMargin/rep*100):0;
-  const byType={};S.ord.forEach(o=>byType[o.issue]=(byType[o.issue]||0)+1);
+  const byType={};S.ord.forEach(o=>{let k=(o.issue||(typeof oIssueLabel==='function'?oIssueLabel(o):'')||'').trim();if(!k)return;byType[k]=(byType[k]||0)+1;});
   const top=Object.entries(byType).sort((a,b)=>b[1]-a[1]).slice(0,6);
   const maxT=Math.max(1,...top.map(t=>t[1]));
   m.innerHTML=`<div class="between"><div><h1 class="h1">Statistik</h1><p class="sub">Aktueller Monat</p></div></div>${statBrandSection()}
