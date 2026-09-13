@@ -3254,7 +3254,7 @@ views.preise=function(){
        <span class="muted" style="font-size:12px;font-weight:700">Marken-Logo</span>
        <span style="width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center">${catBrandLogo(catBrand)?`<img src="${catBrandLogo(catBrand)}" style="max-width:30px;max-height:30px;object-fit:contain">`:brandMonogram(catBrand,28)}</span>
        <label class="btn sm" style="cursor:pointer">Logo hochladen<input type="file" accept="image/*" style="display:none" onchange="catBrandLogoUpload('${qa(catBrand)}',this)"></label>
-       ${catBrandLogo(catBrand)?`<button class="btn sm gho" onclick="catBrandLogoClear('${qa(catBrand)}')">entfernen</button>`:''}
+       ${(ensureCat().brandLogos&&ensureCat().brandLogos[catBrand])?`<button class="btn sm gho" onclick="catBrandLogoClear('${qa(catBrand)}')">entfernen</button>`:''}
        <span class="muted" style="font-size:11px">Erscheint im Self-Check. Für die Nutzungsrechte am Logo ist der Betreiber verantwortlich.</span>
      </div>`:''}
      <div class="card" style="padding:0;overflow:auto;margin-top:10px"><table><thead><tr><th>Bild</th><th>Modell</th><th>Gerätetyp</th><th></th></tr></thead>
