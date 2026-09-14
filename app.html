@@ -415,15 +415,15 @@ const Sync={
       Object.keys(sh).forEach(function(id){ if(!ids[id]){ items.push({coll:k,id:id,deleted:true}); } });
     }); return items; },
   schedulePush(){ if(!this.active())return; clearTimeout(this._pt); const self=this; this._pt=setTimeout(function(){ self.pushChanges(); }, 500); },
-  pushChanges(keepalive){ if(!this.active())return Promise.resolve(); const items=this.collectChanges(); if(!items.length) return Promise.resolve();
+  pushChanges(keepalive){ if(!this.active())return Promise.resolve({ok:true,noop:true}); const items=this.collectChanges(); if(!items.length) return Promise.resolve({ok:true,noop:true});
     const self=this; this.setState('saving');
     return this._api('/api/sync/push',{method:'POST',body:JSON.stringify({items:items}),keepalive:!!keepalive}).then(function(r){ if(r.status===402){ if(typeof fetchBilling==='function'){try{fetchBilling();}catch(e){}} return {__locked:true}; } return r.ok?r.json():null; }).then(function(d){
-      if(d&&d.__locked){ self.setState('offline'); return; }
-      if(!d||!d.ok){ self.setState('offline'); return; }
+      if(d&&d.__locked){ self.setState('offline'); return {ok:false,locked:true}; }
+      if(!d||!d.ok){ self.setState('offline'); return {ok:false}; }
       items.forEach(function(it){ const sh=self.shadow[it.coll]=self.shadow[it.coll]||{}; if(it.deleted) delete sh[it.id]; else sh[it.id]=self._snap(it.data); });
       (d.saved||[]).forEach(function(s){ if(s.updated_at>self.since) self.since=s.updated_at; });
-      self.setState('saved');
-    }).catch(function(){ self.setState('offline'); });
+      self.setState('saved'); return {ok:true};
+    }).catch(function(){ self.setState('offline'); return {ok:false}; });
   },
   flush(keepalive){ if(!this.active())return; clearTimeout(this._pt); this.pushChanges(keepalive); },
   rerender(){ try{ if(typeof current!=='undefined' && current!=='neworder' && typeof views!=='undefined' && views[current]){ views[current](); if(typeof paintIcons==='function')paintIcons(); if(typeof refreshBadges==='function')refreshBadges(); } }catch(e){} },
@@ -1061,7 +1061,34 @@ function aufSelCount(){return Object.keys(aufSel).filter(k=>aufSel[k]).length;}
 function aufToggleSel(id){aufSel[id]=!aufSel[id];views.auftraege();paintIcons();}
 function aufSelAll(ids,on){ids.forEach(id=>aufSel[id]=on);views.auftraege();paintIcons();}
 function sortOrders(list){const l=list.slice();if(aufSort==='neu')l.sort((a,b)=>(b.created||'').localeCompare(a.created||'')||String(b.nr).localeCompare(String(a.nr)));else if(aufSort==='alt')l.sort((a,b)=>(a.created||'').localeCompare(b.created||'')||String(a.nr).localeCompare(String(b.nr)));else if(aufSort==='preis')l.sort((a,b)=>oTotal(b)-oTotal(a));else if(aufSort==='faellig')l.sort((a,b)=>(a.due||'zzzz').localeCompare(b.due||'zzzz'));return l;}
-function setStatusRow(id,s){const o=S.ord.find(x=>x.id===id);if(!o)return;o.status=s;(o.statusHistory=o.statusHistory||[]).push({status:s,at:new Date().toISOString()});logActivity(o,'status',statusLabel(s));if(s==='fertig'&&!o.readyAt)o.readyAt=today();if(s==='abgeholt')o.pickedAt=today();save();if(DB.backend==='server')portalSync(o);const def=statusDef(s);const notified=!!(def&&(def.email||def.sms||def.wa));if(notified)statusNotify(o,def);toast('Status: '+statusLabel(s)+(notified?' · Kunde benachrichtigt':''));views.auftraege();paintIcons();refreshBadges();if(s==='warten')setTimeout(function(){openPartWaitDialog(id);},120);if(s==='fertig')setTimeout(function(){if(confirm('Gerät abholbereit – Kunde jetzt per WhatsApp benachrichtigen?')){window.__waKind='fertig';waDialog(id);}},180);}
+/* v9 #5: Reparaturergebnis bei „Abholbereit“ (Status + Ergebnis getrennt) */
+const REP_RESULTS=[['repariert','Repariert'],['teilweise','Teilweise repariert'],['unrepariert','Unrepariert'],['abgelehnt','Reparatur vom Kunden abgelehnt'],['nicht_reparierbar','Nicht reparierbar']];
+const REP_RESULT_LABEL={repariert:'Repariert',teilweise:'Teilweise repariert',unrepariert:'Unrepariert',abgelehnt:'Reparatur abgelehnt',nicht_reparierbar:'Nicht reparierbar'};
+const REP_REASONS=['Kunde lehnt Kostenvoranschlag ab','Ersatzteil nicht verfügbar','Platinenschaden / wirtschaftlich nicht sinnvoll','Fehler nicht reproduzierbar','Reparatur technisch nicht möglich','Sonstiger Grund'];
+function repNeedsReason(r){return r==='unrepariert'||r==='abgelehnt'||r==='nicht_reparierbar';}
+function repResultColor(r){return r==='repariert'?'#34a24a':(r==='teilweise'?'#d99a00':(r?'#b4231a':'#6b7280'));}
+function repResultBadge(o){ if(!o||o.status!=='fertig'||!o.repResult)return ''; const col=repResultColor(o.repResult); return '<span class="pill" style="border-color:'+col+';color:'+col+'"><span class="d" style="background:'+col+'"></span>'+esc((REP_RESULT_LABEL[o.repResult]||o.repResult).toUpperCase())+'</span>'; }
+let RR=null;
+function ensureRepResult(ids,done){ ids=Array.isArray(ids)?ids:[ids]; const o=S.ord.find(x=>x.id===ids[0])||{}; RR={ids:ids,result:o.repResult||'',reason:o.repResultReason||'',reasonSel:'',done:done}; renderRepModal(); }
+function rrPick(r){RR.result=r;renderRepModal();}
+function renderRepModal(){ if(!RR)return; const need=repNeedsReason(RR.result);
+  const tiles=REP_RESULTS.map(function(x){const on=RR.result===x[0];const col=repResultColor(x[0]);return '<button type="button" class="ztile'+(on?' on':'')+'" style="'+(on?('border-color:'+col+';color:'+col):'')+'" onclick="rrPick(\''+x[0]+'\')">'+esc(x[1])+'</button>';}).join('');
+  const reasons=['<option value="">— Grund wählen —</option>'].concat(REP_REASONS.map(function(r){return '<option'+(RR.reasonSel===r?' selected':'')+'>'+esc(r)+'</option>';})).join('');
+  openModal('<div class="dhead"><b style="flex:1">Reparaturergebnis festlegen</b><button class="btn sm gho" onclick="rrCancel()">Abbrechen</button></div>'
+   +'<div class="dbody"><p class="muted" style="font-size:13px;margin-top:0">„Abholbereit“ heißt nur, dass das Gerät abgeholt werden kann. Bitte zusätzlich festhalten, <b>ob</b> die Reparatur erfolgreich war.</p>'
+   +'<div class="ztiles" style="margin-top:6px">'+tiles+'</div>'
+   +(need?('<label class="f" style="margin-top:14px">Grund / Bemerkung *</label><select class="in" id="rr_reason_sel" onchange="RR.reasonSel=this.value">'+reasons+'</select><textarea class="in" id="rr_reason_free" rows="2" placeholder="Kurze Erläuterung (Pflicht)…" style="margin-top:8px">'+esc(RR.reason||'')+'</textarea>'):'')
+   +'<div class="row" style="justify-content:flex-end;margin-top:16px;gap:8px"><button class="btn gho" onclick="rrCancel()">Abbrechen</button><button class="btn pri" onclick="rrSave()">Übernehmen &amp; auf Abholbereit setzen</button></div></div>');
+}
+function rrCancel(){ RR=null; closeAll(); }
+function rrSave(){ if(!RR)return; if(!RR.result){toast('Bitte Reparaturergebnis wählen');return;}
+  let reason='';
+  if(repNeedsReason(RR.result)){ const sel=(document.getElementById('rr_reason_sel')||{}).value||''; const free=((document.getElementById('rr_reason_free')||{}).value||'').trim(); reason=[sel&&sel!=='Sonstiger Grund'?sel:'',free].filter(Boolean).join(' – '); if(!reason){toast('Bitte einen Grund angeben');return;} }
+  RR.ids.forEach(function(id){ const o=S.ord.find(x=>x.id===id); if(o){ o.repResult=RR.result; o.repResultReason=reason; logActivity(o,'edit','Reparaturergebnis: '+(REP_RESULT_LABEL[RR.result]||RR.result)+(reason?(' ('+reason+')'):'')); } });
+  const done=RR.done; RR=null; closeAll(); if(done)done();
+}
+function setStatusRow(id,s){const o=S.ord.find(x=>x.id===id);if(!o)return; if(s==='fertig'&&(o.status!=='fertig'||!o.repResult)){ensureRepResult(id,function(){_setStatusRowApply(id,s);});return;} _setStatusRowApply(id,s);}
+function _setStatusRowApply(id,s){const o=S.ord.find(x=>x.id===id);if(!o)return;o.status=s;(o.statusHistory=o.statusHistory||[]).push({status:s,at:new Date().toISOString()});logActivity(o,'status',statusLabel(s));if(s==='fertig'&&!o.readyAt)o.readyAt=today();if(s==='abgeholt')o.pickedAt=today();save();if(DB.backend==='server')portalSync(o);const def=statusDef(s);const notified=!!(def&&(def.email||def.sms||def.wa));if(notified)statusNotify(o,def);toast('Status: '+statusLabel(s)+(notified?' · Kunde benachrichtigt':''));views.auftraege();paintIcons();refreshBadges();if(s==='warten')setTimeout(function(){openPartWaitDialog(id);},120);if(s==='fertig')setTimeout(function(){if(confirm('Gerät abholbereit – Kunde jetzt per WhatsApp benachrichtigen?')){window.__waKind='fertig';waDialog(id);}},180);}
 function archiveOrder(id){const o=S.ord.find(x=>x.id===id);if(o){o.archived=true;logActivity(o,'archive','');save();closeAll();toast('Auftrag archiviert');views.auftraege();paintIcons();refreshBadges();}}
 function trashOrder(id){const o=S.ord.find(x=>x.id===id);if(o){o.trashed=true;logActivity(o,'trash','');save();closeAll();toast('In den Papierkorb verschoben');views.auftraege();paintIcons();refreshBadges();}}
 function restoreOrder(id){const o=S.ord.find(x=>x.id===id);if(o){o.trashed=false;o.archived=false;logActivity(o,'restore','');save();toast('Wiederhergestellt');views.auftraege();paintIcons();refreshBadges();}}
@@ -1072,13 +1099,15 @@ function aufBulk(action){const ids=Object.keys(aufSel).filter(k=>aufSel[k]);if(!
   else if(action==='restore'){ids.forEach(id=>{const o=S.ord.find(x=>x.id===id);if(o){o.trashed=false;o.archived=false;}});toast(ids.length+' wiederhergestellt');}
   else if(action==='delete'){if(!confirm(ids.length+' Aufträge endgültig löschen?'))return;S.ord=S.ord.filter(x=>!aufSel[x.id]);toast(ids.length+' gelöscht');}
   aufSel={};save();views.auftraege();paintIcons();refreshBadges();}
-function aufBulkStatus(s){const ids=Object.keys(aufSel).filter(k=>aufSel[k]);ids.forEach(id=>{const o=S.ord.find(x=>x.id===id);if(o){o.status=s;if(s==='fertig'&&!o.readyAt)o.readyAt=today();if(s==='abgeholt')o.pickedAt=today();const def=statusDef(s);if(def&&(def.email||def.sms||def.wa))statusNotify(o,def);}});aufSel={};save();toast(ids.length+' auf „'+statusLabel(s)+'" gesetzt');views.auftraege();paintIcons();refreshBadges();}
+function aufBulkStatus(s){const ids=Object.keys(aufSel).filter(k=>aufSel[k]);if(!ids.length)return;if(s==='fertig'){ensureRepResult(ids,function(){_aufBulkStatusApply(ids,s);});return;}_aufBulkStatusApply(ids,s);}
+function _aufBulkStatusApply(ids,s){ids.forEach(id=>{const o=S.ord.find(x=>x.id===id);if(o){o.status=s;if(s==='fertig'&&!o.readyAt)o.readyAt=today();if(s==='abgeholt')o.pickedAt=today();const def=statusDef(s);if(def&&(def.email||def.sms||def.wa))statusNotify(o,def);}});aufSel={};save();toast(ids.length+' auf „'+statusLabel(s)+'" gesetzt');views.auftraege();paintIcons();refreshBadges();}
 function kanCard(o){const c=cust(o.cid);const prioTag=(o.prio&&o.prio!=='Standard')?` <span class="tag">${esc(o.prio)}</span>`:'';const tech=o.technikerId?(S.users.find(u=>u.id===o.technikerId)||{}).name:'';
   return `<div class="kancard" draggable="true" ondragstart="__kanDrag='${o.id}';this.style.opacity=.5" ondragend="this.style.opacity=1" onclick="openOrder('${o.id}')" style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.06)">
     <div class="between"><b style="font-size:13px">${o.nr}</b><span class="mono" style="font-size:12px">${eur(oTotal(o))}</span></div>
     <div style="font-size:13px;margin-top:2px">${esc(oDevLabel(o))}${oDevices(o).length>1?` <span class="tag">${oDevices(o).length}</span>`:''}</div>
     <div class="muted" style="font-size:12px">${esc(c.name)}${prioTag}${o.source==='online'?' <span class="tag">Online</span>':''}${o.source==='versand'?' <span class="tag">Versand</span>':''}</div>
     <div class="between" style="margin-top:5px"><span class="muted" style="font-size:11px">Fällig ${fmtDate(o.due)}</span>${tech?`<span class="muted" style="font-size:11px">${esc(tech)}</span>`:''}</div>
+    ${repResultBadge(o)?`<div style="margin-top:6px">${repResultBadge(o)}</div>`:''}
   </div>`;}
 function kanBoard(){
   const src=visibleOrders(); const cols=statusFlow(); const byS={}; cols.forEach(s=>byS[s]=[]);
@@ -1131,7 +1160,7 @@ views.auftraege=function(){
       <td onclick="openOrder('${o.id}')" style="cursor:pointer"><div style="display:flex;align-items:center;gap:8px">${modelThumb((oDevices(o)[0]||{}).brand,(oDevices(o)[0]||{}).model,34,(oDevices(o)[0]||{}).typ)}<span>${esc(oDevLabel(o))}${oDevices(o).length>1?` <span class="tag">${oDevices(o).length}</span>`:''}</span></div></td>
       <td onclick="openOrder('${o.id}')" style="cursor:pointer">${esc(oIssueLabel(o))}</td>
       <td class="mono" onclick="openOrder('${o.id}')" style="cursor:pointer">${eur(oTotal(o))}</td>
-      <td onclick="event.stopPropagation()">${aufView==='aktiv'?`<select class="in" style="padding:5px 8px;width:auto;border-color:${statusColor(o.status)};color:${statusColor(o.status)};font-weight:700" onchange="setStatusRow('${o.id}',this.value)">${statusFlow().concat(statusFlow().includes(o.status)?[]:[o.status]).map(s=>`<option value="${s}" ${o.status===s?'selected':''}>${esc(statusLabel(s))}</option>`).join('')}</select>`:statusPill(o.status)}</td>
+      <td onclick="event.stopPropagation()">${aufView==='aktiv'?`<select class="in" style="padding:5px 8px;width:auto;border-color:${statusColor(o.status)};color:${statusColor(o.status)};font-weight:700" onchange="setStatusRow('${o.id}',this.value)">${statusFlow().concat(statusFlow().includes(o.status)?[]:[o.status]).map(s=>`<option value="${s}" ${o.status===s?'selected':''}>${esc(statusLabel(s))}</option>`).join('')}</select>`:statusPill(o.status)}${repResultBadge(o)?`<div style="margin-top:4px">${repResultBadge(o)}</div>`:''}</td>
       <td class="muted mono" onclick="openOrder('${o.id}')" style="cursor:pointer">${fmtDate(o.due)}</td>
       <td onclick="event.stopPropagation()" style="text-align:right;white-space:nowrap">${aufView==='aktiv'?`<button class="btn sm gho" title="Per WhatsApp benachrichtigen" onclick="waDialog('${o.id}')" style="color:#128C3E">📲</button><button class="btn sm gho" onclick="archiveOrder('${o.id}')">Archiv</button><button class="btn sm gho" onclick="trashOrder('${o.id}')">Papierkorb</button>`:''}${aufView==='archiv'?`<button class="btn sm gho" onclick="restoreOrder('${o.id}')">Wiederherstellen</button>`:''}${aufView==='papierkorb'?`<button class="btn sm gho" onclick="restoreOrder('${o.id}')">Wiederherstellen</button><button class="btn sm gho" onclick="deleteOrderPerm('${o.id}')">Löschen</button>`:''}</td>
     </tr>`).join(''):`<tr><td colspan="9"><div class="empty">${aufView==='papierkorb'?'Papierkorb ist leer':(aufView==='archiv'?'Kein Archiv':'Keine Aufträge in diesem Filter')}</div></td></tr>`}</tbody></table>
@@ -1162,6 +1191,34 @@ function activityBox(o){
     ${rows?`<div style="margin-top:10px">${rows}</div>`:'<div class="muted" style="font-size:12px;margin-top:8px">Noch keine protokollierten Aktionen.</div>'}
   </div>`;
 }
+function orderDeviceBlock(o,d,di){
+  const many=oDevices(o).length>1;
+  const ll=lockLabel(d);
+  const ps=devPositions(d);
+  const meta=[d.imei?'IMEI '+esc(d.imei):'',d.fach?esc(d.fach):'',ll?'🔒 '+esc(ll):''].filter(Boolean).join(' · ');
+  const faultTitle=ps.map(p=>esc(p.reparatur)).filter(Boolean).join(' · ');
+  const fbText=(d.fehler||'').trim();
+  const zt=zustandText(d), zu=zubehoerText(d), ft=(d.fotos||[]);
+  const techn=d.technikerId?techName(d.technikerId):'';
+  return `<div style="padding:10px 0;border-bottom:1px solid var(--line)">
+    <div class="between" style="gap:12px;align-items:flex-start">
+      <div style="flex:1;min-width:0"><b style="font-size:15px">${many?('Gerät '+(di+1)+': '):''}${esc(d.brand)} ${esc(d.model)}</b>${meta?`<div class="muted" style="font-size:12px;margin-top:2px">${meta}</div>`:''}</div>
+      <div style="flex:none" title="${esc(d.brand)} ${esc(d.model)}">${modelThumb(d.brand,d.model,60,d.typ)}</div>
+    </div>
+    ${(faultTitle||fbText)?`<div style="margin-top:8px;border-left:3px solid var(--green);background:var(--soft);border-radius:8px;padding:8px 10px">
+       <div style="font-size:11px;font-weight:800;letter-spacing:.04em;color:var(--green)">FEHLERBESCHREIBUNG</div>
+       ${faultTitle?`<div style="font-weight:700;margin-top:2px">${faultTitle}</div>`:''}
+       ${fbText?`<div style="font-size:13px;margin-top:3px;word-break:break-word;white-space:pre-wrap">${esc(fbText)}</div>`:''}
+     </div>`:''}
+    ${zt?`<div style="font-size:12.5px;margin-top:8px;word-break:break-word"><b>Zustand bei Annahme:</b> ${esc(zt)}</div>`:''}
+    ${zu?`<div style="font-size:12.5px;margin-top:3px;word-break:break-word"><b>Mitgegeben:</b> ${esc(zu)}</div>`:''}
+    ${ft.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${ft.map(f=>`<img src="${f.src}" onclick="fotoZoom(this)" style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:1px solid var(--line);cursor:zoom-in">`).join('')}</div>`:''}
+    <div style="margin-top:8px">${ps.map(p=>`<div class="between" style="font-size:13px;padding:3px 0"><span class="muted">${esc(p.reparatur)}${p.qual?' · '+esc(p.qual):''}</span><span class="mono">${eur(p.price)}</span></div>`).join('')}</div>
+    <div class="between" style="font-size:13px;padding-top:4px"><span class="muted">${many?('Gerät '+(di+1)+' '):''}gesamt</span><b class="mono">${eur(devTotal(d))}</b></div>
+    ${techn?`<div class="muted" style="font-size:12px;margin-top:4px">👤 Techniker: ${esc(techn)}</div>`:''}
+  </div>`;
+}
+
 function openOrder(id){
   const o=S.ord.find(x=>x.id===id); if(!o)return; const c=cust(o.cid);
   if(!Array.isArray(o.statusHistory)||!o.statusHistory.length){o.statusHistory=[{status:o.status,at:o.created||new Date().toISOString()}];}
@@ -1182,9 +1239,10 @@ function openOrder(id){
      </div>
      ${partWaitBox(o)}
      ${confirmStatusBox(o)}
+     ${(o.status==='fertig'&&o.repResult)?`<div style="margin-top:12px;border:1px solid ${repResultColor(o.repResult)};background:var(--soft);border-radius:12px;padding:10px 12px"><div style="font-weight:800;color:${repResultColor(o.repResult)};letter-spacing:.02em">ABHOLBEREIT · ${esc((REP_RESULT_LABEL[o.repResult]||o.repResult).toUpperCase())}</div>${o.repResultReason?`<div style="font-size:13px;margin-top:3px">${esc(o.repResultReason)}</div>`:''}<button class="btn sm gho" style="margin-top:8px" onclick="ensureRepResult('${o.id}',function(){save();if(DB.backend==='server')portalSync(S.ord.find(x=>x.id==='${o.id}'));openOrder('${o.id}');})">Ergebnis ändern</button></div>`:''}
      <div class="grid g2" style="margin-top:14px">
        <div style="grid-column:1/-1"><label class="f">Gerät${oDevices(o).length>1?'e ('+oDevices(o).length+')':''} &amp; Reparatur</label>
-         ${oDevices(o).map((d,di)=>{const ll=lockLabel(d);const ps=devPositions(d);const meta=[d.imei?'IMEI '+esc(d.imei):'',d.fach?esc(d.fach):'',ll?'🔒 '+esc(ll):'',d.technikerId?'👤 '+esc(techName(d.technikerId)):''].filter(Boolean).join(' · ');return `<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:flex-start"><div style="flex:1;min-width:0"><div class="between"><b style="min-width:0">Gerät ${di+1}: ${esc(d.brand)} ${esc(d.model)}</b><b class="mono">${eur(devTotal(d))}</b></div>${meta?`<div class="muted" style="font-size:12px;margin-top:2px">${meta}</div>`:''}${(d.fehler||'').trim()?`<div style="font-size:12px;margin-top:3px;word-break:break-word"><b>Fehlerbeschreibung:</b> ${esc(d.fehler.trim()).replace(/\n/g,'<br>')}</div>`:''}${ps.map(p=>`<div class="between" style="font-size:13px;padding:4px 0 0"><span class="muted">${esc(p.reparatur)}${p.qual?' · '+esc(p.qual):''}</span><span class="mono">${eur(p.price)}</span></div>`).join('')}${orderAnnahmeDetail(d)}</div><div style="flex:none" title="${esc(d.brand)} ${esc(d.model)}">${modelThumb(d.brand,d.model,60,d.typ)}</div></div>`;}).join('')}
+         ${oDevices(o).map((d,di)=>orderDeviceBlock(o,d,di)).join('')}
          <div class="between" style="padding:9px 0"><b>Gesamt (inkl. MwSt.)</b><b style="font-size:18px">${eur(oTotal(o))}</b></div>${(oTotal(o)>0)?`<div class="between" style="font-size:12px;color:var(--ink2)"><span>Netto ${eur(netOf(oTotal(o)))}</span><span>darin ${MWST_RATE} % MwSt: ${eur(vatOf(oTotal(o)))}</span></div>`:''}</div>
        <div><label class="f">Priorität</label><div style="font-weight:700">${esc(o.prio)}</div></div>
        <div><label class="f">Termin / Fällig</label><div style="font-weight:700">${o.appt?'Termin '+fmtDate(o.appt)+' · ':''}Fällig ${fmtDate(o.due)}</div></div>
@@ -1240,7 +1298,13 @@ function openOrder(id){
 }
 
 function setStatus(id,s){
+  const _o=S.ord.find(x=>x.id===id); if(!_o)return;
+  if(s==='fertig'&&(_o.status!=='fertig'||!_o.repResult)){ensureRepResult(id,function(){_setStatusApply(id,s);});return;}
+  _setStatusApply(id,s);
+}
+function _setStatusApply(id,s){
   const o=S.ord.find(x=>x.id===id); o.status=s;
+  logActivity(o,'status',statusLabel(s));
   (o.statusHistory=o.statusHistory||[]).push({status:s,at:new Date().toISOString()});
   if(s==='fertig'&&!o.readyAt) o.readyAt=today();
   if(s==='abgeholt') o.pickedAt=today();
@@ -1333,11 +1397,12 @@ function saveSig(id){const c=document.getElementById('sig');const o=S.ord.find(x
 function priceFor(brand,model,repair){const c=ensureCat();const k=brand+'|'+model+'|'+repair;if(c.prices[k]!==undefined&&c.prices[k]!=='')return +c.prices[k];const base=c.base[repair];if(base===undefined)return '';const names=catModelNames(brand);const i=names.indexOf(model);const f=i>=0?1+((i%3)*0.06):1;const bf=(c.brandMul&&c.brandMul[brand])||(brand==='Sonstige'||!brand?1:1.05);return Math.round(base*bf*f);}
 /* v2 Doc #3/#4: Zustand-Sektionen + Zubehör-Optionen (zentral) */
 const ZUSTAND_SECTIONS=[
-  {key:'display',label:'Display',opts:['Einwandfrei','Kratzer','Riss','Bruch','Sonstiges'],sonst:true},
-  {key:'rueck',label:'Rückseite',opts:['Einwandfrei','Kratzer','Riss / Bruch','Sonstiges'],sonst:true},
-  {key:'rahmen',label:'Rahmen / Gehäuse',opts:['Einwandfrei','Gebrauchsspuren','Delle','Beschädigt','Sonstiges'],sonst:true},
-  {key:'weitere',label:'Weitere Auffälligkeiten',opts:['Gerät verbogen','Feuchtigkeitsspuren','Starke Gebrauchsspuren'],sonst:false}
+  {key:'display',label:'Display',sonstOpt:'Sonstiges',sonst:true,opts:['Guter Zustand / sehr geringe Gebrauchsspuren','Leichte Gebrauchsspuren','Deutliche Gebrauchsspuren','Starke Kratzer','Riss','Displaybruch','Absplitterung / beschädigte Kante','Sonstiges']},
+  {key:'rahmen',label:'Rahmen / Gehäuse',sonstOpt:'Sonstiges',sonst:true,opts:['Geringe Gebrauchsspuren','Leichte Gebrauchsspuren','Deutliche Gebrauchsspuren','Starke Kratzer','Dellen / Stoßstellen','Rahmen verbogen','Gehäuse beschädigt','Sonstiges']},
+  {key:'rueck',label:'Rückseite',sonstOpt:'Sonstiges',sonst:true,opts:['Geringe Gebrauchsspuren','Leichte Gebrauchsspuren','Deutliche Gebrauchsspuren','Kratzer','Starke Kratzer','Riss','Bruch','Absplitterung','Sonstiges']},
+  {key:'weitere',label:'Weitere Auffälligkeiten',sonstOpt:'Sonstige Auffälligkeit',sonst:true,opts:['Feuchtigkeitsspuren / Flüssigkeitsschaden sichtbar','Gerät verbogen','Schrauben / Bauteile fehlen','Gerät bereits geöffnet / Reparaturspuren sichtbar','Sonstige Auffälligkeit']}
 ];
+let ZOPEN={};
 const ZUBEHOER_OPTS=['SIM-Karte','Speicherkarte','Hülle','S Pen / Stift','Ladekabel','Netzteil','Ladegerät','Originalverpackung'];
 const ZUBEHOER_KEIN='Kein Zubehör mitgegeben';
 function blankZustand(){return {display:[],rueck:[],rahmen:[],weitere:[]};}
@@ -1375,16 +1440,17 @@ function resumeDraft(did){ closeAll(); const d=(S.drafts||[]).find(x=>x.id===did
 function orderToForm(o){const c=cust(o.cid);const nm=(c.name||'').split(' ');const f=blankForm();f.cid=o.cid;f.typ=c.typ||'Privat';f.firma=c.firma||'';f.anrede=c.anrede||'Herr';f.vorname=nm.slice(0,-1).join(' ')||nm[0]||'';f.nachname=nm.length>1?nm[nm.length-1]:'';f.tel=c.tel||'+49 ';f.mail=c.mail||'';f.plz=c.plz||'';f.stadt=c.stadt||'';f.adr=c.adr||'';f.lock=o.lock||'Keine';f.lockval=o.lockval||'';f.prio=o.prio||'Standard';f.technikerId=o.technikerId||'';f.notes=o.notes||'';f.due=o.due||today();f.appt=o.appt||'';f.terminMode=o.appt?'termin':'kein';f.sig=o.sig||'';f.devices=oDevices(o).map((d,idx)=>({typ:d.typ||'Smartphone',brand:d.brand||'',model:d.model||'',imei:d.imei||'',fach:d.fach||'',ref:d.ref||'',reparatur:d.reparatur||'',price:(d.price!==undefined&&d.price!==0?d.price:(d.price===0?0:'')),qual:d.qual||'Original',warranty:d.warranty||6,lock:normLock(d.lock!==undefined?d.lock:(idx===0?o.lock:'')),lockval:(d.lockval!==undefined?d.lockval:(idx===0?(o.lockval||''):'')),technikerId:d.technikerId||'',zustand:(d.zustand?JSON.parse(JSON.stringify(d.zustand)):blankZustand()),zsonst:(d.zsonst?JSON.parse(JSON.stringify(d.zsonst)):{}),zubehoer:((d.zubehoer||[]).slice()),zubehoerNote:(d.zubehoerNote||''),fotos:((d.fotos||[]).slice()),lockSet:(d.lockSet!==undefined?d.lockSet:(normLock(d.lock)!=='Kein')),positions:(Array.isArray(d.positions)&&d.positions.length?d.positions.map(p=>({reparatur:p.reparatur||'',qual:p.qual||'Original',price:(p.price!==undefined&&p.price!==''?p.price:'')})):[{reparatur:d.reparatur||'',qual:d.qual||'Original',price:(d.price!==undefined&&d.price!==0?d.price:(d.price===0?0:''))}])}));return f;}
 function noHasContent(){ if(!NO)return false; const d=NO.devices[0]||{}; return !!(NO.vorname||NO.nachname||(NO.tel||'').replace(/\D/g,'').length>3||NO.firma||NO.mail||d.brand||d.model||d.reparatur||(d.positions&&d.positions.some(p=>p.reparatur))||NO.notes); }
 function noTitleOf(){const nm=((NO.vorname+' '+NO.nachname).trim())||NO.firma||'Unbenannter Kunde';const d=NO.devices[0]||{};const dev=[d.brand,d.model].filter(Boolean).join(' ');return nm+(dev?' · '+dev:'');}
-function noCollect(){ if(!NO)return; const g=id=>{const e=document.getElementById(id);return e?e.value:'';};
-  NO.typ=g('no_typ')||NO.typ;NO.anrede=g('no_anrede');NO.firma=g('no_firma');NO.vorname=g('no_vorname');NO.nachname=g('no_nachname');NO.tel=g('no_tel');NO.mail=g('no_mail');NO.plz=g('no_plz');NO.stadt=g('no_stadt');NO.adr=g('no_adr');
-  NO.prio=g('no_prio')||NO.prio;NO.technikerId=g('no_tech');NO.notes=g('no_notes');NO.due=g('no_due')||NO.due;NO.appt=g('no_appt');
+function noCollect(){ if(!NO)return; const g=id=>{const e=document.getElementById(id);return e?e.value:null;}; let v;
+  /* step-sicher: nur überschreiben, wenn das Feld gerade sichtbar/gerendert ist */
+  v=g('no_typ');if(v!=null)NO.typ=v; v=g('no_anrede');if(v!=null)NO.anrede=v; v=g('no_firma');if(v!=null)NO.firma=v; v=g('no_vorname');if(v!=null)NO.vorname=v; v=g('no_nachname');if(v!=null)NO.nachname=v; v=g('no_tel');if(v!=null)NO.tel=v; v=g('no_mail');if(v!=null)NO.mail=v; v=g('no_plz');if(v!=null)NO.plz=v; v=g('no_stadt');if(v!=null)NO.stadt=v; v=g('no_adr');if(v!=null)NO.adr=v;
+  v=g('no_prio');if(v!=null)NO.prio=v; v=g('no_tech');if(v!=null)NO.technikerId=v; v=g('no_notes');if(v!=null)NO.notes=v; v=g('no_due');if(v!=null)NO.due=v; v=g('no_appt');if(v!=null)NO.appt=v;
   const tm=document.querySelector('input[name=no_termin]:checked');if(tm)NO.terminMode=tm.value;
-  NO.devices.forEach((d,i)=>{d.typ=g('dev'+i+'_typ')||d.typ;d.brand=g('dev'+i+'_brand');d.model=g('dev'+i+'_model');d.imei=g('dev'+i+'_imei');d.fach=g('dev'+i+'_fach');d.ref=g('dev'+i+'_ref');d.fehler=g('dev'+i+'_fehler');d.warranty=g('dev'+i+'_warranty')||d.warranty;const gt=document.getElementById('dev'+i+'_tech');if(gt)d.technikerId=gt.value;
+  NO.devices.forEach((d,i)=>{ let w;
+    w=g('dev'+i+'_typ');if(w!=null)d.typ=w; w=g('dev'+i+'_brand');if(w!=null)d.brand=w; w=g('dev'+i+'_model');if(w!=null)d.model=w; w=g('dev'+i+'_imei');if(w!=null)d.imei=w; w=g('dev'+i+'_fach');if(w!=null)d.fach=w; w=g('dev'+i+'_ref');if(w!=null)d.ref=w; w=g('dev'+i+'_fehler');if(w!=null)d.fehler=w; w=g('dev'+i+'_warranty');if(w!=null&&w!=='')d.warranty=w;
     if(!Array.isArray(d.positions)||!d.positions.length)d.positions=[blankPosition()];
     d.positions.forEach((p,j)=>{const gr=document.getElementById('dev'+i+'_pos'+j+'_reparatur');if(gr)p.reparatur=gr.value;const gp=document.getElementById('dev'+i+'_pos'+j+'_price');if(gp)p.price=gp.value;const gq=document.getElementById('dev'+i+'_pos'+j+'_qual');if(gq)p.qual=gq.value||p.qual;});
     const p0=d.positions[0]||{};d.reparatur=p0.reparatur||'';d.qual=p0.qual||'Original';d.price=(p0.price!==undefined?p0.price:''); /* Spiegel positions[0] */
-    const lk=document.querySelector('input[name=dev'+i+'_lock]:checked');if(lk)d.lock=lk.value; d.lock=normLock(d.lock);
-    if(d.lock==='PIN')d.lockval=g('dev'+i+'_lockval'); else if(d.lock==='Kein')d.lockval=''; /* Muster: lockval wird beim Zeichnen gesetzt */
+    const lk=document.querySelector('input[name=dev'+i+'_lock]:checked');if(lk){d.lock=normLock(lk.value); if(d.lock==='PIN'){const lv=g('dev'+i+'_lockval');if(lv!=null)d.lockval=lv;} else if(d.lock==='Kein')d.lockval='';}
     ZUSTAND_SECTIONS.forEach(s=>{if(s.sonst){const _e=document.getElementById('dev'+i+'_zs_'+s.key);if(_e){d.zsonst=d.zsonst||{};d.zsonst[s.key]=_e.value;}}});
     const _zn=document.getElementById('dev'+i+'_zubnote');if(_zn)d.zubehoerNote=_zn.value;});
   /* Auftrags-Spiegel (Rückwärtskompatibilität): Sperre des 1. Geräts */
@@ -1454,10 +1520,20 @@ function fFotoTs(ts){if(!ts)return '';try{const d=new Date(ts);return d.toLocale
 function noAnnahmeBlock(d,i){
   const secs=ZUSTAND_SECTIONS.map(s=>{
     const sel=(d.zustand&&d.zustand[s.key])||[];
-    const tiles=s.opts.map(o=>{const on=sel.indexOf(o)>=0;const gut=(o==='Einwandfrei');return `<button type="button" class="ztile${on?' on':''}${gut?' gut':''}" onclick="noZustandToggle(${i},'${s.key}','${o.replace(/'/g,"\\'")}')">${esc(o)}</button>`;}).join('');
-    const showSonst=s.sonst&&sel.indexOf('Sonstiges')>=0;
-    const note=(d.zsonst&&d.zsonst[s.key])||'';
-    return `<div class="zsec"><div class="zlab">${esc(s.label)}</div><div class="ztiles">${tiles}</div>${s.sonst?`<textarea class="in" id="dev${i}_zs_${s.key}" rows="1" placeholder="Sonstiges – kurz beschreiben…" style="margin-top:8px;${showSonst?'':'display:none'}">${esc(note)}</textarea>`:''}</div>`;
+    const open=!!ZOPEN[i+'_'+s.key];
+    const sumTxt=sel.length?sel.join(', '):'– antippen zum Dokumentieren –';
+    const bar=`<button type="button" onclick="noZustandSecToggle(${i},'${s.key}')" style="width:100%;display:flex;align-items:center;gap:10px;justify-content:space-between;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:9px 12px;cursor:pointer;text-align:left">
+        <span style="font-weight:700;min-width:104px;flex:none">${esc(s.label)}</span>
+        <span style="flex:1;min-width:0;font-size:13px;${sel.length?'':'color:var(--ink2)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(sumTxt)}</span>
+        <span style="flex:none;color:var(--ink2)">${open?'▲':'▾'}</span></button>`;
+    let body='';
+    if(open){
+      const tiles=s.opts.map(o=>{const on=sel.indexOf(o)>=0;return `<button type="button" class="ztile${on?' on':''}" onclick="noZustandToggle(${i},'${s.key}','${o.replace(/'/g,"\\'")}')">${esc(o)}</button>`;}).join('');
+      const showSonst=sel.indexOf(s.sonstOpt)>=0;
+      const note=(d.zsonst&&d.zsonst[s.key])||'';
+      body=`<div style="margin-top:8px"><div class="ztiles">${tiles}</div>${showSonst?`<textarea class="in" id="dev${i}_zs_${s.key}" rows="1" placeholder="${esc(s.sonstOpt)} – kurz beschreiben…" style="margin-top:8px">${esc(note)}</textarea>`:''}</div>`;
+    }
+    return `<div class="zsec" style="margin-top:8px">${bar}${body}</div>`;
   }).join('');
   const zub=(d.zubehoer)||[];
   const ztiles=ZUBEHOER_OPTS.map(o=>`<button type="button" class="ztile${zub.indexOf(o)>=0?' on':''}" onclick="noZubehoerToggle(${i},'${o.replace(/'/g,"\\'")}')">${esc(o)}</button>`).join('');
@@ -1465,7 +1541,8 @@ function noAnnahmeBlock(d,i){
   const fotos=(d.fotos)||[];
   const thumbs=fotos.map((f,k)=>`<div class="zfoto"><img src="${f.src}" alt=""><span class="zfx" onclick="noRemoveFoto(${i},${k})">×</span><span class="zft">${esc(fFotoTs(f.ts))}</span></div>`).join('');
   return `<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line)" id="dev${i}_annahme">
-    <div class="between"><label class="f" style="margin:0">Zustand bei Annahme *</label><button type="button" class="btn sm gho" onclick="noZustandGut(${i})">✓ Gerät äußerlich einwandfrei</button></div>
+    <div class="between" style="flex-wrap:wrap;gap:8px"><label class="f" style="margin:0">Zustand bei Annahme *</label><button type="button" class="btn sm gho" onclick="noZustandUeblich(${i})">Übliche Gebrauchsspuren</button></div>
+    <div class="muted" style="font-size:11px;margin-top:2px">Bereich antippen, passende Zustände wählen (Mehrfachauswahl möglich).</div>
     ${secs}
     <label class="f" style="margin-top:14px" id="dev${i}_zublabel">Mitgegebenes Zubehör *</label>
     <div class="ztiles">${ztiles}${keinTile}</div>
@@ -1474,10 +1551,9 @@ function noAnnahmeBlock(d,i){
     <div class="zfotos">${thumbs}<label class="zfadd">＋ Foto<input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="noAddFoto(${i},this)"></label></div>
   </div>`;
 }
-function noZustandToggle(i,sec,opt){noCollect();const d=NO.devices[i];if(!d.zustand)d.zustand=blankZustand();let a=d.zustand[sec]||(d.zustand[sec]=[]);const isGut=(opt==='Einwandfrei');const idx=a.indexOf(opt);
-  if(idx>=0){a.splice(idx,1);} else if(isGut){d.zustand[sec]=[opt];} else {a=a.filter(x=>x!=='Einwandfrei');a.push(opt);d.zustand[sec]=a;}
-  renderNewOrder();}
-function noZustandGut(i){noCollect();const d=NO.devices[i];if(!d.zustand)d.zustand=blankZustand();d.zustand.display=['Einwandfrei'];d.zustand.rueck=['Einwandfrei'];d.zustand.rahmen=['Einwandfrei'];renderNewOrder();}
+function noZustandSecToggle(i,key){noCollect();ZOPEN[i+'_'+key]=!ZOPEN[i+'_'+key];renderNewOrder();}
+function noZustandToggle(i,sec,opt){noCollect();const d=NO.devices[i];if(!d.zustand)d.zustand=blankZustand();let a=d.zustand[sec]||(d.zustand[sec]=[]);const idx=a.indexOf(opt);if(idx>=0)a.splice(idx,1);else a.push(opt);d.zustand[sec]=a;ZOPEN[i+'_'+sec]=true;renderNewOrder();}
+function noZustandUeblich(i){noCollect();const d=NO.devices[i];if(!d.zustand)d.zustand=blankZustand();d.zustand.display=['Leichte Gebrauchsspuren'];d.zustand.rahmen=['Leichte Gebrauchsspuren'];d.zustand.rueck=['Leichte Gebrauchsspuren'];renderNewOrder();}
 function noZubehoerToggle(i,opt){noCollect();const d=NO.devices[i];let a=d.zubehoer||(d.zubehoer=[]);
   if(opt===ZUBEHOER_KEIN){d.zubehoer=(a.indexOf(ZUBEHOER_KEIN)>=0)?[]:[ZUBEHOER_KEIN];}
   else {a=a.filter(x=>x!==ZUBEHOER_KEIN);const idx=a.indexOf(opt);if(idx>=0)a.splice(idx,1);else a.push(opt);d.zubehoer=a;}
@@ -1486,22 +1562,7 @@ function noAddFoto(i,input){const files=Array.from(input.files||[]);if(!files.le
 function noRemoveFoto(i,k){noCollect();const d=NO.devices[i];if(d.fotos)d.fotos.splice(k,1);renderNewOrder();}
 /* ---- v2 Doc #9: Pflichtfeld-/Vollständigkeitsprüfung ---- */
 function inUseDev(d){return !!(d.brand||d.model||devPositions(d).some(p=>p.reparatur)||(d.zustand&&['display','rueck','rahmen','weitere'].some(k=>((d.zustand[k])||[]).length))||((d.zubehoer||[]).length));}
-function noValidate(){
-  const miss=[];
-  if(!((NO.mail||'').trim()))miss.push({t:'E-Mail-Adresse',el:'no_mail'});
-  NO.devices.forEach((d,i)=>{ if(i>0&&!inUseDev(d))return;
-    const pre=NO.devices.length>1?('Gerät '+(i+1)+': '):'';
-    if(!d.brand||!d.model)miss.push({t:pre+'Hersteller & Modell',el:'dev'+i+'_model'});
-    if(!devPositions(d).some(p=>p.reparatur))miss.push({t:pre+'Fehler / Reparatur',el:'dev'+i+'_pos0_reparatur'});
-    const z=d.zustand||{};
-    if(!(((z.display||[]).length)&&((z.rueck||[]).length)&&((z.rahmen||[]).length)))miss.push({t:pre+'Gerätezustand',el:'dev'+i+'_annahme'});
-    if(!((d.zubehoer||[]).length))miss.push({t:pre+'Mitgegebenes Zubehör',el:'dev'+i+'_zublabel'});
-    if(!d.lockSet)miss.push({t:pre+'Displaysperre',el:'dev'+i+'_lockrow'});
-    else if(normLock(d.lock)==='PIN'&&!((d.lockval||'').trim()))miss.push({t:pre+'PIN / Passwort',el:'dev'+i+'_lockval'});
-    else if(normLock(d.lock)==='Muster'&&!((d.lockval||'').trim()))miss.push({t:pre+'Entsperrmuster einzeichnen',el:'dev'+i+'_lockpat'});
-  });
-  return miss;
-}
+function noValidate(){ return [].concat(noStepMiss(2),noStepMiss(3),noStepMiss(4)); }
 function noShowMissing(miss){
   document.querySelectorAll('.field-missing').forEach(e=>e.classList.remove('field-missing'));
   miss.forEach(m=>{const el=document.getElementById(m.el);if(el)el.classList.add('field-missing');});
@@ -1713,9 +1774,9 @@ function noKioskSave(){const c=document.getElementById('sig');if(!window.__sigDi
 function noSaveExit(){noCollect();if(noHasContent()){noSaveDraft();toast('Als Entwurf gespeichert');}NO=null;go('auftraege');}
 function noCancel(){noCollect();const isQ=NO.mode==='angebot';if(!NO.editId&&!NO.quoteEditId&&noHasContent()){if(!confirm(isQ?'Angebot verwerfen?':'Auftrag verwerfen? Der ungespeicherte Entwurf wird gelöscht.'))return;if(!isQ)S.drafts=(S.drafts||[]).filter(x=>x.id!==NO.draftId);save();}NO=null;go(isQ?'angebote':'auftraege');}
 function noFinalize(){ noCollect();
-  if(!NO.vorname&&!NO.nachname&&!NO.firma){noShowMissing([{t:'Kundenname',el:'no_vorname'}]);return;}
-  if((NO.tel||'').replace(/\D/g,'').length<5){noShowMissing([{t:'Telefonnummer',el:'no_tel'}]);return;}
-  const _miss=noValidate(); if(_miss.length){noShowMissing(_miss);return;}
+  if(!NO.vorname&&!NO.nachname&&!NO.firma){noJumpAndShow([{t:'Kundenname',el:'no_vorname'}]);return;}
+  if((NO.tel||'').replace(/\D/g,'').length<5){noJumpAndShow([{t:'Telefonnummer',el:'no_tel'}]);return;}
+  const _miss=noValidate(); if(_miss.length){noJumpAndShow(_miss);return;}
   document.querySelectorAll('.field-missing').forEach(e=>e.classList.remove('field-missing'));
   {const _b=document.getElementById('noMissBanner');if(_b)_b.remove();}
   const d0=NO.devices[0]||{};
@@ -1750,7 +1811,7 @@ function noBuildDevices(){ const built=[];
   });
   return built; }
 function noMirror(devs){ const f=devs[0]||{}; return {devtyp:f.typ||'Smartphone',brand:f.brand||'',model:f.model||'',imei:f.imei||'',fach:f.fach||'',ref:f.ref||'',qual:f.qual||'Original',warranty:f.warranty||6,lock:normLock(f.lock),lockval:f.lockval||'',issue:devs.reduce((a,d)=>a.concat(devPositions(d).map(p=>p.reparatur)),[]).filter(Boolean).join(' · '),price:devs.reduce((s,d)=>s+devTotal(d),0)}; }
-function noDevBlock(d,i){
+function noGeraetFields(d,i){
   const brands=catBrands();
   const modelNames=catModelNames(d.brand);
   const modelOpts=['<option value="">Modell wählen…</option>'].concat(modelNames.map(mm=>`<option ${d.model===mm?'selected':''}>${esc(mm)}</option>`));
@@ -1758,9 +1819,7 @@ function noDevBlock(d,i){
   const brandOpts=['<option value="">Marke wählen…</option>'].concat(brands.map(b=>`<option ${d.brand===b?'selected':''}>${esc(b)}</option>`));
   const types=ensureCat().types;
   const img=(d.brand&&d.model)?catModelImg(d.brand,d.model):'';
-  return `<div class="card" style="background:var(--soft);border:0;margin-top:12px">
-    <div class="between"><b>Gerät ${i+1}</b>${i>0?`<button class="btn sm gho" onclick="noRemoveDevice(${i})">Entfernen</button>`:''}</div>
-    <label class="f" style="margin-top:10px">Geräte-Schnellsuche</label>
+  return `<label class="f" style="margin-top:10px">Geräte-Schnellsuche</label>
     <input class="in" id="dev${i}_search" list="allDevices" placeholder="z. B. „iph 15 p“ → Apple iPhone 15 Pro" onchange="noQuickPick(${i})">
     <div class="grid g2" style="margin-top:10px">
       <div><label class="f">Gerätetyp *</label><select class="in" id="dev${i}_typ">${types.map(t=>`<option ${d.typ===t?'selected':''}>${t}</option>`).join('')}</select></div>
@@ -1770,48 +1829,63 @@ function noDevBlock(d,i){
       <div><label class="f">IMEI / Seriennummer</label><input class="in" id="dev${i}_imei" value="${esc(d.imei)}" placeholder="optional"></div>
       <div><label class="f">Reparaturfach-Nr.</label><input class="in" id="dev${i}_fach" value="${esc(d.fach)}" placeholder="z. B. Fach 42"></div>
       <div><label class="f">Referenznummer</label><input class="in" id="dev${i}_ref" value="${esc(d.ref)}" placeholder="Kundenreferenz / Auftragsnr."></div>
-    </div>
-    <label class="f" style="margin-top:12px">Fehler / Reparaturposition(en) *</label>
+    </div>`;
+}
+function noFehlerFields(d,i){
+  return `<label class="f" style="margin-top:12px">Fehler / Reparaturposition(en) *</label>
     ${devPositions(d).map((p,j)=>noPosBlock(i,j,p,devPositions(d).length)).join('')}
     <button type="button" class="btn sm" style="margin-top:8px" onclick="noAddPosition(${i})">+ Weiteren Fehler hinzufügen</button>
     <div class="muted" style="font-size:11px;margin-top:6px">Nicht in der Liste? Fehler einfach eintippen – wird automatisch gespeichert.</div>
     <label class="f" style="margin-top:12px">Fehlerbeschreibung (Kundenangabe – erscheint auf dem Beleg)</label>
-    <textarea class="in" id="dev${i}_fehler" rows="2" placeholder="z. B. Gerät wird heiß, schaltet sich selbstständig aus, lädt zeitweise nicht …">${esc(d.fehler||'')}</textarea>
-    ${devPositions(d).length>1?`<div class="between" style="margin-top:10px;padding-top:8px;border-top:1px solid var(--line);font-weight:700"><span>Gerät ${i+1} gesamt</span><span class="mono">${eur(devTotal(d))}</span></div>`:''}
-    <div class="grid g2" style="margin-top:10px"><div><label class="f">Garantie (Monate)</label><select class="in" id="dev${i}_warranty">${[6,12,24,0].map(w=>`<option ${(+d.warranty)===w?'selected':''}>${w}</option>`).join('')}</select></div>
-      <div><label class="f">Techniker (dieses Gerät)</label><select class="in" id="dev${i}_tech"><option value="">— wie Auftrag —</option>${(S.users||[]).map(u=>`<option value="${u.id}" ${d.technikerId===u.id?'selected':''}>${esc(u.name)}${u.role?' ('+(ROLE_LABEL[u.role]||u.role)+')':''}</option>`).join('')}</select></div></div>
-    ${noAnnahmeBlock(d,i)}
-    <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line)">
+    <textarea class="in" id="dev${i}_fehler" rows="3" placeholder="z. B. Gerät wird heiß, schaltet sich selbstständig aus, lädt zeitweise nicht …">${esc(d.fehler||'')}</textarea>
+    ${devPositions(d).length>1?`<div class="between" style="margin-top:10px;padding-top:8px;border-top:1px solid var(--line);font-weight:700"><span>Gerät ${i+1} gesamt</span><span class="mono">${eur(devTotal(d))}</span></div>`:''}`;
+}
+function noLockBlock(d,i){
+  return `<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line)">
       <label class="f">Displaysperre / Entsperrmethode *</label>
-      <div class="row" id="dev${i}_lockrow" style="margin-top:4px">${['Kein','PIN','Muster'].map(l=>{const cur=normLock(d.lock);return `<label class="chip ${cur===l?'on':''}" style="cursor:pointer"><input type="radio" name="dev${i}_lock" value="${l}" ${cur===l?'checked':''} onchange="noLockPick(${i},'${l}')" style="display:none">${l==='Kein'?'Kein Sperrcode':(l==='PIN'?'PIN / Passwort':'Muster')}</label>`;}).join('')}</div>
+      <div class="row" id="dev${i}_lockrow" style="margin-top:4px">${['Kein','PIN','Muster'].map(l=>{const cur=normLock(d.lock);const sel=d.lockSet&&cur===l;return `<label class="chip ${sel?'on':''}" style="cursor:pointer"><input type="radio" name="dev${i}_lock" value="${l}" ${sel?'checked':''} onclick="noLockPick(${i},'${l}')" style="display:none">${l==='Kein'?'Kein Sperrcode':(l==='PIN'?'PIN / Passwort':'Muster')}</label>`;}).join('')}</div>
       <div id="dev${i}_lockpin" style="${normLock(d.lock)==='PIN'?'':'display:none'};margin-top:10px"><label class="f">PIN / Passwort (Hinweis für die Werkstatt)</label><input class="in" id="dev${i}_lockval" value="${esc(normLock(d.lock)==='PIN'?(d.lockval||''):'')}" placeholder="z. B. 0000"></div>
       <div id="dev${i}_lockpat" style="${normLock(d.lock)==='Muster'?'':'display:none'};margin-top:10px">
         <label class="f">Entsperrmuster — mit gedrückter Maus/Finger über die Punkte ziehen</label>
         <div style="margin-top:6px">${patternSVG(i,normLock(d.lock)==='Muster'?(d.lockval||''):'')}</div>
         <div class="row" style="margin-top:8px;align-items:center;gap:10px"><button type="button" class="btn sm gho" onclick="patReset(${i})">Zurücksetzen</button><span class="muted" style="font-size:12px" id="dev${i}_patlbl">${normLock(d.lock)==='Muster'&&d.lockval?('Muster: '+esc(d.lockval)):'Noch kein Muster'}</span></div>
       </div>
-    </div>
+    </div>`;
+}
+function noDevBlock(d,i){
+  return `<div class="card" style="background:var(--soft);border:0;margin-top:12px">
+    <div class="between"><b>Gerät ${i+1}</b>${i>0?`<button class="btn sm gho" onclick="noRemoveDevice(${i})">Entfernen</button>`:''}</div>
+    ${noGeraetFields(d,i)}
+    ${noFehlerFields(d,i)}
+    ${noAnnahmeBlock(d,i)}
+    ${noLockBlock(d,i)}
   </div>`;
 }
-function renderNewOrder(){
-  const m=document.getElementById('main'); if(!m||!NO)return;
-  noEnsurePositions();
-  const _sy=window.scrollY;
-  document.querySelectorAll('#nav a').forEach(a=>a.classList.remove('active'));
-  document.getElementById('side').classList.remove('show');
-  const c=NO; const techs=S.users||[]; const isQ=NO.mode==='angebot';
-  m.innerHTML=`
-  <datalist id="allDevices">${catBrands().flatMap(b=>catModelNames(b).map(mm=>`<option value="${esc(b+' '+mm)}"></option>`)).join('')}</datalist>
-  <datalist id="allRepairs">${catRepairs().map(r=>`<option value="${esc(r)}"></option>`).join('')}</datalist>
-  <div id="noForm">
-   <div class="between" style="flex-wrap:wrap;gap:12px">
-     <div><button class="btn sm gho" onclick="noCancel()">← Zurück</button>
-       <h1 class="h1" style="margin-top:8px">${isQ?(NO.quoteEditId?'Angebot bearbeiten':'Neues Angebot'):(NO.editId?'Auftrag bearbeiten':'Neuer Auftrag')}</h1>
-       <p class="sub">${isQ?'Kostenvoranschlag für den Kunden':('Reparatur-Eingang'+(NO.editId?'':' · wird automatisch als Entwurf gesichert'))}</p></div>
-     <div class="row">${isQ?`<button class="btn" onclick="noQuoteSave('entwurf')">Als Entwurf speichern</button><button class="btn pri cta" onclick="noQuoteSave('offen')">Angebot erstellen</button>`:`${NO.editId?'':'<button class="btn" onclick="noSaveExit()">Als Entwurf speichern</button>'}<button class="btn pri cta" onclick="noFinalize()">${NO.editId?'Speichern':'Auftrag erstellen'}</button>`}</div>
-   </div>
-
-   <div class="card" style="margin-top:16px"><b>Kunde</b>
+/* v9 #8: geführte Auftragsannahme (Kunde → Gerät → Fehler → Zustand → Auftrag) */
+const WSTEPS=[[1,'Kunde'],[2,'Gerät'],[3,'Fehler'],[4,'Zustand'],[5,'Auftrag']];
+function noStepMiss(step){ const miss=[];
+  if(step===1){ if(!(NO.vorname||NO.nachname||NO.firma))miss.push({t:'Kundenname',el:'no_vorname'}); if((NO.tel||'').replace(/\D/g,'').length<5)miss.push({t:'Telefonnummer',el:'no_tel'}); }
+  if(step===2){ let any=false; NO.devices.forEach((d,i)=>{ if(i>0&&!inUseDev(d))return; if(d.brand&&d.model)any=true; if(!d.brand||!d.model)miss.push({t:(NO.devices.length>1?('Gerät '+(i+1)+': '):'')+'Hersteller & Modell',el:'dev'+i+'_model'}); }); if(!any&&!miss.length)miss.push({t:'mindestens ein Gerät',el:'dev0_brand'}); }
+  if(step===3){ NO.devices.forEach((d,i)=>{ if(i>0&&!inUseDev(d))return; if(!devPositions(d).some(p=>p.reparatur))miss.push({t:(NO.devices.length>1?('Gerät '+(i+1)+': '):'')+'Fehler / Reparatur',el:'dev'+i+'_pos0_reparatur'}); }); }
+  if(step===4){ NO.devices.forEach((d,i)=>{ if(i>0&&!inUseDev(d))return; const pre=NO.devices.length>1?('Gerät '+(i+1)+': '):''; const z=d.zustand||{}; if(!(((z.display||[]).length)&&((z.rueck||[]).length)&&((z.rahmen||[]).length)))miss.push({t:pre+'Gerätezustand',el:'dev'+i+'_annahme'}); if(!((d.zubehoer||[]).length))miss.push({t:pre+'Mitgegebenes Zubehör',el:'dev'+i+'_zublabel'}); if(!d.lockSet)miss.push({t:pre+'Displaysperre',el:'dev'+i+'_lockrow'}); else if(normLock(d.lock)==='PIN'&&!((d.lockval||'').trim()))miss.push({t:pre+'PIN / Passwort',el:'dev'+i+'_lockval'}); else if(normLock(d.lock)==='Muster'&&!((d.lockval||'').trim()))miss.push({t:pre+'Entsperrmuster einzeichnen',el:'dev'+i+'_lockpat'}); }); }
+  return miss; }
+function noStepComplete(step){ return noStepMiss(step).length===0; }
+function noStepOfMiss(m){ const el=(m&&m.el)||''; if(el.indexOf('no_')===0)return 1; if(/_model$|_brand$|_typ$/.test(el))return 2; if(el.indexOf('_pos')>=0||el.indexOf('_fehler')>=0)return 3; if(el.indexOf('_annahme')>=0||el.indexOf('_zub')>=0||el.indexOf('_lock')>=0)return 4; return 5; }
+function noGo(step){ noCollect(); NO.step=Math.max(1,Math.min(5,step)); renderNewOrder(); window.scrollTo(0,0); }
+function noBack(){ noGo((NO.step||1)-1); }
+function noNext(){ noCollect(); const miss=noStepMiss(NO.step||1); if(miss.length){ noShowMissing(miss); return; } noGo((NO.step||1)+1); }
+function noJumpAndShow(miss){ if(!miss||!miss.length)return; if(NO.mode!=='angebot'){ const stp=noStepOfMiss(miss[0]); if(stp!==NO.step){ NO.step=stp; renderNewOrder(); } miss=miss.filter(m=>noStepOfMiss(m)===NO.step); } noShowMissing(miss); }
+function noSummary(n){
+  const name=((NO.vorname+' '+NO.nachname).trim())||NO.firma||'';
+  const chip=(lbl,txt)=>`<div class="card" style="margin-top:10px;padding:10px 12px;background:var(--soft);border:0"><div class="between" style="gap:10px"><div style="min-width:0"><div style="font-size:11px;font-weight:800;color:var(--green)">${lbl} ✓</div><div style="font-size:13px;margin-top:2px;word-break:break-word">${txt||'—'}</div></div><button class="btn sm gho" style="flex:none" onclick="noGo(${n})">Ändern</button></div></div>`;
+  if(n===1)return chip('KUNDE',esc(name)+(NO.tel?' · '+esc(NO.tel):''));
+  if(n===2)return chip('GERÄT',NO.devices.filter(d=>d.brand||d.model).map(d=>esc([d.brand,d.model].filter(Boolean).join(' '))).join(' · ')||'—');
+  if(n===3)return chip('FEHLER',NO.devices.filter(d=>d.brand||d.model).map(d=>{const t=devPositions(d).map(p=>esc(p.reparatur)).filter(Boolean).join(', ');const f=(d.fehler||'').trim();return (t||'—')+(f?(' — '+esc(f)):'');}).join(' · '));
+  if(n===4)return chip('ZUSTAND',NO.devices.filter(d=>d.brand||d.model).map(d=>{const z=esc(zustandText(d))||'—';const zu=esc(zubehoerText(d));return z+(zu?(' · Zubehör: '+zu):'');}).join(' | '));
+  return '';
+}
+function noCustomerContent(){ const c=NO;
+  return `<b>Kunde</b>
      <label class="f" style="margin-top:10px">Bestehenden Kunden suchen</label>
      <input class="in" id="no_search" list="custList" placeholder="Name oder Telefonnummer…" onchange="noPickCustomer()">
      <datalist id="custList">${S.cust.map(x=>`<option value="${esc(x.name+' · '+x.tel)}"></option>`).join('')}</datalist>
@@ -1826,30 +1900,20 @@ function renderNewOrder(){
        <div><label class="f">PLZ</label><input class="in" id="no_plz" value="${esc(c.plz)}" placeholder="72336" inputmode="numeric" oninput="geoPlz(this.value)"></div>
        <div><label class="f">Stadt</label><input class="in" id="no_stadt" list="no_stadt_list" value="${esc(c.stadt)}" placeholder="wird per PLZ vorgeschlagen"><datalist id="no_stadt_list"></datalist></div>
        <div style="grid-column:1/-1"><label class="f">Adresse (Straße + Hausnr.)</label><input class="in" id="no_adr" list="no_adr_list" value="${esc(c.adr)}" placeholder="Straße tippen – Vorschläge erscheinen, dann Hausnr. ergänzen" oninput="geoStreet(this.value)"><datalist id="no_adr_list"></datalist></div>
-     </div>
-   </div>
-
-   <div class="card" style="margin-top:16px"><b>Gerät &amp; Fehlerbeschreibung</b>
-     ${NO.devices.map((d,i)=>noDevBlock(d,i)).join('')}
-     ${NO.devices.length<4?`<button class="btn" style="margin-top:12px;width:100%" onclick="noAddDevice()">+ Weiteres Gerät hinzufügen (optional)</button>`:''}
-     <label class="f" style="margin-top:14px">Detaillierte Informationen &amp; Notizen</label>
-     <textarea class="in" id="no_notes" rows="3" placeholder="z. B. Daten sichern, Schutzfolie aufbringen, Kundenhinweise, technische Hinweise…">${esc(NO.notes)}</textarea>
-   </div>
-
-   ${isQ?`<div class="card" style="margin-top:16px"><b>Angebots-Details</b>
-     <div class="grid g2" style="margin-top:10px">
-       <div><label class="f">Priorität</label><select class="in" id="no_prio">${PRIOS.map(p=>`<option ${NO.prio===p?'selected':''}>${p}</option>`).join('')}</select></div>
-       <div><label class="f">Angebot gültig bis</label><input class="in" id="no_due" type="date" value="${NO.due}"></div>
-     </div>
-     <div class="note" style="margin-top:12px">Der Kunde erhält einen unverbindlichen Kostenvoranschlag. Nimmt er an, wird daraus mit einem Klick ein Auftrag.</div>
-   </div>`:`<div class="card" style="margin-top:16px"><b>Auftragsdetails</b>
+     </div>`;
+}
+function noAuftragContent(){ const techs=S.users||[];
+  return `<b>Auftrag abschließen</b>
+     ${NO.editId?'':`<div class="note" style="margin-top:10px;font-size:12.5px">Angenommen von <b>${esc(curUserName())}</b> · Erfasst ${esc(fmtDateTime(new Date().toISOString()))} <span class="muted">(automatisch aus deinem Login)</span></div>`}
      <div class="grid g2" style="margin-top:10px">
        <div><label class="f">Priorität *</label><select class="in" id="no_prio">${PRIOS.map(p=>`<option ${NO.prio===p?'selected':''}>${p}</option>`).join('')}</select></div>
-       <div><label class="f">Techniker zuweisen (optional)</label><select class="in" id="no_tech"><option value="">Keinem zugewiesen</option>${techs.map(u=>`<option value="${u.id}" ${NO.technikerId===u.id?'selected':''}>${esc(u.name)} (${ROLE_LABEL[u.role]})</option>`).join('')}</select></div>
+       <div><label class="f">Zuständiger Techniker / Bearbeiter</label><select class="in" id="no_tech"><option value="">— noch nicht zugewiesen —</option>${techs.map(u=>`<option value="${u.id}" ${NO.technikerId===u.id?'selected':''}>${esc(u.name)} (${ROLE_LABEL[u.role]})</option>`).join('')}</select></div>
        <div><label class="f">Fällig bis</label><input class="in" id="no_due" type="date" value="${NO.due}"></div>
        <div><label class="f">Termin</label><div class="row">${[['kein','Kein Termin'],['termin','Termin vereinbaren']].map(t=>`<label class="chip ${NO.terminMode===t[0]?'on':''}" style="cursor:pointer"><input type="radio" name="no_termin" value="${t[0]}" ${NO.terminMode===t[0]?'checked':''} onchange="noTermin()" style="display:none">${t[1]}</label>`).join('')}</div></div>
        <div id="no_apptwrap" style="${NO.terminMode==='termin'?'':'display:none'}"><label class="f">Termin-Datum</label><input class="in" id="no_appt" type="date" value="${NO.appt}"></div>
      </div>
+     <label class="f" style="margin-top:14px">Detaillierte Informationen &amp; Notizen</label>
+     <textarea class="in" id="no_notes" rows="3" placeholder="z. B. Daten sichern, Schutzfolie aufbringen, Kundenhinweise…">${esc(NO.notes)}</textarea>
      <div class="divider"></div>
      <label class="f">Unterschrift des Kunden (Annahme)</label>
      <div class="row" style="align-items:center;gap:12px;flex-wrap:wrap">
@@ -1858,16 +1922,86 @@ function renderNewOrder(){
        <button class="btn" onclick="noSignQR()">QR-Code (Kundenhandy)</button>
        <button class="btn" onclick="noSignKiosk()">Kiosk-Modus</button>
        ${NO.sig?`<button class="btn gho" onclick="noCollect();NO.sig='';renderNewOrder()">Entfernen</button>`:''}
+     </div>`;
+}
+function renderNewOrder(){
+  const m=document.getElementById('main'); if(!m||!NO)return;
+  noEnsurePositions();
+  const _sy=window.scrollY;
+  document.querySelectorAll('#nav a').forEach(a=>a.classList.remove('active'));
+  document.getElementById('side').classList.remove('show');
+  const c=NO; const techs=S.users||[]; const isQ=NO.mode==='angebot';
+  const dls=`<datalist id="allDevices">${catBrands().flatMap(b=>catModelNames(b).map(mm=>`<option value="${esc(b+' '+mm)}"></option>`)).join('')}</datalist>
+  <datalist id="allRepairs">${catRepairs().map(r=>`<option value="${esc(r)}"></option>`).join('')}</datalist>`;
+  if(isQ){
+    m.innerHTML=dls+`<div id="noForm">
+   <div class="between" style="flex-wrap:wrap;gap:12px">
+     <div><button class="btn sm gho" onclick="noCancel()">← Zurück</button>
+       <h1 class="h1" style="margin-top:8px">${NO.quoteEditId?'Angebot bearbeiten':'Neues Angebot'}</h1>
+       <p class="sub">Kostenvoranschlag für den Kunden</p></div>
+     <div class="row"><button class="btn" onclick="noQuoteSave('entwurf')">Als Entwurf speichern</button><button class="btn pri cta" onclick="noQuoteSave('offen')">Angebot erstellen</button></div>
+   </div>
+   <div class="card" style="margin-top:16px">${noCustomerContent()}</div>
+   <div class="card" style="margin-top:16px"><b>Gerät &amp; Fehlerbeschreibung</b>
+     ${NO.devices.map((d,i)=>noDevBlock(d,i)).join('')}
+     ${NO.devices.length<4?`<button class="btn" style="margin-top:12px;width:100%" onclick="noAddDevice()">+ Weiteres Gerät hinzufügen (optional)</button>`:''}
+     <label class="f" style="margin-top:14px">Detaillierte Informationen &amp; Notizen</label>
+     <textarea class="in" id="no_notes" rows="3" placeholder="Kundenhinweise, technische Hinweise…">${esc(NO.notes)}</textarea>
+   </div>
+   <div class="card" style="margin-top:16px"><b>Angebots-Details</b>
+     <div class="grid g2" style="margin-top:10px">
+       <div><label class="f">Priorität</label><select class="in" id="no_prio">${PRIOS.map(p=>`<option ${NO.prio===p?'selected':''}>${p}</option>`).join('')}</select></div>
+       <div><label class="f">Angebot gültig bis</label><input class="in" id="no_due" type="date" value="${NO.due}"></div>
      </div>
-   </div>`}
-
+     <div class="note" style="margin-top:12px">Der Kunde erhält einen unverbindlichen Kostenvoranschlag. Nimmt er an, wird daraus mit einem Klick ein Auftrag.</div>
+   </div>
    <div class="row" style="margin:18px 0 48px;justify-content:flex-end;flex-wrap:wrap;gap:10px">
      <button class="btn gho" onclick="noCancel()">Abbrechen</button>
-     ${isQ?`<button class="btn" onclick="noQuoteSave('entwurf')">Als Entwurf speichern</button><button class="btn pri cta" onclick="noQuoteSave('offen')">Angebot erstellen</button>`:`${NO.editId?'':'<button class="btn" onclick="noSaveExit()">Als Entwurf speichern</button>'}<button class="btn pri cta" onclick="noFinalize()">${NO.editId?'Speichern':'Auftrag erstellen'}</button>`}
+     <button class="btn" onclick="noQuoteSave('entwurf')">Als Entwurf speichern</button><button class="btn pri cta" onclick="noQuoteSave('offen')">Angebot erstellen</button>
    </div>
   </div>`;
+    const fq=document.getElementById('noForm'); if(fq){fq.addEventListener('input',noSaveDraftDebounced);fq.addEventListener('change',noSaveDraftDebounced);}
+    NO.devices.forEach((d,i)=>{if(normLock(d.lock)==='Muster')patBind(i);});
+    paintIcons(); window.scrollTo(0,_sy); return;
+  }
+  /* ---- Auftrag: geführter 5-Schritt-Ablauf ---- */
+  if(!NO.step)NO.step=1; const step=NO.step;
+  const bar=WSTEPS.map(([n,lbl],ix)=>{const active=n===step;const ok=noStepComplete(n);
+    return (ix?`<span style="flex:none;color:var(--line);align-self:center;font-size:16px">›</span>`:'')+`<button type="button" onclick="noGo(${n})" style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:0;cursor:pointer;padding:2px">
+      <span style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;${active?'background:var(--green);color:#fff':(ok?'background:#e9f5ec;color:var(--green);border:1px solid var(--green)':'background:var(--soft);color:var(--ink2);border:1px solid var(--line)')}">${ok&&!active?'✓':n}</span>
+      <span style="font-size:11px;font-weight:${active?'800':'600'};color:${active?'var(--ink)':'var(--ink2)'};white-space:nowrap">${lbl}</span></button>`;
+  }).join('');
+  let content='';
+  if(step===1){ content=noCustomerContent(); }
+  else if(step===2){ content=`<b>Gerät</b><p class="muted" style="font-size:12px;margin-top:2px">Gerätetyp, Hersteller und Modell wählen.</p>`
+     +NO.devices.map((d,i)=>`<div class="card" style="background:var(--soft);border:0;margin-top:12px"><div class="between"><b>Gerät ${i+1}</b>${i>0?`<button class="btn sm gho" onclick="noRemoveDevice(${i})">Entfernen</button>`:''}</div>${noGeraetFields(d,i)}</div>`).join('')
+     +(NO.devices.length<4?`<button class="btn" style="margin-top:12px;width:100%" onclick="noAddDevice()">+ Weiteres Gerät hinzufügen (optional)</button>`:''); }
+  else if(step===3){ content=`<b>Fehler</b><p class="muted" style="font-size:12px;margin-top:2px">Was ist das Problem? Fehlerart wählen und beschreiben.</p>`
+     +NO.devices.map((d,i)=>{ if(i>0&&!inUseDev(d))return ''; return `<div class="card" style="background:var(--soft);border:0;margin-top:12px"><b>Gerät ${i+1}: ${esc([d.brand,d.model].filter(Boolean).join(' '))||'—'}</b>${noFehlerFields(d,i)}</div>`; }).join(''); }
+  else if(step===4){ content=`<b>Zustand &amp; Zubehör</b><p class="muted" style="font-size:12px;margin-top:2px">Annahmezustand dokumentieren, Zubehör und Displaysperre erfassen.</p>`
+     +NO.devices.map((d,i)=>{ if(i>0&&!inUseDev(d))return ''; return `<div class="card" style="background:var(--soft);border:0;margin-top:12px"><b>Gerät ${i+1}: ${esc([d.brand,d.model].filter(Boolean).join(' '))||'—'}</b>${noAnnahmeBlock(d,i)}${noLockBlock(d,i)}</div>`; }).join(''); }
+  else { content=noAuftragContent(); }
+  let summaries=''; for(let n=1;n<step;n++)summaries+=noSummary(n);
+  const footer=`<div class="row" style="margin:16px 0 48px;gap:10px;flex-wrap:wrap;align-items:center">
+     <button class="btn gho" onclick="noCancel()">Abbrechen</button>
+     ${NO.editId?'':`<button class="btn" onclick="noSaveExit()">Als Entwurf speichern</button>`}
+     <span style="flex:1"></span>
+     ${step>1?`<button class="btn" onclick="noBack()">← Zurück</button>`:''}
+     ${step<5?`<button class="btn pri cta" onclick="noNext()">Weiter →</button>`:`<button class="btn pri cta" onclick="noFinalize()">${NO.editId?'Speichern':'Auftrag erstellen'}</button>`}
+   </div>`;
+  m.innerHTML=dls+`<div id="noForm">
+   <div class="between" style="flex-wrap:wrap;gap:12px">
+     <div><button class="btn sm gho" onclick="noCancel()">← Abbrechen</button>
+       <h1 class="h1" style="margin-top:8px">${NO.editId?'Auftrag bearbeiten':'Neuer Auftrag'}</h1>
+       <p class="sub">Reparatur-Eingang · Schritt ${step} von 5</p></div>
+   </div>
+   <div class="card" style="margin-top:14px"><div class="row" style="gap:2px;align-items:flex-start">${bar}</div></div>
+   ${summaries}
+   <div class="card" style="margin-top:14px">${content}</div>
+   ${footer}
+  </div>`;
   const f=document.getElementById('noForm'); if(f){f.addEventListener('input',noSaveDraftDebounced);f.addEventListener('change',noSaveDraftDebounced);}
-  NO.devices.forEach((d,i)=>{if(normLock(d.lock)==='Muster')patBind(i);});
+  if(step===4){ NO.devices.forEach((d,i)=>{if(normLock(d.lock)==='Muster')patBind(i);}); }
   paintIcons(); window.scrollTo(0,_sy);
 }
 views.neworder=function(){ if(!NO)NO=blankForm(); renderNewOrder(); };
@@ -2077,6 +2211,7 @@ function portalSnapshot(o){ const c=cust(o.cid); const hist=(o.statusHistory||[]
     nr:o.nr, customerName:(c.name||''), device:oDevices(o).map(d=>[d.brand,d.model].filter(Boolean).join(' ')).join(' + '), issue:oIssueLabel(o),
     devicesDetail:oDevices(o).map(d=>({name:[d.brand,d.model].filter(Boolean).join(' ')||'Gerät',zustand:zustandText(d),zubehoer:zubehoerText(d)})),
     status:o.status, statusLabel:statusLabel(o.status), statusColor:statusColor(o.status), timeline:hist,
+    repResult:o.repResult||'', repResultLabel:(o.repResult?(REP_RESULT_LABEL[o.repResult]||o.repResult):''), repResultColor:(o.repResult?repResultColor(o.repResult):''), repResultReason:o.repResultReason||'',
     price:oTotal(o), warranty:o.warranty||0, appt:o.appt||'', readyAt:o.readyAt||'', created:o.created||'',
     kva:o.kva||null, messages:ensureComms(o).filter(m=>!m.internal).map(m=>({from:m.dir==='in'?'kunde':'werkstatt',text:m.text,at:m.at,kind:m.kind})),
     updatedAt:new Date().toISOString() }; }
@@ -2166,13 +2301,13 @@ function labelPanelInner(){const cfg=ensureLabelCfg();const tpls=ensureLabelTpls
    ${tpls.length?`<div class="muted" style="font-size:12px;margin-top:6px">Vorlagen: ${tpls.map(t=>`${esc(t.name)} <a onclick="labelDelTpl('${qa(t.name)}')" style="color:#c0392b;cursor:pointer">✕</a>`).join(' · ')}</div>`:''}`; }
 function labelSettingsCard(){ return `<div class="card" style="margin-top:16px"><b>🏷️ Etikettendruck</b><p class="muted" style="font-size:13px;margin:4px 0 10px">Etikettengröße, Ränder, Inhalte und Vorlagen einstellen. Vorschau in Originalgröße; Testdruck ohne echten Auftrag.</p><div id="labelPanel">${labelPanelInner()}</div></div>`; }
 /* v2 Doc #5: Zustand/Zubehör als lesbarer Text (Beleg/Portal/Detail) */
-function zustandText(d){const z=(d&&d.zustand)||{};const parts=[];(typeof ZUSTAND_SECTIONS!=='undefined'?ZUSTAND_SECTIONS:[]).forEach(s=>{const a=((z[s.key])||[]).slice();if(!a.length)return;let str=a.join(', ');if(s.sonst&&d.zsonst&&d.zsonst[s.key]&&a.indexOf('Sonstiges')>=0)str=str.replace('Sonstiges','Sonstiges: '+d.zsonst[s.key]);parts.push(s.label+': '+str);});return parts.join(' · ');}
+function zustandText(d){const z=(d&&d.zustand)||{};const parts=[];(typeof ZUSTAND_SECTIONS!=='undefined'?ZUSTAND_SECTIONS:[]).forEach(s=>{const a=((z[s.key])||[]).slice();if(!a.length)return;let str=a.join(', ');const so=s.sonstOpt||'Sonstiges';if(s.sonst&&d.zsonst&&d.zsonst[s.key]&&a.indexOf(so)>=0)str=str.replace(so,so+': '+d.zsonst[s.key]);parts.push(s.label+': '+str);});return parts.join(' · ');}
 function zubehoerText(d){const a=((d&&d.zubehoer)||[]).slice();let s=a.join(', ');if(d&&d.zubehoerNote)s+=(s?' · ':'')+d.zubehoerNote;return s;}
 function fotoZoom(img){const w=window.open('');if(w)w.document.write('<title>Foto</title><body style="margin:0;background:#111"><img src="'+img.src+'" style="max-width:100%;display:block;margin:auto"></body>');}
 function orderAnnahmeDetail(d){const zt=zustandText(d),zu=zubehoerText(d),ft=(d.fotos||[]);let h='';if(zt)h+=`<div style="font-size:12px;margin-top:4px;word-break:break-word"><b>Zustand:</b> ${esc(zt)}</div>`;if(zu)h+=`<div style="font-size:12px;margin-top:2px;word-break:break-word"><b>Mitgegeben:</b> ${esc(zu)}</div>`;if(ft.length)h+=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${ft.map(f=>`<img src="${f.src}" onclick="fotoZoom(this)" style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:1px solid var(--line);cursor:zoom-in">`).join('')}</div>`;return h;}
 function devDetailRows(o){ return oDevices(o).map((d,i)=>{const meta=[d.imei?'IMEI/SN: '+esc(d.imei):'',d.fach?'Fach: '+esc(d.fach):'',lockLabel(d)?'Sperre: '+esc(lockLabel(d)):'',(d.technikerId&&techName(d.technikerId))?'Techniker: '+esc(techName(d.technikerId)):''].filter(Boolean).join(' · ');const name=[d.brand,d.model].filter(Boolean).join(' ')||'Gerät';const fb=(d.fehler||'').trim();return `<div style="font-size:12px;color:#333;margin-top:5px"><b>Gerät ${i+1}: ${esc(name)}</b>${meta?`<span style="color:#666"> · ${meta}</span>`:''}${fb?`<div style="color:#333;margin-top:2px;word-break:break-word"><b>Fehlerbeschreibung:</b> ${esc(fb).replace(/\n/g,'<br>')}</div>`:''}</div>`;}).join(''); }
 /* v11 #11: prominente Geräte-Blöcke für den Kundenbeleg (Hersteller+Modell fett & groß, je Gerät ein Block) */
-function receiptDeviceBlocks(o){ const devs=oDevices(o); return devs.map((d,i)=>{const name=[d.brand,d.model].filter(Boolean).join(' ')||'Gerät';const meta=[d.imei?'IMEI/SN: '+esc(d.imei):'',d.fach?'Fach: '+esc(d.fach):'',lockLabel(d)?'Sperre: '+esc(lockLabel(d)):'',(d.technikerId&&techName(d.technikerId))?'Techniker: '+esc(techName(d.technikerId)):''].filter(Boolean).join(' · ');const fb=(d.fehler||'').trim();const pos=devPositions(d).map(p=>`<div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:3px 0"><span>${esc(p.reparatur)||'Reparatur'}${p.qual?` <span style="color:#6b7280 !important">(${esc(p.qual)})</span>`:''}</span><span style="font-family:monospace;white-space:nowrap">${eur(p.price)}</span></div>`).join('');return `<div class="rc-dev">${devs.length>1?`<div class="rc-dev-idx">Gerät ${i+1} von ${devs.length}</div>`:''}<div class="rc-dev-name">${esc(name)}</div>${meta?`<div class="rc-dev-meta">${meta}</div>`:''}${fb?`<div class="rc-dev-fb"><b>Fehlerbeschreibung:</b> ${esc(fb).replace(/\n/g,'<br>')}</div>`:''}<div style="margin-top:6px;border-top:1px solid #eee;padding-top:4px">${pos}</div>${(function(){const zt=zustandText(d),zu=zubehoerText(d),ft=(d.fotos||[]);let h='';if(zt)h+='<div class="rc-dev-cond" style="font-size:12px;margin-top:6px"><b>Zustand bei Annahme:</b> '+esc(zt)+'</div>';if(zu)h+='<div class="rc-dev-acc" style="font-size:12px;margin-top:2px"><b>Mitgegeben:</b> '+esc(zu)+'</div>';if(ft.length)h+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:5px">'+ft.map(f=>'<img src="'+f.src+'" style="width:46px;height:46px;object-fit:cover;border-radius:6px;border:1px solid #ddd">').join('')+'</div>';return h;})()}</div>`;}).join(''); }
+function receiptDeviceBlocks(o){ const devs=oDevices(o); return devs.map((d,i)=>{const name=[d.brand,d.model].filter(Boolean).join(' ')||'Gerät';const meta=[d.imei?'IMEI/SN: '+esc(d.imei):'',d.fach?'Fach: '+esc(d.fach):'',lockLabel(d)?'Sperre: '+esc(lockLabel(d)):'',(d.technikerId&&techName(d.technikerId))?'Techniker: '+esc(techName(d.technikerId)):''].filter(Boolean).join(' · ');const fb=(d.fehler||'').trim();const pos=devPositions(d).map(p=>`<div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:3px 0"><span>${esc(p.reparatur)||'Reparatur'}${p.qual?` <span style="color:#6b7280 !important">(${esc(p.qual)})</span>`:''}</span><span style="font-family:monospace;white-space:nowrap">${eur(p.price)}</span></div>`).join('');return `<div class="rc-dev">${devs.length>1?`<div class="rc-dev-idx">Gerät ${i+1} von ${devs.length}</div>`:''}<div class="rc-dev-name">${esc(name)}</div>${meta?`<div class="rc-dev-meta">${meta}</div>`:''}${(function(){const ft2=devPositions(d).map(p=>esc(p.reparatur)).filter(Boolean).join(' · ');return (ft2||fb)?('<div class="rc-dev-fb" style="margin-top:4px"><b>Fehlerbeschreibung:</b>'+(ft2?' '+ft2:'')+(fb?('<div style="margin-top:2px">'+esc(fb).replace(/\n/g,'<br>')+'</div>'):'')+'</div>'):'';})()}<div style="margin-top:6px;border-top:1px solid #eee;padding-top:4px">${pos}</div>${(function(){const zt=zustandText(d),zu=zubehoerText(d),ft=(d.fotos||[]);let h='';if(zt)h+='<div class="rc-dev-cond" style="font-size:12px;margin-top:6px"><b>Zustand bei Annahme:</b> '+esc(zt)+'</div>';if(zu)h+='<div class="rc-dev-acc" style="font-size:12px;margin-top:2px"><b>Mitgegeben:</b> '+esc(zu)+'</div>';if(ft.length)h+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:5px">'+ft.map(f=>'<img src="'+f.src+'" style="width:46px;height:46px;object-fit:cover;border-radius:6px;border:1px solid #ddd">').join('')+'</div>';return h;})()}</div>`;}).join(''); }
 function sigBlock(o){ if(!o.sig)return '';
   const conf=o.sigConsents?'☑ AGB gelesen &amp; akzeptiert &nbsp;&nbsp; ☑ Hinweis zur Datensicherung bestätigt':'Der Kunde hat den Auftrag bestätigt.';
   return `<div style="margin-top:18px;padding-top:12px;border-top:1px solid #ddd">
@@ -2370,76 +2505,100 @@ function ensureTermine(){ if(!Array.isArray(S.termine))S.termine=[]; return S.te
 function _hhmm2min(s){ var m=/^(\d{1,2}):(\d{2})$/.exec(s||''); return m?(+m[1]*60+ +m[2]):null; }
 function _min2hhmm(m){ return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); }
 function apptRanges(dateStr){ var d=new Date(dateStr+'T00:00:00'); if(isNaN(d))return []; var wd=(d.getDay()+6)%7; var hd=ensureHours()[wd]; if(!hd||hd.closed)return []; var out=[]; [hd.r1,hd.r2].forEach(function(r){ if(r&&r.on&&r.from&&r.to){ var a=_hhmm2min(r.from),b=_hhmm2min(r.to); if(a!=null&&b!=null&&b>a)out.push([a,b]); } }); return out; }
-function apptBusy(dateStr,excludeId){ return ensureTermine().filter(function(t){return t.date===dateStr&&t.id!==excludeId;}).map(function(t){var a=_hhmm2min(t.start);return a==null?null:[a,a+(+t.dur||30)];}).filter(Boolean); }
+function apptBusy(dateStr,excludeId){ return ensureTermine().filter(function(t){return t.date===dateStr&&t.id!==excludeId&&t.status!=='storniert';}).map(function(t){var a=_hhmm2min(t.start);return a==null?null:[a,a+(+t.dur||30)];}).filter(Boolean); }
 function freeSlots(dateStr,dur,excludeId){ dur=+dur||30; var ranges=apptRanges(dateStr); if(!ranges.length)return []; var busy=apptBusy(dateStr,excludeId); var slots=[]; ranges.forEach(function(r){ for(var s=r[0]; s+dur<=r[1]; s+=15){ var e=s+dur; if(!busy.some(function(b){return s<b[1]&&e>b[0];})) slots.push(_min2hhmm(s)); } }); return slots; }
 function terminForOrder(oid){ return ensureTermine().find(function(t){return t.orderId===oid;})||null; }
 function fmtTermin(t){ if(!t)return ''; return fmtDate(t.date)+' · '+t.start+' Uhr'+(t.dur?(' ('+t.dur+' Min)'):''); }
 let TN=null;
+const TERMIN_STATUS={offen:['Geplant','#34a24a'],erledigt:['Erledigt','#6b7280'],storniert:['Storniert','#b4231a']};
+function _terminEnd(t){ var m=_hhmm2min(t&&t.start); return m==null?'':_min2hhmm(m+(+((t&&t.dur))||30)); }
 function terminModal(opts){ opts=opts||{}; ensureTermine();
-  if(opts.id){ TN=Object.assign({}, ensureTermine().find(function(t){return t.id===opts.id;})||{}); }
-  else { TN={ id:'', date:opts.date||today(), start:'', dur:30, cid:opts.cid||'', orderId:opts.orderId||'', technikerId:opts.technikerId||'', reason:'', note:'', custQuery:'' }; }
+  if(opts.id){ var ex=ensureTermine().find(function(t){return t.id===opts.id;})||{}; TN=Object.assign({status:'offen',custQuery:'',newCust:false}, JSON.parse(JSON.stringify(ex))); }
+  else { TN={ id:'', date:opts.date||today(), start:'', dur:30, cid:opts.cid||'', orderId:opts.orderId||'', technikerId:opts.technikerId||'', reason:'', note:'', status:'offen', custQuery:'', newCust:false }; }
   renderTerminModal();
 }
-function tnDate(v){ TN.date=v; TN.start=''; renderTerminModal(); }
-function tnDur(v){ TN.dur=+v||30; TN.start=''; renderTerminModal(); }
-function tnPickCust(cid){ TN.cid=cid; TN.orderId=''; TN.custQuery=''; renderTerminModal(); }
-function tnClearCust(){ TN.cid=''; TN.orderId=''; renderTerminModal(); }
-function tnSearch(v){ TN.custQuery=v; var el=document.getElementById('tn_matches'); if(!el)return; var q=(v||'').toLowerCase().trim(); if(!q){el.innerHTML='';return;} var ms=S.cust.filter(function(x){return (x.name+' '+(x.tel||'')+' '+(x.mail||'')).toLowerCase().indexOf(q)>=0;}).slice(0,6); el.innerHTML=ms.length?ms.map(function(c){return '<div class="listitem" style="cursor:pointer" onclick="tnPickCust(\''+c.id+'\')"><div class="avatar">'+initials(c.name)+'</div><div style="flex:1;min-width:0"><b>'+esc(c.name)+'</b><div class="muted" style="font-size:12px">'+esc(c.tel||'')+'</div></div><span class="btn sm">Wählen</span></div>';}).join(''):'<div class="muted" style="font-size:12px;padding:6px">Kein Kunde gefunden. <a style="color:var(--green);cursor:pointer" onclick="tnQuickCust()">Neuen Kunden anlegen</a></div>'; }
-function tnQuickCust(){ var name=prompt('Name des Kunden:'); if(!name)return; var tel=prompt('Telefon:')||''; var c={id:uid('c'),name:name.trim(),tel:tel.trim(),mail:'',adr:'',plz:'',stadt:'',typ:'Privat'}; S.cust.unshift(c); save(); tnPickCust(c.id); }
+function tnCollect(){ if(!TN)return; var g=function(id){var e=document.getElementById(id);return e?e.value:null;}; var v;
+  v=g('tn_start'); if(v!=null&&v!=='')TN.start=v; v=g('tn_dur'); if(v!=null)TN.dur=+v||TN.dur; v=g('tn_tech'); if(v!=null)TN.technikerId=v; v=g('tn_reason'); if(v!=null)TN.reason=v; v=g('tn_note'); if(v!=null)TN.note=v; }
+function tnDate(v){ tnCollect(); TN.date=v; TN.start=''; renderTerminModal(); }
+function tnDur(v){ tnCollect(); TN.dur=+v||30; TN.start=''; renderTerminModal(); }
+function tnPickCust(cid){ tnCollect(); TN.cid=cid; TN.orderId=''; TN.custQuery=''; TN.newCust=false; renderTerminModal(); }
+function tnClearCust(){ tnCollect(); TN.cid=''; TN.orderId=''; TN.newCust=false; renderTerminModal(); }
+function tnNewCust(){ tnCollect(); TN.custQuery=(document.getElementById('tn_cq')||{}).value||TN.custQuery||''; TN.newCust=true; renderTerminModal(); }
+function tnNewCustCancel(){ TN.newCust=false; renderTerminModal(); }
+function tnCreateCust(){ var g=function(id){var e=document.getElementById(id);return e?e.value.trim():'';}; var name=g('tnnc_name'); if(!name){toast('Bitte Namen angeben');return;} var c={id:uid('c'),name:name,tel:g('tnnc_tel'),mail:g('tnnc_mail'),adr:'',plz:'',stadt:'',typ:'Privat'}; S.cust.unshift(c); save(); tnPickCust(c.id); toast('Kunde angelegt: '+name); }
+function tnSearch(v){ TN.custQuery=v; var el=document.getElementById('tn_matches'); if(!el)return; var q=(v||'').toLowerCase().trim(); if(!q){el.innerHTML='';return;} var ms=S.cust.filter(function(x){return (x.name+' '+(x.tel||'')+' '+(x.mail||'')).toLowerCase().indexOf(q)>=0;}).slice(0,6); el.innerHTML=ms.length?ms.map(function(c){return '<div class="listitem" style="cursor:pointer" onclick="tnPickCust(\''+c.id+'\')"><div class="avatar">'+initials(c.name)+'</div><div style="flex:1;min-width:0"><b>'+esc(c.name)+'</b><div class="muted" style="font-size:12px">'+esc(c.tel||'')+'</div></div><span class="btn sm">Wählen</span></div>';}).join(''):'<div class="muted" style="font-size:12px;padding:6px">Kein Kunde gefunden. <a style="color:var(--green);cursor:pointer;font-weight:700" onclick="tnNewCust()">+ Neuen Kunden anlegen</a></div>'; }
 function renderTerminModal(){
   ensureTermine(); var c=TN.cid?cust(TN.cid):null;
   var slots=TN.date?freeSlots(TN.date,TN.dur,TN.id):[];
   var ordersOfCust=TN.cid?S.ord.filter(function(o){return o.cid===TN.cid&&!o.trashed;}):[];
   var closed=TN.date&&!apptRanges(TN.date).length;
   var durOpts=[15,30,45,60,90].map(function(x){return '<option value="'+x+'" '+(TN.dur==x?'selected':'')+'>'+x+' Min</option>';}).join('');
+  var slotOpts=slots.slice();
+  if(TN.start&&slotOpts.indexOf(TN.start)<0)slotOpts.unshift(TN.start);
   var startSel = closed
     ? '<div class="muted" style="font-size:13px;padding:6px 0">An diesem Tag ist geschlossen – bitte anderes Datum wählen.</div>'
-    : (slots.length
-        ? '<select class="in" id="tn_start" onchange="TN.start=this.value">'+['<option value="">— Uhrzeit wählen —</option>'].concat(slots.map(function(s){return '<option value="'+s+'" '+(TN.start===s?'selected':'')+'>'+s+' Uhr</option>';})).join('')+'</select>'
+    : (slotOpts.length
+        ? '<select class="in" id="tn_start" onchange="TN.start=this.value;renderTerminModal()">'+['<option value="">— Uhrzeit wählen —</option>'].concat(slotOpts.map(function(s){return '<option value="'+s+'" '+(TN.start===s?'selected':'')+'>'+s+' Uhr</option>';})).join('')+'</select>'
         : '<div class="muted" style="font-size:13px;padding:6px 0">Keine freien Zeiten für diese Dauer an dem Tag (alles belegt oder außerhalb der Öffnungszeiten).</div>');
-  var custBlock = c
-    ? '<div class="listitem"><div class="avatar">'+initials(c.name)+'</div><div style="flex:1;min-width:0"><b>'+esc(c.name)+'</b><div class="muted" style="font-size:12px">'+esc(c.tel||'')+'</div></div><button class="btn sm gho" onclick="tnClearCust()">ändern</button></div>'
-    : '<input class="in" id="tn_cq" placeholder="Kunde suchen (Name / Telefon)…" oninput="tnSearch(this.value)" value="'+esc(TN.custQuery||'')+'"><div id="tn_matches" style="margin-top:6px"></div>';
+  var endLine=(TN.start&&!closed)?'<div class="muted" style="font-size:12px;margin-top:4px">Ende ca. '+_min2hhmm(_hhmm2min(TN.start)+(+TN.dur||30))+' Uhr</div>':'';
+  var custBlock;
+  if(c){ custBlock='<div class="listitem"><div class="avatar">'+initials(c.name)+'</div><div style="flex:1;min-width:0"><b>'+esc(c.name)+'</b><div class="muted" style="font-size:12px">'+esc(c.tel||'')+(c.mail?' · '+esc(c.mail):'')+'</div></div><button class="btn sm gho" onclick="tnClearCust()">ändern</button></div>'; }
+  else if(TN.newCust){ custBlock='<div class="card" style="background:var(--soft);border:0;padding:12px"><div class="between"><b>Neuen Kunden anlegen</b><button class="btn sm gho" onclick="tnNewCustCancel()">Abbrechen</button></div><div class="grid g2" style="margin-top:8px"><div style="grid-column:1/-1"><label class="f">Name *</label><input class="in" id="tnnc_name" value="'+esc(TN.custQuery||'')+'"></div><div><label class="f">Telefon</label><input class="in" id="tnnc_tel"></div><div><label class="f">E-Mail</label><input class="in" id="tnnc_mail"></div></div><button class="btn pri" style="margin-top:10px" onclick="tnCreateCust()">Anlegen &amp; übernehmen</button></div>'; }
+  else { custBlock='<input class="in" id="tn_cq" placeholder="Kunde suchen (Name / Telefon / E-Mail)…" oninput="tnSearch(this.value)" value="'+esc(TN.custQuery||'')+'"><div id="tn_matches" style="margin-top:6px"></div><button class="btn sm gho" style="margin-top:6px" onclick="tnNewCust()">+ Neuen Kunden anlegen</button>'; }
   var orderBlock = c
     ? (ordersOfCust.length
         ? '<select class="in" id="tn_order"><option value="">— kein Auftrag / nur Kunde —</option>'+ordersOfCust.map(function(o){return '<option value="'+o.id+'" '+(TN.orderId===o.id?'selected':'')+'>'+esc(o.nr)+' · '+esc(oDevLabel(o))+'</option>';}).join('')+'</select>'
         : '<div class="muted" style="font-size:12px">Kein offener Auftrag – Termin wird nur dem Kunden zugeordnet.</div>')
     : '';
   var techs=(S.users||[]);
-  openModal('<div class="dhead"><b style="flex:1">📅 '+(TN.id?'Termin bearbeiten':'Termin vereinbaren')+'</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>'
+  var st=(TERMIN_STATUS[TN.status]||TERMIN_STATUS.offen);
+  var statusBadge=TN.id?' <span class="pill" style="border-color:'+st[1]+';color:'+st[1]+';font-size:11px"><span class="d" style="background:'+st[1]+'"></span>'+st[0]+'</span>':'';
+  var meta=TN.id&&TN.createdByName?'<div class="muted" style="font-size:11px;margin-top:8px">Angelegt von '+esc(TN.createdByName)+(TN.createdAt?' · '+esc(fmtDateTime(TN.createdAt)):'')+'</div>':'';
+  var footer='<div class="row" style="justify-content:flex-end;margin-top:16px;gap:8px;flex-wrap:wrap">';
+  if(TN.id){ footer+='<button class="btn gho" onclick="tnDelete()" style="color:#b4231a">Löschen</button>';
+    if(TN.status!=='storniert')footer+='<button class="btn gho" onclick="tnStorno()">Stornieren</button>';
+    footer+='<button class="btn gho" onclick="tnMarkDone()">'+(TN.status==='erledigt'?'Als offen':'Als erledigt')+'</button>';
+    if(TN.orderId&&S.ord.find(function(x){return x.id===TN.orderId;}))footer+='<button class="btn" onclick="closeAll();openOrder(\''+TN.orderId+'\')">Auftrag öffnen</button>'; }
+  footer+='<button class="btn pri" id="tn_savebtn" onclick="tnSave()">Termin speichern</button></div>';
+  openModal('<div class="dhead"><b style="flex:1">📅 '+(TN.id?'Termin':'Termin vereinbaren')+statusBadge+'</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>'
    +'<div class="dbody">'
    +'<label class="f">Kunde</label>'+custBlock
-   +(c&&orderBlock?'<label class="f" style="margin-top:10px">Auftrag (optional)</label>'+orderBlock:'')
+   +(c&&orderBlock?'<label class="f" style="margin-top:10px">Verknüpfter Auftrag (optional)</label>'+orderBlock:'')
    +'<div class="grid g2" style="margin-top:10px"><div><label class="f">Datum</label><input class="in" type="date" id="tn_date" value="'+esc(TN.date)+'" onchange="tnDate(this.value)"></div>'
    +'<div><label class="f">Dauer</label><select class="in" id="tn_dur" onchange="tnDur(this.value)">'+durOpts+'</select></div></div>'
-   +'<label class="f" style="margin-top:10px">Uhrzeit (nur freie Zeiten in den Öffnungszeiten)</label>'+startSel
-   +'<div class="grid g2" style="margin-top:10px"><div><label class="f">Techniker/Mitarbeiter (optional)</label><select class="in" id="tn_tech"><option value="">— keiner —</option>'+techs.map(function(u){return '<option value="'+u.id+'" '+(TN.technikerId===u.id?'selected':'')+'>'+esc(u.name)+'</option>';}).join('')+'</select></div>'
-   +'<div><label class="f">Grund / Terminart (optional)</label><input class="in" id="tn_reason" value="'+esc(TN.reason||'')+'" placeholder="z. B. Abgabe, Abholung, Beratung"></div></div>'
+   +'<label class="f" style="margin-top:10px">Uhrzeit (nur freie Zeiten in den Öffnungszeiten)</label>'+startSel+endLine
+   +'<div class="grid g2" style="margin-top:10px"><div><label class="f">Techniker / Mitarbeiter</label><select class="in" id="tn_tech"><option value="">— keiner —</option>'+techs.map(function(u){return '<option value="'+u.id+'" '+(TN.technikerId===u.id?'selected':'')+'>'+esc(u.name)+'</option>';}).join('')+'</select></div>'
+   +'<div><label class="f">Terminart / Was ist zu tun?</label><input class="in" id="tn_reason" value="'+esc(TN.reason||'')+'" placeholder="z. B. Abgabe, Abholung, Display prüfen"></div></div>'
    +'<label class="f" style="margin-top:10px">Interne Notiz (optional)</label><textarea class="in" id="tn_note" rows="2">'+esc(TN.note||'')+'</textarea>'
-   +((c&&c.mail)?'<label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;cursor:pointer"><input type="checkbox" id="tn_confirm" '+(TN.confirm===false?'':'checked')+'> ✉️ Kunde per E-Mail über den Termin informieren <span class="muted">('+esc(c.mail)+')</span></label>':(c?'<div class="muted" style="font-size:11px;margin-top:10px">Keine Kunden-E-Mail hinterlegt – keine automatische Terminbestätigung möglich.</div>':''))
-   +'<div class="row" style="justify-content:flex-end;margin-top:14px;gap:8px">'+(TN.id?'<button class="btn gho" onclick="tnDelete()" style="color:#b4231a">Termin löschen</button>':'')+'<button class="btn pri" onclick="tnSave()">Termin speichern</button></div>'
+   +((c&&c.mail)?'<label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;cursor:pointer"><input type="checkbox" id="tn_confirm" '+(TN.id?'':'checked')+'> ✉️ Kunde per E-Mail über den Termin informieren <span class="muted">('+esc(c.mail)+')</span></label>':(c?'<div class="muted" style="font-size:11px;margin-top:10px">Keine Kunden-E-Mail hinterlegt – keine automatische Terminbestätigung möglich.</div>':''))
+   +meta+footer
    +'</div>');
   var cq=document.getElementById('tn_cq'); if(cq&&TN.custQuery)tnSearch(TN.custQuery);
 }
-function tnSave(){ ensureTermine();
-  var g=function(id){var e=document.getElementById(id);return e?e.value:'';};
+function tnSave(){ ensureTermine(); tnCollect();
   if(!TN.cid){ toast('Bitte einen Kunden wählen'); return; }
-  var start=g('tn_start')||TN.start; if(!TN.date||!start){ toast('Bitte Datum und Uhrzeit wählen'); return; }
-  var rec={ id:TN.id||('tm'+Date.now().toString(36)+Math.random().toString(36).slice(2,5)), date:TN.date, start:start, dur:+g('tn_dur')||TN.dur||30, cid:TN.cid, orderId:g('tn_order')||TN.orderId||'', technikerId:g('tn_tech')||'', reason:g('tn_reason')||'', note:g('tn_note')||'', branch:(typeof curBranch==='function'?curBranch():''), createdBy:(S.userId||''), createdByName:(typeof curUserName==='function'?curUserName():''), createdAt:new Date().toISOString() };
-  var arr=ensureTermine(); var i=arr.findIndex(function(t){return t.id===rec.id;}); if(i>=0)arr[i]=rec; else arr.unshift(rec);
+  var start=TN.start||''; if(!TN.date||!start){ toast('Bitte Datum und Uhrzeit wählen'); return; }
+  if(!TN.id)TN.id='tm'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+  var oid=(document.getElementById('tn_order')||{}).value||TN.orderId||'';
+  var rec={ id:TN.id, date:TN.date, start:start, dur:+TN.dur||30, cid:TN.cid, orderId:oid, technikerId:TN.technikerId||'', reason:TN.reason||'', note:TN.note||'', status:TN.status||'offen', branch:(typeof curBranch==='function'?curBranch():''), createdBy:TN.createdBy||(S.userId||''), createdByName:TN.createdByName||(typeof curUserName==='function'?curUserName():''), createdAt:TN.createdAt||new Date().toISOString(), updatedAt:new Date().toISOString() };
+  TN.orderId=oid;
+  var arr=ensureTermine(); var idx=arr.findIndex(function(t){return t.id===rec.id;}); if(idx>=0)arr[idx]=rec; else arr.unshift(rec);
   if(rec.orderId){ var o=S.ord.find(function(x){return x.id===rec.orderId;}); if(o){ o.appt=rec.date; o.apptTime=rec.start; if(typeof logActivity==='function')logActivity(o,'edit','Termin '+fmtTermin(rec)); } }
   var wantConf=!!(document.getElementById('tn_confirm')&&document.getElementById('tn_confirm').checked);
-  save(); closeAll();
-  if(wantConf){ sendTerminConfirm(rec); } else { toast('Termin gespeichert: '+fmtTermin(rec)); }
-  if(current==='kalender')views.kalender(); else if(current==='dashboard')views.dashboard&&views.dashboard();
-  var dr=document.getElementById('drawer'); if(rec.orderId&&dr&&dr.classList.contains('show'))openOrder(rec.orderId);
-  paintIcons();
+  var finish=function(){ closeAll(); if(wantConf){ sendTerminConfirm(rec); } else { toast('✓ Termin gespeichert: '+fmtTermin(rec)); } if(current==='kalender')views.kalender(); else if(current==='dashboard')views.dashboard&&views.dashboard(); var dr=document.getElementById('drawer'); if(rec.orderId&&dr&&dr.classList.contains('show'))openOrder(rec.orderId); paintIcons(); };
+  save();
+  if(typeof Sync!=='undefined' && Sync.active()){
+    var btn=document.getElementById('tn_savebtn'); if(btn){btn.disabled=true;btn.textContent='Speichere…';}
+    Sync.pushChanges().then(function(res){ if(res&&res.ok){ finish(); } else { if(btn){btn.disabled=false;btn.textContent='Termin speichern';} toast(res&&res.locked?'⚠ Speichern gesperrt – bitte Abo prüfen.':'⚠ Termin NICHT gespeichert – keine Verbindung. Bitte erneut versuchen.'); } }).catch(function(){ if(btn){btn.disabled=false;btn.textContent='Termin speichern';} toast('⚠ Termin NICHT gespeichert – keine Verbindung.'); });
+  } else { finish(); }
 }
-function tnDelete(){ if(!TN.id)return; if(!confirm('Termin löschen?'))return; var t=ensureTermine().find(function(x){return x.id===TN.id;}); S.termine=ensureTermine().filter(function(x){return x.id!==TN.id;}); if(t&&t.orderId){var o=S.ord.find(function(x){return x.id===t.orderId;});if(o){o.appt='';o.apptTime='';}} save(); closeAll(); toast('Termin gelöscht'); if(current==='kalender')views.kalender(); paintIcons(); }
-function termineToday(){ return ensureTermine().filter(function(t){return t.date===today();}).sort(function(a,b){return (a.start||'').localeCompare(b.start||'');}); }
+function tnMarkDone(){ if(!TN||!TN.id)return; TN.status=(TN.status==='erledigt'?'offen':'erledigt'); tnSave(); }
+function tnStorno(){ if(!TN||!TN.id)return; if(!confirm('Diesen Termin stornieren?'))return; TN.status='storniert'; tnSave(); }
+function tnDelete(){ if(!TN.id)return; if(!confirm('Termin endgültig löschen?'))return; var t=ensureTermine().find(function(x){return x.id===TN.id;}); S.termine=ensureTermine().filter(function(x){return x.id!==TN.id;}); if(t&&t.orderId){var o=S.ord.find(function(x){return x.id===t.orderId;});if(o){o.appt='';o.apptTime='';}} save(); closeAll(); toast('Termin gelöscht'); if(current==='kalender')views.kalender(); paintIcons(); }
+function termineToday(){ return ensureTermine().filter(function(t){return t.date===today()&&t.status!=='storniert';}).sort(function(a,b){return (a.start||'').localeCompare(b.start||'');}); }
 function terminBoxOrder(o){ var t=terminForOrder(o.id);
-  return '<div class="card" style="margin-top:14px"><div class="between"><b>📅 Termin</b><button class="btn sm pri" onclick="terminModal('+(t?"{id:'"+t.id+"'}":"{cid:'"+o.cid+"',orderId:'"+o.id+"'}")+')">'+(t?'Termin ändern':'Termin vereinbaren')+'</button></div>'
-    +(t?'<div style="margin-top:6px;font-weight:700">'+esc(fmtTermin(t))+'</div>'+(t.reason?'<div class="muted" style="font-size:12px">'+esc(t.reason)+'</div>':'')+(t.technikerId&&techName(t.technikerId)?'<div class="muted" style="font-size:12px">👤 '+esc(techName(t.technikerId))+'</div>':'')
+  return '<div class="card" style="margin-top:14px"><div class="between"><b>📅 Termin</b><button class="btn sm pri" onclick="terminModal('+(t?"{id:'"+t.id+"'}":"{cid:'"+o.cid+"',orderId:'"+o.id+"'}")+')">'+(t?'Termin öffnen':'Termin vereinbaren')+'</button></div>'
+    +(t?'<div style="margin-top:6px;font-weight:700">'+esc(fmtTermin(t))+(t.status&&t.status!=='offen'?' · '+(TERMIN_STATUS[t.status]||['',''])[0]:'')+'</div>'+(t.reason?'<div class="muted" style="font-size:12px">'+esc(t.reason)+'</div>':'')+(t.technikerId&&techName(t.technikerId)?'<div class="muted" style="font-size:12px">👤 '+esc(techName(t.technikerId))+'</div>':'')
        :'<div class="muted" style="font-size:13px;margin-top:6px">Noch kein Termin vereinbart.</div>')+'</div>'; }
 /* v11 #9 optional: bald anstehende Termine (interne Erinnerung) + Terminbestätigung per E-Mail */
 function termineSoon(){ var now=new Date(); var cur=now.getHours()*60+now.getMinutes(); return termineToday().filter(function(t){var m=_hhmm2min(t.start);return m!=null&&m>=cur-5&&m<=cur+90;}); }
@@ -2457,25 +2616,24 @@ views.kalender=function(){
   const first=(new Date(y,mo,1).getDay()+6)%7; const dim=new Date(y,mo+1,0).getDate();
   const evByDay={};
   ensureTermine().forEach(t=>{ (evByDay[t.date]=evByDay[t.date]||[]).push({t:'Termin',termin:t}); });
-  visibleOrders().forEach(o=>{ if(o.appt&&!terminForOrder(o.id)){(evByDay[o.appt]=evByDay[o.appt]||[]).push({t:'Termin',o});}
-    if(o.due&&o.status!=='abgeholt'){(evByDay[o.due]=evByDay[o.due]||[]).push({t:'Fällig',o});}});
   let cells='';
   for(let i=0;i<first;i++)cells+='<div></div>';
   for(let dnum=1;dnum<=dim;dnum++){
     const ds=`${y}-${String(mo+1).padStart(2,'0')}-${String(dnum).padStart(2,'0')}`;
-    const ev=evByDay[ds]||[]; const isToday=ds===today();
+    const ev=(evByDay[ds]||[]).slice().sort((a,b)=>((a.termin&&a.termin.start)||'').localeCompare((b.termin&&b.termin.start)||'')); const isToday=ds===today();
     cells+=`<div onclick="terminModal({date:'${ds}'})" title="Klicken: Termin an diesem Tag anlegen" style="border:1px solid var(--line);border-radius:10px;padding:8px;min-height:92px;cursor:pointer;${isToday?'outline:2px solid #34a24a;outline-offset:-2px':''}">
       <div style="font-weight:700;font-size:13px;${isToday?'':'color:#888'}">${dnum}</div>
-      ${ev.slice(0,3).map(e=>{ if(e.termin){const tc=cust(e.termin.cid);return `<div onclick="event.stopPropagation();terminModal({id:'${e.termin.id}'})" style="cursor:pointer;font-size:11px;margin-top:3px;padding:2px 5px;border-radius:5px;background:#34a24a;color:#fff">${esc(e.termin.start)} ${esc((tc.name||'').split(' ')[0])}</div>`;} return `<div onclick="event.stopPropagation();openOrder('${e.o.id}')" style="cursor:pointer;font-size:11px;margin-top:3px;padding:2px 5px;border-radius:5px;${e.t==='Termin'?'background:#34a24a;color:#fff':'background:var(--soft);color:#34a24a'}">${esc(cust(e.o.cid).name.split(' ')[0])}</div>`;}).join('')}
+      ${ev.slice(0,3).map(e=>{ const t=e.termin;const tc=cust(t.cid);const stt=t.status||'offen';const col=(TERMIN_STATUS[stt]||TERMIN_STATUS.offen)[1];const strike=stt==='storniert'?'text-decoration:line-through;':'';return `<div onclick="event.stopPropagation();terminModal({id:'${t.id}'})" style="cursor:pointer;font-size:11px;margin-top:3px;padding:2px 5px;border-radius:5px;background:${col};color:#fff;${strike}">${esc(t.start)} ${esc((tc.name||'').split(' ')[0])}</div>`;}).join('')}
       ${ev.length>3?`<div class="muted" style="font-size:11px;margin-top:2px">+${ev.length-3} mehr</div>`:''}
     </div>`;
   }
   const monName=base.toLocaleDateString('de-DE',{month:'long',year:'numeric'});
   const tHeute=termineToday();
-  m.innerHTML=`<div class="between"><div><h1 class="h1">Kalender</h1><p class="sub">${monName}</p></div>
-     <div class="row"><span class="pill solid"><span class="d"></span>Termin</span><span class="pill soft"><span class="d"></span>Fällig</span><button class="btn pri" onclick="terminModal({})">＋ Neuer Termin</button></div></div>
-   ${tHeute.length?`<div class="card" style="margin-top:16px;border:1px solid var(--green)"><b>Heute · ${tHeute.length} Termin${tHeute.length>1?'e':''}</b>${tHeute.map(t=>{const tc=cust(t.cid);const o=t.orderId?S.ord.find(x=>x.id===t.orderId):null;return `<div class="listitem" style="cursor:pointer" onclick="${t.orderId?`openOrder('${t.orderId}')`:`terminModal({id:'${t.id}'})`}"><span class="pill solid" style="min-width:64px;justify-content:center">${esc(t.start)}</span><div style="flex:1;min-width:0"><b>${esc(tc.name||'—')}</b><div class="muted" style="font-size:12px">${t.dur} Min${t.reason?' · '+esc(t.reason):''}${o?' · '+esc(oDevLabel(o)):''}${t.technikerId&&techName(t.technikerId)?' · 👤 '+esc(techName(t.technikerId)):''}</div></div></div>`;}).join('')}</div>`:''}
-   <div class="card" style="margin-top:16px">
+  m.innerHTML=`<div class="between"><div><h1 class="h1">Kalender</h1><p class="sub">${monName} · nur vereinbarte Termine</p></div>
+     <div class="row"><span class="pill solid"><span class="d"></span>Termin</span><button class="btn pri" onclick="terminModal({})">＋ Neuer Termin</button></div></div>
+   ${tHeute.length?`<div class="card" style="margin-top:16px;border:1px solid var(--green)"><b>Heute · ${tHeute.length} Termin${tHeute.length>1?'e':''}</b>${tHeute.map(t=>{const tc=cust(t.cid);const o=t.orderId?S.ord.find(x=>x.id===t.orderId):null;const done=t.status==='erledigt';return `<div class="listitem" style="cursor:pointer;${done?'opacity:.6':''}" onclick="terminModal({id:'${t.id}'})"><span class="pill solid" style="min-width:64px;justify-content:center">${esc(t.start)}</span><div style="flex:1;min-width:0"><b>${esc(tc.name||'—')}</b>${done?' <span class="tag">erledigt</span>':''}<div class="muted" style="font-size:12px">${t.dur} Min${t.reason?' · '+esc(t.reason):''}${o?' · '+esc(oDevLabel(o)):''}${t.technikerId&&techName(t.technikerId)?' · 👤 '+esc(techName(t.technikerId)):''}</div></div></div>`;}).join('')}</div>`:''}
+   <div class="note" style="margin-top:14px">Im Kalender erscheinen nur <b>vereinbarte Termine</b>. Das reine Annehmen eines Auftrags erzeugt keinen Kalendereintrag. Klick auf einen Termin öffnet die Detailansicht zum Bearbeiten.</div>
+   <div class="card" style="margin-top:14px">
      <div class="grid" style="grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:8px">${['Mo','Di','Mi','Do','Fr','Sa','So'].map(d=>`<div class="muted" style="font-size:12px;font-weight:700;text-align:center">${d}</div>`).join('')}</div>
      <div class="grid" style="grid-template-columns:repeat(7,1fr);gap:6px">${cells}</div>
    </div>
@@ -3529,12 +3687,13 @@ function statInPrev(ds){ if(!ds)return false; const now=new Date();
   if(statRange==='frei'){ if(!statFrom||!statTo)return false; const f=new Date(statFrom),tt=new Date(statTo);const len=Math.max(1,Math.round((tt-f)/86400000)+1);const pf=new Date(f);pf.setDate(pf.getDate()-len);const pt=new Date(f);pt.setDate(pt.getDate()-1);const s=pf.toISOString().slice(0,10),e=pt.toISOString().slice(0,10);return ds>=s&&ds<=e; }
   return false; }
 function statCollect(fn){ const all=S.ord.filter(o=>!o.trashed&&fn(o.created));
-  const brand={},model={},fehler={}; let cnt=0,rev=0;
+  const brand={},model={},fehler={},result={}; let cnt=0,rev=0;
   all.forEach(o=>{ const devs=oDevices(o); const ot=oTotal(o); rev+=ot; const per=devs.length?ot/devs.length:0;
+    if(o.repResult)result[o.repResult]=(result[o.repResult]||0)+1;
     devs.forEach(d=>{ const b=d.brand||'Sonstige'; (brand[b]=brand[b]||{cnt:0,rev:0}); brand[b].cnt++; brand[b].rev+=per; cnt++;
       const mn=[d.brand,d.model].filter(Boolean).join(' '); if(mn){model[mn]=(model[mn]||0)+1;}
       devPositions(d).forEach(p=>{ if(p.reparatur)fehler[p.reparatur]=(fehler[p.reparatur]||0)+1; }); }); });
-  return {orders:all.length,cnt,rev,brand,model,fehler}; }
+  return {orders:all.length,cnt,rev,brand,model,fehler,result}; }
 function statSetRange(r){statRange=r;views.statistik();paintIcons();}
 function statSetFrom(v){statFrom=v;if(statFrom&&statTo)views.statistik();}
 function statSetTo(v){statTo=v;if(statFrom&&statTo)views.statistik();}
@@ -3562,7 +3721,9 @@ function statBrandSection(){
     <div class="grid g2" style="margin-top:16px">
       <div><div style="font-weight:700;margin-bottom:10px">Aufträge je Hersteller</div>${brandRows}</div>
       <div><div style="font-weight:700;margin-bottom:10px">Top-Modelle</div>${modelRows}</div>
-    </div></div>`;
+    </div>
+    ${(function(){const R=cur.result||{};const tot=REP_RESULTS.reduce((a,x)=>a+(R[x[0]]||0),0);if(!tot)return '';return '<div style="margin-top:18px;border-top:1px solid var(--line);padding-top:14px"><div style="font-weight:700;margin-bottom:10px">Reparaturergebnisse ('+tot+')</div>'+REP_RESULTS.map(function(x){const n=R[x[0]]||0;const col=repResultColor(x[0]);const pct=tot?Math.round(n/tot*100):0;return '<div style="margin-bottom:10px"><div class="between" style="margin-bottom:4px"><span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:'+col+';margin-right:6px"></span>'+esc(x[1])+'</span><b>'+n+' · '+pct+'%</b></div><div class="bar"><i style="width:'+pct+'%;background:'+col+'"></i></div></div>';}).join('')+'</div>';})()}
+    </div>`;
 }
 views.statistik=function(){
   const m=document.getElementById('main');
