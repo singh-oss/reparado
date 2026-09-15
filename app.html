@@ -1297,7 +1297,7 @@ function openOrder(id){
      <label class="f">Status-Link für den Kunden</label>
      <div class="row"><input class="in" style="flex:1" readonly value="${track}"><button class="btn" onclick="navigator.clipboard&&navigator.clipboard.writeText('${track}');toast('Link kopiert')">Kopieren</button><button class="btn" onclick="window.open('status.html?nr=${o.nr}&ws='+encodeURIComponent(SHOP.name),'_blank')">Ansehen</button></div>
      ${o.status==='abgeholt'?`<div class="row" style="margin-top:10px;align-items:center;gap:10px"><button class="btn" onclick="askReview('${o.id}')">${o.reviewAsked?'Bewertung erneut anfragen':'Bewertung anfragen'}</button><span class="muted" style="font-size:12px">${o.reviewAsked?'bereits angefragt':'Zufriedene Kunden werden zu Google geleitet, kritische bleiben intern.'}</span></div>`:''}
-     <div class="row" style="margin-top:12px;align-items:center;gap:12px"><div>${qrSVG(track,110)}</div><div><label class="f">Geräte-Akte (QR)</label><div class="muted" style="font-size:13px">Auf Etikett/Gerät kleben. Kunde &amp; Werkstatt scannen für Status, Fotos, Garantie und Reparatur-Historie.</div></div></div>
+     <div class="row" style="margin-top:12px;align-items:center;gap:12px"><div>${RQR.svg(orderPortalUrl(o),{cell:3,margin:2})}</div><div><label class="f">Geräte-Akte (QR)</label><div class="muted" style="font-size:13px">Auf Etikett/Gerät kleben. Kunde &amp; Werkstatt scannen für Status, Fotos, Garantie und Reparatur-Historie.</div></div></div>
 
      <div class="divider"></div>
      <div class="row" style="justify-content:flex-end;gap:8px">${o.archived?`<button class="btn gho" onclick="restoreOrder('${o.id}')">Aus Archiv holen</button>`:`<button class="btn gho" onclick="archiveOrder('${o.id}')">Archivieren</button>`}<button class="btn gho" onclick="trashOrder('${o.id}')">In den Papierkorb</button></div>
@@ -1423,13 +1423,10 @@ function blankForm(){return {mode:'auftrag',draftId:'',editId:'',quoteEditId:'',
 function dPlus(n){const x=new Date();x.setDate(x.getDate()+(+n||0));return x.toISOString().slice(0,10);}
 function newQuote(pref){ closeAll(); NO=blankForm(); NO.mode='angebot'; NO.draftId=uid('dr'); NO.due=dPlus(14); if(pref)Object.assign(NO,pref); current='neworder'; renderNewOrder(); window.scrollTo(0,0); }
 function editQuote(id){ closeAll(); const q=(S.quotes||[]).find(x=>x.id===id); if(!q)return; NO=quoteToForm(q); NO.mode='angebot'; NO.quoteEditId=id; NO.draftId=uid('dr'); current='neworder'; renderNewOrder(); window.scrollTo(0,0); }
-function quoteToForm(q){const c=cust(q.cid);const nm=(c.name||'').split(' ');const f=blankForm();f.mode='angebot';f.cid=q.cid;f.typ=c.typ||'Privat';f.firma=c.firma||'';f.anrede=c.anrede||'Herr';f.vorname=nm.slice(0,-1).join(' ')||nm[0]||'';f.nachname=nm.length>1?nm[nm.length-1]:'';f.tel=c.tel||'+49 ';f.mail=c.mail||'';f.plz=c.plz||'';f.stadt=c.stadt||'';f.adr=c.adr||'';f.notes=q.notes||'';f.due=q.validUntil||dPlus(14);f.devices=oDevices(q).map(d=>({typ:d.typ||'Smartphone',brand:d.brand||'',model:d.model||'',imei:d.imei||'',fach:d.fach||'',ref:d.ref||'',reparatur:d.reparatur||'',price:(d.price!==undefined&&d.price!==''?d.price:''),qual:d.qual||'Original',warranty:d.warranty||6,lock:normLock(d.lock),lockval:d.lockval||'',technikerId:d.technikerId||'',zustand:(d.zustand?JSON.parse(JSON.stringify(d.zustand)):blankZustand()),zsonst:(d.zsonst?JSON.parse(JSON.stringify(d.zsonst)):{}),zubehoer:((d.zubehoer||[]).slice()),zubehoerNote:(d.zubehoerNote||''),fotos:((d.fotos||[]).slice()),lockSet:(d.lockSet!==undefined?d.lockSet:(normLock(d.lock)!=='Kein')),positions:(Array.isArray(d.positions)&&d.positions.length?d.positions.map(p=>({reparatur:p.reparatur||'',qual:p.qual||'Original',price:(p.price!==undefined&&p.price!==''?p.price:'')})):[{reparatur:d.reparatur||'',qual:d.qual||'Original',price:(d.price!==undefined&&d.price!==''?d.price:'')}])}));return f;}
+function quoteToForm(q){const c=cust(q.cid);const nm=(c.name||'').split(' ');const f=blankForm();f.mode='angebot';f.cid=q.cid;f.typ=c.typ||'Privat';f.firma=c.firma||'';f.anrede=c.anrede||'Herr';f.vorname=nm.slice(0,-1).join(' ')||nm[0]||'';f.nachname=nm.length>1?nm[nm.length-1]:'';f.tel=c.tel||'+49 ';f.mail=c.mail||'';f.plz=c.plz||'';f.stadt=c.stadt||'';f.adr=c.adr||'';f.notes=q.notes||'';f.due=q.validUntil||dPlus(14);f.devices=oDevices(q).map(d=>({typ:d.typ||'Smartphone',brand:d.brand||'',model:d.model||'',imei:d.imei||'',fach:d.fach||'',ref:d.ref||'',fehler:d.fehler||'',reparatur:d.reparatur||'',price:(d.price!==undefined&&d.price!==''?d.price:''),qual:d.qual||'Original',warranty:d.warranty||6,lock:normLock(d.lock),lockval:d.lockval||'',technikerId:d.technikerId||'',zustand:(d.zustand?JSON.parse(JSON.stringify(d.zustand)):blankZustand()),zsonst:(d.zsonst?JSON.parse(JSON.stringify(d.zsonst)):{}),zubehoer:((d.zubehoer||[]).slice()),zubehoerNote:(d.zubehoerNote||''),fotos:((d.fotos||[]).slice()),lockSet:(d.lockSet!==undefined?d.lockSet:(normLock(d.lock)!=='Kein')),positions:(Array.isArray(d.positions)&&d.positions.length?d.positions.map(p=>({reparatur:p.reparatur||'',qual:p.qual||'Original',price:(p.price!==undefined&&p.price!==''?p.price:'')})):[{reparatur:d.reparatur||'',qual:d.qual||'Original',price:(d.price!==undefined&&d.price!==''?d.price:'')}])}));return f;}
 function noQuoteSave(status){ noCollect();
-  if(!NO.vorname&&!NO.nachname&&!NO.firma){toast('Bitte Kundennamen angeben');return;}
-  if((NO.tel||'').replace(/\D/g,'').length<5){toast('Bitte Telefonnummer angeben');return;}
-  const d0=NO.devices[0]||{}; if(!d0.brand&&!d0.model){toast('Bitte Gerät (Marke/Modell) angeben');return;}
-  if(!devPositions(d0).some(p=>p.reparatur)){toast('Bitte mindestens eine Reparaturposition angeben');return;}
-  for(const d of NO.devices){ if((d.brand||d.model)&&!devPositions(d).some(p=>p.reparatur)){toast('Bitte für jedes Gerät mindestens eine Reparaturposition angeben');return;} }
+  if(status!=='entwurf'){ const miss=[].concat(noStepMiss(1),noStepMiss(2),noStepMiss(3)); if(miss.length){noJumpAndShow(miss);return;} }
+  else if(!NO.vorname&&!NO.nachname&&!NO.firma){noJumpAndShow([{t:'Kundenname',el:'no_vorname'}]);return;}
   const name=((NO.vorname+' '+NO.nachname).trim())||NO.firma; const digits=(NO.tel||'').replace(/\D/g,'');
   let c=NO.cid?S.cust.find(x=>x.id===NO.cid):null;
   if(!c)c=S.cust.find(x=>x.tel&&x.tel.replace(/\D/g,'')===digits&&digits.length>5);
@@ -1445,7 +1442,7 @@ let NO=null;
 function newOrder(){ closeAll(); NO=blankForm(); NO.draftId=uid('dr'); current='neworder'; renderNewOrder(); window.scrollTo(0,0); }
 function editOrder(id){ closeAll(); const o=S.ord.find(x=>x.id===id); if(!o)return; NO=orderToForm(o); NO.editId=id; current='neworder'; renderNewOrder(); window.scrollTo(0,0); }
 function resumeDraft(did){ closeAll(); const d=(S.drafts||[]).find(x=>x.id===did); if(!d)return; NO=Object.assign(blankForm(),JSON.parse(JSON.stringify(d.data))); NO.draftId=did; NO.editId=''; current='neworder'; renderNewOrder(); window.scrollTo(0,0); }
-function orderToForm(o){const c=cust(o.cid);const nm=(c.name||'').split(' ');const f=blankForm();f.cid=o.cid;f.typ=c.typ||'Privat';f.firma=c.firma||'';f.anrede=c.anrede||'Herr';f.vorname=nm.slice(0,-1).join(' ')||nm[0]||'';f.nachname=nm.length>1?nm[nm.length-1]:'';f.tel=c.tel||'+49 ';f.mail=c.mail||'';f.plz=c.plz||'';f.stadt=c.stadt||'';f.adr=c.adr||'';f.lock=o.lock||'Keine';f.lockval=o.lockval||'';f.prio=o.prio||'Standard';f.technikerId=o.technikerId||'';f.notes=o.notes||'';f.due=o.due||today();f.appt=o.appt||'';f.terminMode=o.appt?'termin':'kein';f.sig=o.sig||'';f.devices=oDevices(o).map((d,idx)=>({typ:d.typ||'Smartphone',brand:d.brand||'',model:d.model||'',imei:d.imei||'',fach:d.fach||'',ref:d.ref||'',reparatur:d.reparatur||'',price:(d.price!==undefined&&d.price!==0?d.price:(d.price===0?0:'')),qual:d.qual||'Original',warranty:d.warranty||6,lock:normLock(d.lock!==undefined?d.lock:(idx===0?o.lock:'')),lockval:(d.lockval!==undefined?d.lockval:(idx===0?(o.lockval||''):'')),technikerId:d.technikerId||'',zustand:(d.zustand?JSON.parse(JSON.stringify(d.zustand)):blankZustand()),zsonst:(d.zsonst?JSON.parse(JSON.stringify(d.zsonst)):{}),zubehoer:((d.zubehoer||[]).slice()),zubehoerNote:(d.zubehoerNote||''),fotos:((d.fotos||[]).slice()),lockSet:(d.lockSet!==undefined?d.lockSet:(normLock(d.lock)!=='Kein')),positions:(Array.isArray(d.positions)&&d.positions.length?d.positions.map(p=>({reparatur:p.reparatur||'',qual:p.qual||'Original',price:(p.price!==undefined&&p.price!==''?p.price:'')})):[{reparatur:d.reparatur||'',qual:d.qual||'Original',price:(d.price!==undefined&&d.price!==0?d.price:(d.price===0?0:''))}])}));return f;}
+function orderToForm(o){const c=cust(o.cid);const nm=(c.name||'').split(' ');const f=blankForm();f.cid=o.cid;f.typ=c.typ||'Privat';f.firma=c.firma||'';f.anrede=c.anrede||'Herr';f.vorname=nm.slice(0,-1).join(' ')||nm[0]||'';f.nachname=nm.length>1?nm[nm.length-1]:'';f.tel=c.tel||'+49 ';f.mail=c.mail||'';f.plz=c.plz||'';f.stadt=c.stadt||'';f.adr=c.adr||'';f.lock=o.lock||'Keine';f.lockval=o.lockval||'';f.prio=o.prio||'Standard';f.technikerId=o.technikerId||'';f.notes=o.notes||'';f.due=o.due||today();f.appt=o.appt||'';f.terminMode=o.appt?'termin':'kein';f.sig=o.sig||'';f.devices=oDevices(o).map((d,idx)=>({typ:d.typ||'Smartphone',brand:d.brand||'',model:d.model||'',imei:d.imei||'',fach:d.fach||'',ref:d.ref||'',fehler:d.fehler||'',reparatur:d.reparatur||'',price:(d.price!==undefined&&d.price!==0?d.price:(d.price===0?0:'')),qual:d.qual||'Original',warranty:d.warranty||6,lock:normLock(d.lock!==undefined?d.lock:(idx===0?o.lock:'')),lockval:(d.lockval!==undefined?d.lockval:(idx===0?(o.lockval||''):'')),technikerId:d.technikerId||'',zustand:(d.zustand?JSON.parse(JSON.stringify(d.zustand)):blankZustand()),zsonst:(d.zsonst?JSON.parse(JSON.stringify(d.zsonst)):{}),zubehoer:((d.zubehoer||[]).slice()),zubehoerNote:(d.zubehoerNote||''),fotos:((d.fotos||[]).slice()),lockSet:(d.lockSet!==undefined?d.lockSet:(normLock(d.lock)!=='Kein')),positions:(Array.isArray(d.positions)&&d.positions.length?d.positions.map(p=>({reparatur:p.reparatur||'',qual:p.qual||'Original',price:(p.price!==undefined&&p.price!==''?p.price:'')})):[{reparatur:d.reparatur||'',qual:d.qual||'Original',price:(d.price!==undefined&&d.price!==0?d.price:(d.price===0?0:''))}])}));return f;}
 function noHasContent(){ if(!NO)return false; const d=NO.devices[0]||{}; return !!(NO.vorname||NO.nachname||(NO.tel||'').replace(/\D/g,'').length>3||NO.firma||NO.mail||d.brand||d.model||d.reparatur||(d.positions&&d.positions.some(p=>p.reparatur))||NO.notes); }
 function noTitleOf(){const nm=((NO.vorname+' '+NO.nachname).trim())||NO.firma||'Unbenannter Kunde';const d=NO.devices[0]||{};const dev=[d.brand,d.model].filter(Boolean).join(' ');return nm+(dev?' · '+dev:'');}
 function noCollect(){ if(!NO)return; const g=id=>{const e=document.getElementById(id);return e?e.value:null;}; let v;
@@ -1816,7 +1813,7 @@ function noBuildDevices(){ const built=[];
     if(!ps.length)return;
     ps.forEach(p=>catLearnRepair(p.reparatur));
     const p0=ps[0];
-    built.push({typ:d.typ,brand:d.brand,model:d.model,imei:d.imei,fach:d.fach,ref:d.ref,warranty:+d.warranty||6,lock:normLock(d.lock),lockval:(normLock(d.lock)==='Kein'?'':(d.lockval||'')),technikerId:d.technikerId||'',positions:ps,reparatur:p0.reparatur,qual:p0.qual,price:p0.price,zustand:(d.zustand||blankZustand()),zsonst:(d.zsonst||{}),zubehoer:(d.zubehoer||[]),zubehoerNote:(d.zubehoerNote||''),fotos:(d.fotos||[])});
+    built.push({typ:d.typ,brand:d.brand,model:d.model,imei:d.imei,fach:d.fach,ref:d.ref,fehler:(d.fehler||''),warranty:+d.warranty||6,lock:normLock(d.lock),lockval:(normLock(d.lock)==='Kein'?'':(d.lockval||'')),technikerId:d.technikerId||'',positions:ps,reparatur:p0.reparatur,qual:p0.qual,price:p0.price,zustand:(d.zustand||blankZustand()),zsonst:(d.zsonst||{}),zubehoer:(d.zubehoer||[]),zubehoerNote:(d.zubehoerNote||''),fotos:(d.fotos||[])});
   });
   return built; }
 function noMirror(devs){ const f=devs[0]||{}; return {devtyp:f.typ||'Smartphone',brand:f.brand||'',model:f.model||'',imei:f.imei||'',fach:f.fach||'',ref:f.ref||'',qual:f.qual||'Original',warranty:f.warranty||6,lock:normLock(f.lock),lockval:f.lockval||'',issue:devs.reduce((a,d)=>a.concat(devPositions(d).map(p=>p.reparatur)),[]).filter(Boolean).join(' · '),price:devs.reduce((s,d)=>s+devTotal(d),0)}; }
@@ -1876,14 +1873,14 @@ function noStepMiss(step){ const miss=[];
   if(step===1){ if(!(NO.vorname||NO.nachname||NO.firma))miss.push({t:'Kundenname',el:'no_vorname'}); if((NO.tel||'').replace(/\D/g,'').length<5)miss.push({t:'Telefonnummer',el:'no_tel'}); }
   if(step===2){ let any=false; NO.devices.forEach((d,i)=>{ if(i>0&&!inUseDev(d))return; if(d.brand&&d.model)any=true; if(!d.brand||!d.model)miss.push({t:(NO.devices.length>1?('Gerät '+(i+1)+': '):'')+'Hersteller & Modell',el:'dev'+i+'_model'}); }); if(!any&&!miss.length)miss.push({t:'mindestens ein Gerät',el:'dev0_brand'}); }
   if(step===3){ NO.devices.forEach((d,i)=>{ if(i>0&&!inUseDev(d))return; if(!devPositions(d).some(p=>p.reparatur))miss.push({t:(NO.devices.length>1?('Gerät '+(i+1)+': '):'')+'Fehler / Reparatur',el:'dev'+i+'_pos0_reparatur'}); }); }
-  if(step===4){ NO.devices.forEach((d,i)=>{ if(i>0&&!inUseDev(d))return; const pre=NO.devices.length>1?('Gerät '+(i+1)+': '):''; const z=d.zustand||{}; if(!(((z.display||[]).length)&&((z.rueck||[]).length)&&((z.rahmen||[]).length)))miss.push({t:pre+'Gerätezustand',el:'dev'+i+'_annahme'}); if(!((d.zubehoer||[]).length))miss.push({t:pre+'Mitgegebenes Zubehör',el:'dev'+i+'_zublabel'}); if(!d.lockSet)miss.push({t:pre+'Displaysperre',el:'dev'+i+'_lockrow'}); else if(normLock(d.lock)==='PIN'&&!((d.lockval||'').trim()))miss.push({t:pre+'PIN / Passwort',el:'dev'+i+'_lockval'}); else if(normLock(d.lock)==='Muster'&&!((d.lockval||'').trim()))miss.push({t:pre+'Entsperrmuster einzeichnen',el:'dev'+i+'_lockpat'}); }); }
+  if(step===4&&NO.mode!=='angebot'){ NO.devices.forEach((d,i)=>{ if(i>0&&!inUseDev(d))return; const pre=NO.devices.length>1?('Gerät '+(i+1)+': '):''; const z=d.zustand||{}; if(!(((z.display||[]).length)&&((z.rueck||[]).length)&&((z.rahmen||[]).length)))miss.push({t:pre+'Gerätezustand',el:'dev'+i+'_annahme'}); if(!((d.zubehoer||[]).length))miss.push({t:pre+'Mitgegebenes Zubehör',el:'dev'+i+'_zublabel'}); if(!d.lockSet)miss.push({t:pre+'Displaysperre',el:'dev'+i+'_lockrow'}); else if(normLock(d.lock)==='PIN'&&!((d.lockval||'').trim()))miss.push({t:pre+'PIN / Passwort',el:'dev'+i+'_lockval'}); else if(normLock(d.lock)==='Muster'&&!((d.lockval||'').trim()))miss.push({t:pre+'Entsperrmuster einzeichnen',el:'dev'+i+'_lockpat'}); }); }
   return miss; }
 function noStepComplete(step){ return noStepMiss(step).length===0; }
 function noStepOfMiss(m){ const el=(m&&m.el)||''; if(el.indexOf('no_')===0)return 1; if(/_model$|_brand$|_typ$/.test(el))return 2; if(el.indexOf('_pos')>=0||el.indexOf('_fehler')>=0)return 3; if(el.indexOf('_annahme')>=0||el.indexOf('_zub')>=0||el.indexOf('_lock')>=0)return 4; return 5; }
 function noGo(step){ noCollect(); NO.step=Math.max(1,Math.min(5,step)); renderNewOrder(); window.scrollTo(0,0); }
 function noBack(){ noGo((NO.step||1)-1); }
 function noNext(){ noCollect(); const miss=noStepMiss(NO.step||1); if(miss.length){ noShowMissing(miss); return; } noGo((NO.step||1)+1); }
-function noJumpAndShow(miss){ if(!miss||!miss.length)return; if(NO.mode!=='angebot'){ const stp=noStepOfMiss(miss[0]); if(stp!==NO.step){ NO.step=stp; renderNewOrder(); } miss=miss.filter(m=>noStepOfMiss(m)===NO.step); } noShowMissing(miss); }
+function noJumpAndShow(miss){ if(!miss||!miss.length)return; const stp=noStepOfMiss(miss[0]); if(stp!==NO.step){ NO.step=stp; renderNewOrder(); } noShowMissing(miss.filter(m=>noStepOfMiss(m)===NO.step)); }
 function noSummary(n){
   const name=((NO.vorname+' '+NO.nachname).trim())||NO.firma||'';
   const chip=(lbl,txt)=>`<div class="card" style="margin-top:10px;padding:10px 12px;background:var(--soft);border:0"><div class="between" style="gap:10px"><div style="min-width:0"><div style="font-size:11px;font-weight:800;color:var(--green)">${lbl} ✓</div><div style="font-size:13px;margin-top:2px;word-break:break-word">${txt||'—'}</div></div><button class="btn sm gho" style="flex:none" onclick="noGo(${n})">Ändern</button></div></div>`;
@@ -1933,6 +1930,16 @@ function noAuftragContent(){ const techs=S.users||[];
        ${NO.sig?`<button class="btn gho" onclick="noCollect();NO.sig='';renderNewOrder()">Entfernen</button>`:''}
      </div>`;
 }
+function noAngebotContent(){
+  return `<b>Angebot abschließen</b>
+     <div class="note" style="margin-top:10px">Unverbindlicher Kostenvoranschlag. Nimmt der Kunde an, wird daraus mit einem Klick ein Auftrag.</div>
+     <div class="grid g2" style="margin-top:10px">
+       <div><label class="f">Priorität</label><select class="in" id="no_prio">${PRIOS.map(p=>`<option ${NO.prio===p?'selected':''}>${p}</option>`).join('')}</select></div>
+       <div><label class="f">Angebot gültig bis</label><input class="in" id="no_due" type="date" value="${NO.due}"></div>
+     </div>
+     <label class="f" style="margin-top:14px">Notiz für das Angebot (optional)</label>
+     <textarea class="in" id="no_notes" rows="3" placeholder="z. B. Diagnose vorbehalten, Preis kann nach Prüfung abweichen…">${esc(NO.notes)}</textarea>`;
+}
 function renderNewOrder(){
   const m=document.getElementById('main'); if(!m||!NO)return;
   noEnsurePositions();
@@ -1942,37 +1949,6 @@ function renderNewOrder(){
   const c=NO; const techs=S.users||[]; const isQ=NO.mode==='angebot';
   const dls=`<datalist id="allDevices">${catBrands().flatMap(b=>catModelNames(b).map(mm=>`<option value="${esc(b+' '+mm)}"></option>`)).join('')}</datalist>
   <datalist id="allRepairs">${catRepairs().map(r=>`<option value="${esc(r)}"></option>`).join('')}</datalist>`;
-  if(isQ){
-    m.innerHTML=dls+`<div id="noForm">
-   <div class="between" style="flex-wrap:wrap;gap:12px">
-     <div><button class="btn sm gho" onclick="noCancel()">← Zurück</button>
-       <h1 class="h1" style="margin-top:8px">${NO.quoteEditId?'Angebot bearbeiten':'Neues Angebot'}</h1>
-       <p class="sub">Kostenvoranschlag für den Kunden</p></div>
-     <div class="row"><button class="btn" onclick="noQuoteSave('entwurf')">Als Entwurf speichern</button><button class="btn pri cta" onclick="noQuoteSave('offen')">Angebot erstellen</button></div>
-   </div>
-   <div class="card" style="margin-top:16px">${noCustomerContent()}</div>
-   <div class="card" style="margin-top:16px"><b>Gerät &amp; Fehlerbeschreibung</b>
-     ${NO.devices.map((d,i)=>noDevBlock(d,i)).join('')}
-     ${NO.devices.length<4?`<button class="btn" style="margin-top:12px;width:100%" onclick="noAddDevice()">+ Weiteres Gerät hinzufügen (optional)</button>`:''}
-     <label class="f" style="margin-top:14px">Detaillierte Informationen &amp; Notizen</label>
-     <textarea class="in" id="no_notes" rows="3" placeholder="Kundenhinweise, technische Hinweise…">${esc(NO.notes)}</textarea>
-   </div>
-   <div class="card" style="margin-top:16px"><b>Angebots-Details</b>
-     <div class="grid g2" style="margin-top:10px">
-       <div><label class="f">Priorität</label><select class="in" id="no_prio">${PRIOS.map(p=>`<option ${NO.prio===p?'selected':''}>${p}</option>`).join('')}</select></div>
-       <div><label class="f">Angebot gültig bis</label><input class="in" id="no_due" type="date" value="${NO.due}"></div>
-     </div>
-     <div class="note" style="margin-top:12px">Der Kunde erhält einen unverbindlichen Kostenvoranschlag. Nimmt er an, wird daraus mit einem Klick ein Auftrag.</div>
-   </div>
-   <div class="row" style="margin:18px 0 48px;justify-content:flex-end;flex-wrap:wrap;gap:10px">
-     <button class="btn gho" onclick="noCancel()">Abbrechen</button>
-     <button class="btn" onclick="noQuoteSave('entwurf')">Als Entwurf speichern</button><button class="btn pri cta" onclick="noQuoteSave('offen')">Angebot erstellen</button>
-   </div>
-  </div>`;
-    const fq=document.getElementById('noForm'); if(fq){fq.addEventListener('input',noSaveDraftDebounced);fq.addEventListener('change',noSaveDraftDebounced);}
-    NO.devices.forEach((d,i)=>{if(normLock(d.lock)==='Muster')patBind(i);});
-    paintIcons(); window.scrollTo(0,_sy); return;
-  }
   /* ---- Auftrag: geführter 5-Schritt-Ablauf ---- */
   if(!NO.step)NO.step=1; const step=NO.step;
   const bar=WSTEPS.map(([n,lbl],ix)=>{const active=n===step;const ok=noStepComplete(n);
@@ -1987,22 +1963,22 @@ function renderNewOrder(){
      +(NO.devices.length<4?`<button class="btn" style="margin-top:12px;width:100%" onclick="noAddDevice()">+ Weiteres Gerät hinzufügen (optional)</button>`:''); }
   else if(step===3){ content=`<b>Fehler</b><p class="muted" style="font-size:12px;margin-top:2px">Was ist das Problem? Fehlerart wählen und beschreiben.</p>`
      +NO.devices.map((d,i)=>{ if(i>0&&!inUseDev(d))return ''; return `<div class="card" style="background:var(--soft);border:0;margin-top:12px"><b>Gerät ${i+1}: ${esc([d.brand,d.model].filter(Boolean).join(' '))||'—'}</b>${noFehlerFields(d,i)}</div>`; }).join(''); }
-  else if(step===4){ content=`<b>Zustand &amp; Zubehör</b><p class="muted" style="font-size:12px;margin-top:2px">Annahmezustand dokumentieren, Zubehör und Displaysperre erfassen.</p>`
+  else if(step===4){ content=`<b>Zustand &amp; Zubehör${isQ?" <span class=\"muted\" style=\"font-weight:400\">(optional)</span>":""}</b><p class="muted" style="font-size:12px;margin-top:2px">Annahmezustand dokumentieren, Zubehör und Displaysperre erfassen.${isQ?" Für ein Angebot optional.":""}</p>`
      +NO.devices.map((d,i)=>{ if(i>0&&!inUseDev(d))return ''; return `<div class="card" style="background:var(--soft);border:0;margin-top:12px"><b>Gerät ${i+1}: ${esc([d.brand,d.model].filter(Boolean).join(' '))||'—'}</b>${noAnnahmeBlock(d,i)}${noLockBlock(d,i)}</div>`; }).join(''); }
-  else { content=noAuftragContent(); }
+  else { content=isQ?noAngebotContent():noAuftragContent(); }
   let summaries=''; for(let n=1;n<step;n++)summaries+=noSummary(n);
   const footer=`<div class="row" style="margin:16px 0 48px;gap:10px;flex-wrap:wrap;align-items:center">
      <button class="btn gho" onclick="noCancel()">Abbrechen</button>
-     ${NO.editId?'':`<button class="btn" onclick="noSaveExit()">Als Entwurf speichern</button>`}
+     ${isQ?`<button class="btn" onclick="noQuoteSave('entwurf')">Als Entwurf speichern</button>`:(NO.editId?'':`<button class="btn" onclick="noSaveExit()">Als Entwurf speichern</button>`)}
      <span style="flex:1"></span>
      ${step>1?`<button class="btn" onclick="noBack()">← Zurück</button>`:''}
-     ${step<5?`<button class="btn pri cta" onclick="noNext()">Weiter →</button>`:`<button class="btn pri cta" onclick="noFinalize()">${NO.editId?'Speichern':'Auftrag erstellen'}</button>`}
+     ${step<5?`<button class="btn pri cta" onclick="noNext()">Weiter →</button>`:(isQ?`<button class="btn pri cta" onclick="noQuoteSave('offen')">${NO.quoteEditId?'Angebot speichern':'Angebot erstellen'}</button>`:`<button class="btn pri cta" onclick="noFinalize()">${NO.editId?'Speichern':'Auftrag erstellen'}</button>`)}
    </div>`;
   m.innerHTML=dls+`<div id="noForm">
    <div class="between" style="flex-wrap:wrap;gap:12px">
      <div><button class="btn sm gho" onclick="noCancel()">← Abbrechen</button>
-       <h1 class="h1" style="margin-top:8px">${NO.editId?'Auftrag bearbeiten':'Neuer Auftrag'}</h1>
-       <p class="sub">Reparatur-Eingang · Schritt ${step} von 5</p></div>
+       <h1 class="h1" style="margin-top:8px">${isQ?(NO.quoteEditId?'Angebot bearbeiten':'Neues Angebot'):(NO.editId?'Auftrag bearbeiten':'Neuer Auftrag')}</h1>
+       <p class="sub">${isQ?'Kostenvoranschlag':'Reparatur-Eingang'} · Schritt ${step} von 5</p></div>
    </div>
    <div class="card" style="margin-top:14px"><div class="row" style="gap:2px;align-items:flex-start">${bar}</div></div>
    ${summaries}
@@ -2077,12 +2053,56 @@ function quoteToOrder(id){const q=(S.quotes||[]).find(x=>x.id===id);if(!q)return
   const rc=S.rules.find(x=>x.id==='r_confirm'); if(rc&&rc.on&&cust(q.cid).mail)logMail(o,rc,'automatisch (aus Angebot)');
   closeAll(); toast('Auftrag '+nr+' aus Angebot erstellt'); go('auftraege'); refreshBadges();
 }
-function printQuote(id){const q=(S.quotes||[]).find(x=>x.id===id);if(!q)return;const c=cust(q.cid);
-  printHTML('Angebot '+q.nr, shopHead()+`<h2>Angebot / Kostenvoranschlag</h2><div class="muted">Angebot ${q.nr} · ${fmtDate(q.created)}</div>
-    <div class="box" style="margin-top:12px"><b>${esc(c.name)}</b><br><span class="muted">${esc(c.adr)}</span></div>
-    <table><thead><tr><th>Leistung</th><th style="text-align:right">Preis</th></tr></thead><tbody>${posRows(q)}</tbody></table>
-    <div class="tot"><span>Gesamt (inkl. MwSt.)</span><span>${eur(oTotal(q))}</span></div>${totVatLine(q)}
-    <div class="foot">Unverbindliches Angebot, gültig bis ${fmtDate(q.validUntil)}. Der endgültige Preis kann nach genauer Prüfung des Geräts abweichen; wir informieren Sie vor Ausführung.<br>${SHOP.name} · ${SHOP.street}, ${SHOP.zip} ${SHOP.city}</div>`);
+function quotePortalUrl(q){ if(q.orderId){const o=S.ord.find(x=>x.id===q.orderId); if(o)return orderPortalUrl(o);} return q.portalToken?(location.origin+'/status.html?t='+q.portalToken):(location.origin+'/status.html?nr='+encodeURIComponent(q.nr)); }
+function printQuote(id){ const q=(S.quotes||[]).find(x=>x.id===id); if(!q)return;
+  if(DB.backend==='server' && !q.portalToken && !q.orderId){ try{ portalSync(q,function(){ _printQuoteDoc(q); }); return; }catch(e){} }
+  _printQuoteDoc(q);
+}
+function _printQuoteDoc(q){
+  const c=cust(q.cid); const ACC='#0e7a3c';
+  const logo=(S.settings&&S.settings.logo)?`<img src="${S.settings.logo}" style="height:52px;max-width:200px;object-fit:contain">`:`<div style="font-weight:800;font-size:22px;color:${ACC}">${esc(SHOP.name)}</div>`;
+  const compContact=[SHOP.phone?('Tel. '+esc(SHOP.phone)):'',SHOP.email?esc(SHOP.email):'',(SHOP.web?esc(SHOP.web):'')].filter(Boolean).join(' · ');
+  const devBlocks=oDevices(q).map((d,i)=>{ const nm=[d.brand,d.model].filter(Boolean).join(' ')||'Gerät'; const fb=(d.fehler||'').trim(); const ra=devPositions(d).map(p=>esc(p.reparatur)).filter(Boolean).join(', ');
+    return `<div style="margin-top:14px">
+      <div style="font-size:10px;font-weight:700;letter-spacing:.06em;color:#8a96a3">GERÄT${oDevices(q).length>1?' '+(i+1):''}</div>
+      <div style="font-weight:700;font-size:15px;color:#1a2b22">${esc(nm)}${d.imei?` <span style="font-weight:400;color:#8a96a3;font-size:12px">· IMEI ${esc(d.imei)}</span>`:''}</div>
+      ${fb?`<div style="margin-top:6px"><div style="font-size:10px;font-weight:700;letter-spacing:.06em;color:#8a96a3">FEHLERBESCHREIBUNG / KUNDENANGABE</div><div style="font-size:13px;color:#33403a;white-space:pre-wrap">${esc(fb)}</div></div>`:''}
+      ${ra?`<div style="margin-top:6px"><div style="font-size:10px;font-weight:700;letter-spacing:.06em;color:#8a96a3">VORGESCHLAGENE REPARATUR</div><div style="font-size:13px;color:#33403a">${ra}</div></div>`:''}
+    </div>`;}).join('');
+  const posLines=oDevices(q).reduce((a,d)=>a.concat(devPositions(d).map(p=>({name:([d.brand,d.model].filter(Boolean).join(' ')+' — '+(p.reparatur||'Position')+(posQual(p)?' ('+posQual(p)+')':'')),price:+p.price||0}))),[]);
+  const rows=posLines.map(p=>`<tr><td style="padding:9px 0;border-bottom:1px solid #eef1f0;font-size:13px;color:#1a2b22">${esc(p.name)}</td><td style="padding:9px 0;border-bottom:1px solid #eef1f0;text-align:center;font-size:13px;color:#667">1</td><td style="padding:9px 0;border-bottom:1px solid #eef1f0;text-align:right;font-size:13px;color:#1a2b22;white-space:nowrap">${eur(p.price)}</td></tr>`).join('');
+  const gross=oTotal(q), net=netOf(gross), vat=vatOf(gross);
+  const body=`<style>#kva,#kva *{color:#1a2b22}</style><div id="kva" style="background:#fff">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px">
+      <div>${logo}</div>
+      <div style="text-align:right;font-size:11px;color:#667;line-height:1.5"><div style="font-weight:700;color:#1a2b22;font-size:13px">${esc(SHOP.name)}</div><div>${esc(SHOP.street)}</div><div>${esc(((SHOP.zip||'')+' '+(SHOP.city||'')).trim())}</div>${compContact?`<div style="margin-top:3px">${compContact}</div>`:''}</div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:22px;padding-bottom:10px;border-bottom:2px solid ${ACC}">
+      <div style="font-size:24px;font-weight:800;letter-spacing:-.5px;color:#1a2b22">Kostenvoranschlag</div>
+      <div style="text-align:right;font-size:12px;color:#667"><div><b style="color:#1a2b22">Nr. ${esc(q.nr)}</b></div><div>Datum: ${fmtDate(q.created)}</div><div>Gültig bis: ${fmtDate(q.validUntil)}</div></div>
+    </div>
+    <div style="margin-top:16px"><div style="font-size:10px;font-weight:700;letter-spacing:.06em;color:#8a96a3">KUNDE</div>
+      <div style="font-size:14px;color:#1a2b22;line-height:1.55;margin-top:2px"><div style="font-weight:700">${esc(c.name)||'—'}</div>${c.adr?`<div>${esc(c.adr)}</div>`:''}${(c.plz||c.stadt)?`<div>${esc(((c.plz||'')+' '+(c.stadt||'')).trim())}</div>`:''}${c.mail?`<div>${esc(c.mail)}</div>`:''}${c.tel?`<div>${esc(c.tel)}</div>`:''}</div>
+    </div>
+    ${devBlocks}
+    <table style="width:100%;border-collapse:collapse;margin-top:20px">
+      <thead><tr><th style="text-align:left;font-size:10px;letter-spacing:.06em;color:#8a96a3;padding:0 0 6px;border-bottom:2px solid #eef1f0">LEISTUNG</th><th style="text-align:center;font-size:10px;letter-spacing:.06em;color:#8a96a3;padding:0 0 6px;border-bottom:2px solid #eef1f0">MENGE</th><th style="text-align:right;font-size:10px;letter-spacing:.06em;color:#8a96a3;padding:0 0 6px;border-bottom:2px solid #eef1f0">EINZELPREIS</th></tr></thead>
+      <tbody>${rows||'<tr><td style="padding:9px 0;color:#8a96a3;font-size:13px">Positionen folgen nach der Diagnose.</td><td></td><td></td></tr>'}</tbody>
+    </table>
+    <div style="display:flex;justify-content:flex-end;margin-top:16px"><div style="min-width:240px">
+      <div style="display:flex;justify-content:space-between;font-size:13px;color:#667;padding:3px 0"><span>Nettobetrag</span><span>${eur(net)}</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:13px;color:#667;padding:3px 0"><span>zzgl. ${MWST_RATE} % MwSt.</span><span>${eur(vat)}</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:800;color:#1a2b22;padding:8px 0;margin-top:4px;border-top:2px solid ${ACC}"><span>Gesamtbetrag</span><span>${eur(gross)}</span></div>
+    </div></div>
+    <div style="display:flex;gap:14px;align-items:center;margin-top:22px;padding:14px;background:#f6f9f7;border-radius:12px">
+      <div style="flex:none">${RQR.svg(quotePortalUrl(q),{cell:3,margin:2})}</div>
+      <div style="font-size:12px;color:#33403a"><div style="font-weight:700;color:#1a2b22;font-size:13px">Auftrag online ansehen</div>QR-Code scannen und den Vorgang jederzeit im geschützten Kundenbereich verfolgen.</div>
+    </div>
+    ${q.notes?`<div style="margin-top:16px;font-size:12px;color:#33403a"><b style="color:#1a2b22">Hinweis:</b> ${esc(q.notes)}</div>`:''}
+    <div style="margin-top:18px;font-size:11px;color:#8a96a3;line-height:1.5">Unverbindlicher Kostenvoranschlag. Der endgültige Preis kann nach genauer Prüfung des Geräts abweichen; wir informieren Sie vor Ausführung. Alle Preise inkl. gesetzlicher MwSt.</div>
+    <div style="margin-top:8px;font-size:11px;color:#8a96a3">${esc(SHOP.name)} · ${esc(SHOP.street)}, ${esc(((SHOP.zip||'')+' '+(SHOP.city||'')).trim())}${SHOP.phone?' · '+esc(SHOP.phone):''}${SHOP.email?' · '+esc(SHOP.email):''}</div>
+  </div>`;
+  showDoc('Kostenvoranschlag '+q.nr, body);
 }
 function requestToQuote(id){const r=(S.requests||[]).find(x=>x.id===id);if(!r)return;const nm=(r.name||'').split(' ');
   newQuote({fromRequest:id,vorname:nm.slice(0,-1).join(' ')||nm[0]||'',nachname:nm.length>1?nm[nm.length-1]:'',tel:r.tel||'+49 ',mail:r.mail||'',
@@ -3877,7 +3897,7 @@ views.einstellungen=function(){
          </div>
          <div>
            <label class="f">3 · QR-Code <span class="muted">(Theke, Flyer, Schaufenster, Instagram-Bio)</span></label>
-           <div style="border:1px solid var(--line);border-radius:12px;padding:12px;background:#fff;display:inline-block">${qrSVG(siteFormShort(),150)}</div>
+           <div style="border:1px solid var(--line);border-radius:12px;padding:12px;background:#fff;display:inline-block">${RQR.svg(siteFormShort(),{cell:4,margin:3})}</div>
            <div class="muted" style="font-size:12px;margin-top:6px">Kunde scannt → Anfrageformular öffnet sich sofort.</div>
          </div>
        </div>
