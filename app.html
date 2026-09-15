@@ -233,6 +233,7 @@
       <a data-view="angebote"><span class="ic" data-ic="pen"></span> Angebote <span class="badge" id="bg-ang">0</span></a>
       <a data-view="kalender"><span class="ic" data-ic="cal"></span> Kalender</a>
       <a data-view="kunden"><span class="ic" data-ic="user"></span> Kunden</a>
+      <a data-view="postfach"><span class="ic" data-ic="chat"></span> Kunden-Postfach <span class="badge" id="bg-postfach">0</span></a>
       <a data-view="versicherung"><span class="ic" data-ic="shield"></span> Versicherung <span class="badge" id="bg-ins">0</span></a>
       <div class="grouplbl">Werkstatt</div>
       <a data-view="erinnerungen"><span class="ic" data-ic="bell"></span> Erinnerungen <span class="badge" id="bg-rem">0</span></a>
@@ -260,7 +261,7 @@
       <div class="sp"></div>
       <button class="btn gho" title="Scannen (Barcode / IMEI)" onclick="var g=document.getElementById('gsearch');g.value='';g.focus();toast('Bereit zum Scannen – Barcode/IMEI einlesen')"><span class="ic" data-ic="label"></span></button>
       <button class="btn gho" title="Kasse öffnen" onclick="go('kasse')"><span class="ic" data-ic="cart"></span></button>
-      <button class="btn gho" title="Benachrichtigungen" onclick="go('dashboard')" style="position:relative"><span class="ic" data-ic="bell"></span><span class="badge" id="bg-notif" style="position:absolute;top:-4px;right:-4px;display:none">0</span></button>
+      <button class="btn gho" title="Kunden-Postfach & Benachrichtigungen" onclick="go('postfach')" style="position:relative"><span class="ic" data-ic="bell"></span><span class="badge" id="bg-notif" style="position:absolute;top:-4px;right:-4px;display:none">0</span></button>
       <button class="btn pri" onclick="newOrder()"><span class="ic" data-ic="plus"></span> Neuer Auftrag</button>
     </div>
     <div class="content" id="main"></div>
@@ -305,6 +306,7 @@ const ICONS={
  pen:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>',
  cart:'<circle cx="9" cy="21" r="1.5"/><circle cx="18" cy="21" r="1.5"/><path d="M2 3h3l2.5 13h11l2-9H6"/>',
  mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
+ chat:'<path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
  phone:'<path d="M6.6 10.8a15 15 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.24 11 11 0 0 0 3.5.56 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.6a1 1 0 0 1 1 1 11 11 0 0 0 .56 3.5 1 1 0 0 1-.24 1z"/>',
  diag:'<path d="M12 3l1.7 4.1L18 8.8l-4.3 1.7L12 15l-1.7-4.5L6 8.8l4.3-1.7L12 3z"/><path d="M18.5 14l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9.9-2.1z"/>',
  truck:'<rect x="1" y="6" width="13" height="10" rx="1"/><path d="M14 9h4l3 3v4h-7z"/><circle cx="5.5" cy="18" r="1.7"/><circle cx="17.5" cy="18" r="1.7"/>',
@@ -857,7 +859,8 @@ function refreshBadges(){
   const bo=document.getElementById('bg-best'); if(bo){const n=(S.orders||[]).filter(b=>b.status!=='geliefert'&&b.status!=='storniert').length; bo.textContent=n; bo.style.display=n?'':'none';}
   const bs=document.getElementById('bg-ship'); if(bs){const n=(S.shipments||[]).filter(s=>['transit_in','received','repair'].includes(s.status)).length; bs.textContent=n; bs.style.display=n?'':'none';}
   const bv=document.getElementById('bg-vert'); if(bv){const n=(S.contracts||[]).reduce((a,c)=>a+(c.bills||[]).filter(b=>b.status!=='bezahlt').length,0); bv.textContent=n; bv.style.display=n?'':'none';}
-  const bn=document.getElementById('bg-notif'); if(bn){const n=((S.requests||[]).length)+((S.feedback||[]).length)+((S.warrantyClaims||[]).length)+(typeof uncollectedOrders==='function'?uncollectedOrders().length:0)+((S.drafts||[]).length); bn.textContent=n; bn.style.display=n?'':'none';}
+  const _pfu=(typeof pfUnread==='function')?pfUnread():0; const bp=document.getElementById('bg-postfach'); if(bp){bp.textContent=_pfu; bp.style.display=_pfu?'':'none';}
+  const bn=document.getElementById('bg-notif'); if(bn){const n=_pfu+((S.requests||[]).length)+((S.feedback||[]).length)+((S.warrantyClaims||[]).length)+(typeof uncollectedOrders==='function'?uncollectedOrders().length:0)+((S.drafts||[]).length); bn.textContent=n; bn.style.display=n?'':'none';}
 }
 
 /* ---- KI-Tagesbriefing / Chef-Cockpit (L16) ---- */
@@ -2199,11 +2202,11 @@ function waOpen(id){ const o=S.ord.find(x=>x.id===id); const num=(document.getEl
   try{ if(o){ const arr=ensureComms(o); arr.push({dir:'out',kind:'wa',text:msg,at:new Date().toISOString()}); logActivity(o,'wa','WhatsApp-Nachricht an Kunden geöffnet'); save(); if(DB.backend==='server')portalSync(o); } }catch(e){}
   window.__waKind=''; closeAll(); toast('WhatsApp geöffnet – bitte auf „Senden" tippen');
 }
-function commLog(o,dir,internal,text,kind){ const u=curUser(); ensureComms(o).push({id:uid('m'),dir:dir,internal:!!internal,text:text,kind:kind||'nachricht',by:(u&&u.name)||'',at:new Date().toISOString()}); }
+function commLog(o,dir,internal,text,kind){ const u=curUser(); ensureComms(o).push({id:uid('m'),dir:dir,internal:!!internal,text:text,kind:kind||'nachricht',by:(u&&u.name)||'',read:(dir!=='in'),at:new Date().toISOString()}); }
 function orderCommsPanel(o){ const cs=ensureComms(o);
   const ext=cs.filter(c=>!c.internal), int=cs.filter(c=>c.internal); const c=cust(o.cid);
   const bubble=(m)=>{const mine=m.dir!=='in'; return `<div style="display:flex;justify-content:${mine?'flex-end':'flex-start'};margin:4px 0"><div style="max-width:82%;background:${mine?'var(--accent,#16a34a)':'var(--soft)'};color:${mine?'#fff':'var(--ink)'};border-radius:12px;padding:8px 11px;font-size:13px"><div style="white-space:pre-wrap">${esc(m.text)}</div><div style="opacity:.7;font-size:10px;margin-top:3px">${m.dir==='in'?'Kunde':(esc(m.by||'Werkstatt'))} · ${new Date(m.at).toLocaleString('de-DE')}${m.kind==='kva'?' · KVA':''}</div></div></div>`;};
-  return `<div class="card" style="margin-top:14px"><b>Kommunikation</b>
+  return `<div class="card" id="commPanel" style="margin-top:14px"><b>Kommunikation</b>
     <div class="row" style="gap:6px;margin-top:8px"><button class="btn sm ${(!o._commTab||o._commTab==='ext')?'pri':'gho'}" onclick="commTab('${o.id}','ext')">Kundenkommunikation</button><button class="btn sm ${o._commTab==='int'?'pri':'gho'}" onclick="commTab('${o.id}','int')">Interne Notizen</button></div>
     ${(!o._commTab||o._commTab==='ext')?`
       <div style="margin-top:10px;max-height:230px;overflow:auto;padding:4px;border:1px solid var(--line);border-radius:10px;background:#fff">${ext.length?ext.map(bubble).join(''):'<div class="muted" style="font-size:12px;text-align:center;padding:10px">Noch keine Nachrichten an den Kunden.</div>'}</div>
@@ -2249,8 +2252,46 @@ function portalPollReplies(){ if(DB.backend!=='server')return; fetch(API+'/api/p
     if(!res||!res.items||!res.items.length)return; const ids=[]; let n=0;
     res.items.forEach(it=>{ ids.push(it.id); const o=S.ord.find(x=>x.id===it.orderId); if(o){ commLog(o,'in',false,it.text,'nachricht'); n++; } });
     fetch(API+'/api/portal/replies/consume',{method:'POST',headers:DB._hdr(),body:JSON.stringify({ids:ids})}).catch(()=>{});
-    if(n){ save(); if(current==='auftraege')views.auftraege(); paintIcons(); refreshBadges&&refreshBadges(); toast(n+' neue Kundenantwort'+(n>1?'en':'')); }
+    if(n){ save(); if(current==='auftraege')views.auftraege(); else if(current==='postfach')views.postfach(); paintIcons(); refreshBadges&&refreshBadges(); toast('📬 '+n+' neue Kundennachricht'+(n>1?'en':'')+' im Postfach'); }
   }).catch(()=>{}); }
+/* ============================ KUNDEN-POSTFACH (v6 #6) ============================ */
+let pfFilter='alle';
+function pfThreads(){ const out=[];
+  (S.ord||[]).forEach(o=>{ if(o.trashed)return; const ext=ensureComms(o).filter(m=>!m.internal); const ins=ext.filter(m=>m.dir==='in'); if(!ins.length)return;
+    const lastIn=ins[ins.length-1]; const unread=ins.filter(m=>!m.read).length;
+    const answered=ext.some(m=>m.dir==='out' && String(m.at)>String(lastIn.at));
+    const status=unread>0?'neu':(answered?'beantwortet':'gelesen');
+    out.push({o:o,ext:ext,lastIn:lastIn,unread:unread,answered:answered,status:status,lastAt:ext[ext.length-1].at});
+  });
+  out.sort((a,b)=>String(b.lastAt).localeCompare(String(a.lastAt)));
+  return out; }
+function pfUnread(){ try{ return pfThreads().reduce((s,t)=>s+t.unread,0); }catch(e){ return 0; } }
+function pfOpen(id){ const o=S.ord.find(x=>x.id===id); if(!o)return; let changed=false; ensureComms(o).forEach(m=>{ if(m.dir==='in'&&!m.read){m.read=true;changed=true;} }); if(changed){ logActivity(o,'mail','Kundennachricht gelesen'); save(); } o._commTab='ext'; refreshBadges&&refreshBadges(); openOrder(id);
+  setTimeout(function(){ var el=document.getElementById('commPanel'); if(el)el.scrollIntoView({behavior:'smooth',block:'start'}); },120); }
+views.postfach=function(){
+  const m=document.getElementById('main'); const threads=pfThreads();
+  const total=threads.length, unreadN=threads.filter(t=>t.unread>0).length, unansweredN=threads.filter(t=>!t.answered).length, answeredN=threads.filter(t=>t.answered).length;
+  let list=threads;
+  if(pfFilter==='ungelesen')list=threads.filter(t=>t.unread>0);
+  else if(pfFilter==='unbeantwortet')list=threads.filter(t=>!t.answered);
+  else if(pfFilter==='beantwortet')list=threads.filter(t=>t.answered);
+  const chip=(k,l,n)=>`<button class="chip ${pfFilter===k?'on':''}" onclick="pfFilter='${k}';views.postfach();paintIcons()">${l}${n!=null?' · '+n:''}</button>`;
+  const stCol={neu:'#b4231a',gelesen:'#d99a00',beantwortet:'#34a24a'}; const stLbl={neu:'Neu',gelesen:'Gelesen',beantwortet:'Beantwortet'};
+  m.innerHTML=`<div class="between"><div><h1 class="h1">Kunden-Postfach</h1><p class="sub">Nachrichten aus dem Kundenportal – keine bleibt unbemerkt</p></div></div>
+   <div class="row" style="margin:14px 0;gap:8px;flex-wrap:wrap">${chip('alle','Alle',total)}${chip('ungelesen','Ungelesen',unreadN)}${chip('unbeantwortet','Unbeantwortet',unansweredN)}${chip('beantwortet','Beantwortet',answeredN)}</div>
+   ${list.length?`<div class="card" style="padding:0">${list.map(t=>{const c=cust(t.o.cid);const col=stCol[t.status];return `<div class="listitem" style="cursor:pointer;${t.unread?'background:var(--soft)':''}" onclick="pfOpen('${t.o.id}')">
+      <div class="avatar ${t.unread?'':'out'}">${initials(c.name)}</div>
+      <div style="flex:1;min-width:0">
+        <div class="between" style="gap:8px"><b style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.unread?'🔴 ':''}${esc(c.name||'—')}</b><span class="muted" style="font-size:11px;flex:none">${fmtDateTime(t.lastAt)}</span></div>
+        <div class="muted" style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.o.nr)} · ${esc(oDevLabel(t.o))} · ${esc(statusLabel(t.o.status))}</div>
+        <div style="font-size:13px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.lastIn.text)}</div>
+      </div>
+      <span class="pill" style="border-color:${col};color:${col};flex:none;align-self:center"><span class="d" style="background:${col}"></span>${stLbl[t.status]}${t.unread>1?(' '+t.unread):''}</span>
+    </div>`;}).join('')}</div>
+    <div class="note" style="margin-top:12px">Ein Klick öffnet den Auftrag und springt direkt zur Unterhaltung. „Gelesen“ wird beim Öffnen gesetzt, „Beantwortet“ erst, wenn du dem Kunden antwortest.</div>`
+   :`<div class="card"><div class="empty">Keine Nachrichten${pfFilter!=='alle'?' in diesem Filter':''}. Sobald ein Kunde über den QR-Code / das Kundenportal schreibt, erscheint die Nachricht hier – mit Zähler an Glocke und Menü.</div></div>`}`;
+  paintIcons();
+};
 /* ---- Bewertungs-Booster (L6): Feedback von der Statusseite ---- */
 function pullFeedback(){let arr=[];try{arr=JSON.parse(localStorage.getItem('reparado_feedback')||'[]');}catch(e){}if(!arr.length)return 0;S.feedback=S.feedback||[];arr.forEach(f=>{S.feedback.unshift(Object.assign({id:uid('fb')},f,{ts:f.ts?(typeof f.ts==='number'?new Date(f.ts).toISOString():f.ts):new Date().toISOString()}));});localStorage.removeItem('reparado_feedback');save();return arr.length;}
 function dismissFb(id){S.feedback=(S.feedback||[]).filter(f=>f.id!==id);save();views.dashboard();paintIcons();toast('Erledigt');}
