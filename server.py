@@ -19,6 +19,7 @@ Konfiguration: config.py (nicht im oeffentlichen Repo!). Fehlt sie, gelten lokal
 """
 import json, os, sqlite3, hmac, hashlib, base64, time, smtplib, ssl, threading
 from email.message import EmailMessage
+from email.utils import formataddr, parseaddr
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 import urllib.request as _urlreq, urllib.parse as _urlparse, urllib.error as _urlerr, calendar as _cal
@@ -282,29 +283,60 @@ def _ws_pub(wid):
 _PUB_HITS = {}
 
 # ---------- Mail ----------
-def send_mail(workshop_id, to, subject, body, html=None):
-    host = _cfg("SMTP_HOST", "")
+def _ws_mailcfg(wid):
+    with db() as c:
+        r = c.execute("SELECT value FROM app_data WHERE workshop_id=? AND key='mailcfg'", (wid,)).fetchone()
+    if not r:
+        return {}
+    try: return json.loads(r["value"])
+    except Exception: return {}
+
+def send_mail(workshop_id, to, subject, body, html=None, from_name=None, reply_to=None):
+    """White-Label: Kunden-Mails (mit from_name) erscheinen unter dem Namen des Betriebs;
+    wenn der Betrieb ein eigenes SMTP-Konto hinterlegt hat, wird darüber versendet (echte
+    Domain/SPF/DKIM). Plattform-Mails (2FA/Reset, ohne from_name) laufen über das Master-Konto."""
     ts = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    cfg = _ws_mailcfg(workshop_id) if (from_name or reply_to) else {}
+    own = bool(cfg.get("smtpHost") and cfg.get("smtpUser") and cfg.get("smtpPass"))
+    host = cfg.get("smtpHost") if own else _cfg("SMTP_HOST", "")
+    port = int((cfg.get("smtpPort") if own else _cfg("SMTP_PORT", 587)) or 587)
+    user = cfg.get("smtpUser") if own else _cfg("SMTP_USER", "")
+    pw = cfg.get("smtpPass") if own else _cfg("SMTP_PASS", "")
     if not host:
         with db() as c:
             c.execute("INSERT INTO mail_log(workshop_id,ts,recipient,subject,sent,note) VALUES(?,?,?,?,?,?)",
                       (workshop_id, ts, to, subject, 0, "SMTP nicht konfiguriert – nur protokolliert"))
         return False, "SMTP nicht konfiguriert – Nachricht protokolliert, nicht gesendet"
+    # Absender-Identität
+    master = _cfg("MAIL_FROM", "Reparado <noreply@example.com>")
+    master_addr = parseaddr(master)[1] or master
+    if own:
+        addr = (cfg.get("fromEmail") or cfg.get("smtpUser") or master_addr)
+    else:
+        addr = master_addr
+    disp = from_name or parseaddr(master)[0] or ""
     msg = EmailMessage()
-    msg["From"] = _cfg("MAIL_FROM", "Reparado <noreply@example.com>")
+    msg["From"] = formataddr((disp, addr)) if disp else (addr or master)
     msg["To"] = to
     msg["Subject"] = subject
+    rt = reply_to or (cfg.get("replyTo") if own else "")
+    if rt:
+        msg["Reply-To"] = rt
     msg.set_content(body or "")
     if html:
         msg.add_alternative(html, subtype="html")
     try:
         ctx = ssl.create_default_context()
-        with smtplib.SMTP(host, int(_cfg("SMTP_PORT", 587)), timeout=20) as s:
-            s.starttls(context=ctx)
-            if _cfg("SMTP_USER"):
-                s.login(_cfg("SMTP_USER"), _cfg("SMTP_PASS"))
-            s.send_message(msg)
-        note = "gesendet"
+        if port == 465:
+            with smtplib.SMTP_SSL(host, port, timeout=20, context=ctx) as s:
+                if user: s.login(user, pw)
+                s.send_message(msg)
+        else:
+            with smtplib.SMTP(host, port, timeout=20) as s:
+                s.starttls(context=ctx)
+                if user: s.login(user, pw)
+                s.send_message(msg)
+        note = "gesendet" + (" (eigenes Konto)" if own else "")
         ok = True
     except Exception as e:
         note = "Fehler: " + str(e)
@@ -760,6 +792,15 @@ class H(BaseHTTPRequestHandler):
             if not p:
                 return self._send(401, {"error": "unauthorized"})
             return self._send(200, {"ok": True, "key": _ws_pub(p["wid"])})
+        if self.path == "/api/mail/config":
+            p = self._auth()
+            if not p:
+                return self._send(401, {"error": "unauthorized"})
+            cfg = _ws_mailcfg(p["wid"])
+            return self._send(200, {"ok": True, "fromEmail": cfg.get("fromEmail", ""), "replyTo": cfg.get("replyTo", ""),
+                                    "smtpHost": cfg.get("smtpHost", ""), "smtpPort": cfg.get("smtpPort", ""),
+                                    "smtpUser": cfg.get("smtpUser", ""), "smtpConfigured": bool(cfg.get("smtpHost") and cfg.get("smtpUser") and cfg.get("smtpPass")),
+                                    "masterConfigured": bool(_cfg("SMTP_HOST", ""))})
         if self.path == "/api/voice/config":
             # Werkstatt liest ihre Telefon-Bot-Konfiguration + die Webhook-URL für Twilio.
             p = self._auth()
@@ -1299,8 +1340,24 @@ class H(BaseHTTPRequestHandler):
             to = body.get("to"); subj = body.get("subject", ""); text = body.get("body", "")
             if not to:
                 return self._send(400, {"error": "Empfaenger fehlt"})
-            ok, note = send_mail(p["wid"], to, subj, text, body.get("html"))
+            ok, note = send_mail(p["wid"], to, subj, text, body.get("html"), body.get("fromName"), body.get("replyTo"))
             return self._send(200, {"sent": ok, "note": note})
+
+        if self.path == "/api/mail/config":
+            p = self._auth()
+            if not p:
+                return self._send(401, {"error": "unauthorized"})
+            cur = _ws_mailcfg(p["wid"])
+            nc = {"fromEmail": str(body.get("fromEmail", cur.get("fromEmail", "")))[:160],
+                  "replyTo": str(body.get("replyTo", cur.get("replyTo", "")))[:160],
+                  "smtpHost": str(body.get("smtpHost", cur.get("smtpHost", "")))[:160],
+                  "smtpPort": str(body.get("smtpPort", cur.get("smtpPort", "")))[:6],
+                  "smtpUser": str(body.get("smtpUser", cur.get("smtpUser", "")))[:160],
+                  "smtpPass": (str(body.get("smtpPass"))[:200] if body.get("smtpPass") else cur.get("smtpPass", ""))}
+            with _lock, db() as c:
+                c.execute("INSERT INTO app_data(workshop_id,key,value,updated_at) VALUES(?,?,?,?) ON CONFLICT(workshop_id,key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at",
+                          (p["wid"], "mailcfg", json.dumps(nc), _iso()))
+            return self._send(200, {"ok": True})
 
         if self.path == "/api/admin/provision":
             if self.headers.get("X-Admin-Key") != _cfg("ADMIN_KEY"):

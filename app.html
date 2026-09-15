@@ -2151,7 +2151,7 @@ function intakeCreate(via){
 }
 function intakeMail(token){ const el=document.getElementById('ik_mail'); const to=el?el.value.trim():''; if(!to){toast('Bitte E-Mail eingeben');return;} const url=location.origin+'/intake.html?t='+token;
   const rb=document.getElementById('ik_mailres'); if(rb)rb.innerHTML='<span class="muted" style="font-size:13px">Wird gesendet…</span>';
-  fetch(API+'/api/mail/send',{method:'POST',headers:DB._hdr(),body:JSON.stringify({to:to,subject:'Reparatur vorab anmelden – '+SHOP.name,body:'Guten Tag,\n\nbitte melden Sie Ihre Reparatur vorab über diesen Link an – so geht die Annahme vor Ort schneller:\n'+url+'\n\nVielen Dank,\nIhr Team von '+SHOP.name})})
+  fetch(API+'/api/mail/send',{method:'POST',headers:DB._hdr(),body:JSON.stringify({to:to,subject:SHOP.name+' – Reparatur vorab anmelden',body:'Guten Tag,\n\nbitte melden Sie Ihre Reparatur vorab über diesen Link an – so geht die Annahme vor Ort schneller:\n'+url+'\n\nVielen Dank,\nIhr Team von '+SHOP.name,fromName:SHOP.name,replyTo:(SHOP.email||'')})})
    .then(r=>r.json()).then(res=>{ if(rb)rb.innerHTML='<div class="muted" style="font-size:13px;margin-top:6px">'+(res.sent?'✓ E-Mail an den Kunden gesendet':('ℹ '+esc(res.note||'nicht gesendet')))+'</div>'; }).catch(()=>{ if(rb)rb.innerHTML='<div class="muted" style="font-size:13px;margin-top:6px">Senden fehlgeschlagen</div>'; }); }
 function intakeImport(silent){
   if(DB.backend!=='server')return;
@@ -2223,8 +2223,23 @@ function commTab(id,t){ const o=S.ord.find(x=>x.id===id); if(!o)return; o._commT
 function orderAddNote(id){ const o=S.ord.find(x=>x.id===id); const e=document.getElementById('cm_int_'+id); const v=e?e.value.trim():''; if(!v){toast('Bitte Notiz eingeben');return;} commLog(o,'out',true,v,'notiz'); save(); openOrder(id); toast('Interne Notiz gespeichert'); }
 function orderSendExternal(id){ const o=S.ord.find(x=>x.id===id); const e=document.getElementById('cm_ext_'+id); const v=e?e.value.trim():''; if(!v){toast('Bitte Nachricht eingeben');return;} _orderSendMsg(o,v,'nachricht','Nachricht Ihrer Werkstatt'); }
 function orderSendKVA(id){ const o=S.ord.find(x=>x.id===id); const e=document.getElementById('cm_ext_'+id); let v=e?e.value.trim():''; if(!v)v='Wir haben Ihr Gerät geprüft. Unser Kostenvoranschlag für die Reparatur beträgt '+eur(oTotal(o))+'. Bitte geben Sie uns kurz Bescheid, ob wir die Reparatur durchführen dürfen.'; o.kva={amount:oTotal(o),at:new Date().toISOString(),note:v}; _orderSendMsg(o,v,'kva','Kostenvoranschlag – '+SHOP.name); }
+function mailIdentity(){ return {fromName:(SHOP.name||'Ihre Werkstatt'), replyTo:(SHOP.email||'')}; }
+function mailBrandHtml(o,opts){ opts=opts||{}; const ACC='#0e7a3c';
+  const logo=(S.settings&&S.settings.logo)?`<img src="${S.settings.logo}" alt="${esc(SHOP.name)}" style="max-height:48px;max-width:200px">`:`<div style="font-size:20px;font-weight:800;color:${ACC}">${esc(SHOP.name)}</div>`;
+  const addr=[SHOP.street,(((SHOP.zip||'')+' '+(SHOP.city||'')).trim())].filter(Boolean).join(', ');
+  const link=(o&&o.portalToken)?(location.origin+'/status.html?t='+o.portalToken):'';
+  const cta=link?`<div style="margin:22px 0"><a href="${link}" style="background:${ACC};color:#fff;text-decoration:none;padding:12px 22px;border-radius:10px;font-weight:700;display:inline-block">Auftrag ansehen</a></div>`:'';
+  const info=o?`<table style="border-collapse:collapse;margin:10px 0">${o.nr?`<tr><td style="padding:2px 14px 2px 0;color:#667;font-size:13px">Auftrag</td><td style="font-size:13px;font-weight:700;color:#1a2b22">${esc(o.nr)}</td></tr>`:''}${(typeof oDevLabel==='function'&&oDevLabel(o))?`<tr><td style="padding:2px 14px 2px 0;color:#667;font-size:13px">Gerät</td><td style="font-size:13px;color:#1a2b22">${esc(oDevLabel(o))}</td></tr>`:''}</table>`:'';
+  const foot=[SHOP.phone?('Tel. '+esc(SHOP.phone)):'',SHOP.email?esc(SHOP.email):'',(SHOP.web?esc(SHOP.web):'')].filter(Boolean).join(' · ');
+  return `<div style="background:#f4f6f5;padding:24px 0;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif"><div style="max-width:520px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;border:1px solid #e6ebe8">
+    <div style="padding:20px 24px;border-bottom:1px solid #eef1f0">${logo}</div>
+    <div style="padding:22px 24px;color:#1a2b22">${opts.title?`<div style="font-size:18px;font-weight:800;margin-bottom:10px;color:#1a2b22">${esc(opts.title)}</div>`:''}${opts.greeting?`<div style="font-size:14px;margin-bottom:10px;color:#1a2b22">${esc(opts.greeting)}</div>`:''}<div style="font-size:14px;line-height:1.55;white-space:pre-wrap;color:#33403a">${esc(opts.bodyText||'')}</div>${info}${cta}</div>
+    <div style="padding:16px 24px;background:#f6f9f7;color:#667;font-size:12px;line-height:1.5"><b style="color:#1a2b22">${esc(SHOP.name)}</b>${addr?' · '+esc(addr):''}${foot?'<br>'+foot:''}</div>
+  </div></div>`; }
+function sendCustomerMail(o,to,subject,text,opts){ const id=mailIdentity();
+  return fetch(API+'/api/mail/send',{method:'POST',headers:DB._hdr(),body:JSON.stringify({to:to,subject:subject,body:text,html:mailBrandHtml(o,Object.assign({bodyText:text},opts||{})),fromName:id.fromName,replyTo:id.replyTo})}).then(r=>r.json()); }
 function _orderSendMsg(o,text,kind,subject){ const c=cust(o.cid); commLog(o,'out',false,text,kind); logActivity(o,'mail',kind==='kva'?'Kostenvoranschlag gesendet':'Nachricht gesendet'); save();
-  if(DB.backend==='server'&&c.mail){ fetch(API+'/api/mail/send',{method:'POST',headers:DB._hdr(),body:JSON.stringify({to:c.mail,subject:subject+' · '+o.nr,body:text+'\n\nStatus & Antwort: '+(o.portalToken?(location.origin+'/status.html?t='+o.portalToken):'—')+'\n\nIhr Team von '+SHOP.name})}).then(r=>r.json()).then(res=>{ toast(res.sent?'✓ An Kunden gesendet':'Protokolliert (E-Mail: '+(res.note||'—')+')'); }).catch(()=>toast('Gesendet (Protokoll)')); }
+  if(DB.backend==='server'&&c.mail){ sendCustomerMail(o,c.mail,SHOP.name+' – '+(kind==='kva'?'Kostenvoranschlag':'Update')+' zu Auftrag '+o.nr,text,{title:(kind==='kva'?'Ihr Kostenvoranschlag':'Nachricht Ihrer Werkstatt'),greeting:'Guten Tag '+(c.name||'')+','}).then(res=>{ toast(res.sent?'✓ An Kunden gesendet':'Protokolliert (E-Mail: '+(res.note||'—')+')'); }).catch(()=>toast('Gesendet (Protokoll)')); }
   else { S.mailLog&&S.mailLog.unshift({t:new Date().toISOString(),to:c.name,ch:'E-Mail',rule:kind==='kva'?'Kostenvoranschlag':'Kundennachricht',subj:subject,how:'manuell'}); toast(c.mail?'Nachricht protokolliert':'Keine Kunden-E-Mail – nur protokolliert'); }
   portalSync(o); const el=document.getElementById('cm_ext_'+o.id); if(el)el.value=''; openOrder(o.id); }
 function orderAiRewrite(id){ const o=S.ord.find(x=>x.id===id); const e=document.getElementById('cm_ext_'+id); const v=e?e.value.trim():''; if(!v){toast('Bitte zuerst Stichpunkte eingeben');return;}
@@ -2461,8 +2476,8 @@ function orderConfirmBody(o){ const c=cust(o.cid);
 function sendOrderConfirmation(o, opts){ opts=opts||{}; if(!o)return; const c=cust(o.cid);
   if(!c.mail){ o.confirmSent=false; o.confirmFailed=true; o.confirmNote='Keine Kunden-E-Mail hinterlegt'; o.confirmAt=new Date().toISOString(); save(); return; }
   if(DB.backend!=='server'){ o.confirmSent=true; o.confirmFailed=false; o.confirmAt=new Date().toISOString(); o.confirmNote='Demo – protokolliert (kein echter Versand)'; if(S.mailLog)S.mailLog.unshift({t:o.confirmAt,to:c.name,ch:'E-Mail',rule:'Auftragsbestätigung',subj:'Auftragsbestätigung '+o.nr,how:'automatisch'}); save(); return; }
-  const doSend=function(){ fetch(API+'/api/mail/send',{method:'POST',headers:DB._hdr(),body:JSON.stringify({to:c.mail,subject:'Auftragsbestätigung '+o.nr+' · '+SHOP.name,body:orderConfirmBody(o)})})
-    .then(r=>r.json()).then(res=>{ const ok=res.sent===true; o.confirmSent=ok; o.confirmFailed=!ok; o.confirmAt=new Date().toISOString(); o.confirmNote=ok?'gesendet an '+c.mail:(res.note||'nicht versendet');
+  const doSend=function(){ sendCustomerMail(o,c.mail,SHOP.name+' – Auftragsbestätigung '+o.nr,orderConfirmBody(o),{title:'Auftragsbestätigung',greeting:'Guten Tag '+(c.name||'')+','})
+    .then(res=>{ const ok=res.sent===true; o.confirmSent=ok; o.confirmFailed=!ok; o.confirmAt=new Date().toISOString(); o.confirmNote=ok?'gesendet an '+c.mail:(res.note||'nicht versendet');
       if(ok)logActivity(o,'mail','Auftragsbestätigung gesendet');
       if(S.mailLog)S.mailLog.unshift({t:o.confirmAt,to:c.name,ch:'E-Mail',rule:'Auftragsbestätigung',subj:'Auftragsbestätigung '+o.nr,how:'automatisch'+(ok?'':' – FEHLGESCHLAGEN')}); save();
       if(!opts.silent){ toast(ok?'✓ Auftragsbestätigung gesendet':'⚠ Bestätigung NICHT versendet: '+(res.note||'')); if(current==='auftraege')views.auftraege(); paintIcons(); } })
@@ -2675,8 +2690,9 @@ function termineSoon(){ var now=new Date(); var cur=now.getHours()*60+now.getMin
 function sendTerminConfirm(rec){ if(DB.backend!=='server')return; var c=cust(rec.cid); if(!c||!c.mail)return;
   var adr=[SHOP.street,((SHOP.zip||'')+' '+(SHOP.city||'')).trim()].filter(Boolean).join(', ');
   var body='Guten Tag '+(c.name||'')+',\n\nwir bestätigen Ihren Termin bei '+SHOP.name+':\n\n  Datum: '+fmtDate(rec.date)+'\n  Uhrzeit: '+rec.start+' Uhr'+(rec.dur?(' (ca. '+rec.dur+' Min)'):'')+(rec.reason?('\n  Grund: '+rec.reason):'')+'\n'+(adr?('\nAdresse: '+adr):'')+(SHOP.phone?('\nTelefon: '+SHOP.phone):'')+'\n\nBitte sagen Sie uns kurz Bescheid, falls der Termin nicht passt.\n\nViele Grüße\n'+SHOP.name;
-  fetch(API+'/api/mail/send',{method:'POST',headers:DB._hdr(),body:JSON.stringify({to:c.mail,subject:'Terminbestätigung · '+fmtDate(rec.date)+' '+rec.start+' Uhr · '+SHOP.name,body:body})})
-    .then(function(r){return r.json();}).then(function(res){ toast(res.sent?'✓ Terminbestätigung an Kunden gesendet':'Termin gespeichert (E-Mail nicht gesendet: '+(res.note||'—')+')'); if(S.mailLog)S.mailLog.unshift({t:new Date().toISOString(),to:c.name,ch:'E-Mail',rule:'Terminbestätigung',subj:'Terminbestätigung '+fmtDate(rec.date)+' '+rec.start,how:'automatisch'+(res.sent?'':' – nicht gesendet')}); save(); })
+  var _to=(rec.orderId?S.ord.find(function(x){return x.id===rec.orderId;}):null);
+  sendCustomerMail(_to,c.mail,SHOP.name+' – Terminbestätigung '+fmtDate(rec.date)+' '+rec.start+' Uhr',body,{title:'Terminbestätigung',greeting:'Guten Tag '+(c.name||'')+','})
+    .then(function(res){ toast(res.sent?'✓ Terminbestätigung an Kunden gesendet':'Termin gespeichert (E-Mail nicht gesendet: '+(res.note||'—')+')'); if(S.mailLog)S.mailLog.unshift({t:new Date().toISOString(),to:c.name,ch:'E-Mail',rule:'Terminbestätigung',subj:'Terminbestätigung '+fmtDate(rec.date)+' '+rec.start,how:'automatisch'+(res.sent?'':' – nicht gesendet')}); save(); })
     .catch(function(){ toast('Termin gespeichert (Bestätigung nur protokolliert)'); }); }
 
 views.kalender=function(){
@@ -4030,6 +4046,24 @@ views.einstellungen=function(){
        ${on&&pd.direct?`<input class="in" style="margin:-2px 0 12px" value="${esc(r.partnerNr||'')}" placeholder="Fachhandelspartner-Nr." onchange="insurerSetPartner('${esc(p)}',this.value)">`:''}`;}).join('');})()}
        <div class="row" style="margin-top:6px"><button class="btn" onclick="go('versicherung')">Versicherungsfälle öffnen</button></div>
      </div>
+     ${(function(){ if(DB.backend!=='server') return `<div class="card" style="grid-column:1/-1"><b>✉️ Kundenkommunikation (White-Label)</b><p class="muted" style="font-size:13px;margin-top:6px">Kunden-E-Mails erscheinen unter dem Namen deiner Werkstatt. Nur im Online-Betrieb.</p></div>`;
+       const mc=window.__mailcfg; if(!mc){ mailcfgLoad(); return `<div class="card" style="grid-column:1/-1"><b>✉️ Kundenkommunikation (White-Label)</b><p class="muted" style="font-size:13px;margin-top:6px">Wird geladen…</p></div>`; }
+       return `<div class="card" style="grid-column:1/-1"><b>✉️ Kundenkommunikation (White-Label)</b>
+       <p class="muted" style="font-size:13px;margin:4px 0 12px">Jede Kunden-E-Mail (Auftragsbestätigung, Kostenvoranschlag, Terminbestätigung, Nachricht) wird unter <b>deiner</b> Marke gesendet – mit Logo, Firmenname und Fußzeile aus den Stammdaten. VELQIO erscheint nie als Absender.</p>
+       <div class="note" style="margin-bottom:12px">Absender: <b>${esc(SHOP.name)}</b>${SHOP.email?(' &lt;'+esc(SHOP.email)+'&gt;'):''} · Antworten gehen an ${SHOP.email?esc(SHOP.email):'deine Werkstatt (bitte E-Mail in den Stammdaten hinterlegen)'}.</div>
+       <details><summary style="cursor:pointer;font-weight:600;font-size:14px">Eigenes E-Mail-Konto verbinden (empfohlen für beste Zustellbarkeit · SPF/DKIM)</summary>
+         <p class="muted" style="font-size:12px;margin:8px 0">Ohne eigenes Konto senden wir im Namen deiner Werkstatt über den VELQIO-Versand – Antworten kommen trotzdem bei dir an. Mit eigenem SMTP-Konto gehen die Mails über deine echte Geschäftsdomain (beste Zustellbarkeit).</p>
+         <div class="grid g2">
+           <div><label class="f">Absender-E-Mail</label><input class="in" id="mc_from" value="${esc(mc.fromEmail||SHOP.email||'')}" placeholder="info@deinhandydoc.de"></div>
+           <div><label class="f">Antwort-Adresse (Reply-To)</label><input class="in" id="mc_reply" value="${esc(mc.replyTo||SHOP.email||'')}" placeholder="info@deinhandydoc.de"></div>
+           <div><label class="f">SMTP-Server</label><input class="in" id="mc_host" value="${esc(mc.smtpHost||'')}" placeholder="smtp.ionos.de"></div>
+           <div><label class="f">Port</label><input class="in" id="mc_port" value="${esc(mc.smtpPort||'587')}" placeholder="587"></div>
+           <div><label class="f">SMTP-Benutzer</label><input class="in" id="mc_user" value="${esc(mc.smtpUser||'')}" placeholder="info@deinhandydoc.de"></div>
+           <div><label class="f">SMTP-Passwort ${mc.smtpConfigured?'<span class="muted">(gesetzt – leer lassen zum Behalten)</span>':''}</label><input class="in" id="mc_pass" type="password" placeholder="${mc.smtpConfigured?'••••••':'App-Passwort'}"></div>
+         </div>
+         <div class="row" style="margin-top:10px;align-items:center;gap:10px"><button class="btn pri" onclick="mailcfgSave()">Speichern</button>${mc.smtpConfigured?'<span class="pill soft"><span class="d"></span>Eigenes Konto aktiv</span>':''}</div>
+       </details>
+       </div>`;})()}
      <div class="card" style="grid-column:1/-1"><b>Benachrichtigungen</b><p class="muted" style="font-size:13px;margin:4px 0 12px">E-Mail (SMTP) und SMS für Auto-Nachrichten &amp; Erinnerungen. Prototyp – im echten System werden hiermit die Nachrichten wirklich verschickt.</p>
        ${(function(){const nt=ensureSettings().notify;return `
        <div class="grid g2"><div><label class="f">Absender-Name</label><input class="in" value="${esc(nt.fromName||'')}" placeholder="${esc(SHOP.name)}" onchange="ensureSettings().notify.fromName=this.value;save()"></div>
@@ -4645,6 +4679,8 @@ function voiceSave(){ if(DB.backend!=='server'){toast('Nur im Online-Betrieb');r
   const prof={enabled:!!cur.enabled, number:g('vc_num'), name:SHOP.name, greeting:g('vc_greet'), hours:SHOP.hours||'', address:voiceAddr(), phone:SHOP.phone||'', faq:g('vc_faq')};
   fetch(API+'/api/voice/config',{method:'POST',headers:DB._hdr(),body:JSON.stringify({profile:prof})}).then(r=>r.json()).then(res=>{ if(res&&res.ok){ window.__voiceCfg=window.__voiceCfg||{}; window.__voiceCfg.profile=prof; toast('Telefon-Bot gespeichert'); if(current==='einstellungen'){views.einstellungen();paintIcons();} } else toast('Speichern fehlgeschlagen'); }).catch(()=>toast('Keine Verbindung')); }
 function voiceToggle(){ window.__voiceCfg=window.__voiceCfg||{profile:{}}; window.__voiceCfg.profile=window.__voiceCfg.profile||{}; window.__voiceCfg.profile.enabled=!window.__voiceCfg.profile.enabled; voiceSave(); }
+function mailcfgLoad(force){ if(DB.backend!=='server')return; if(window.__mailcfg&&!force)return; fetch(API+'/api/mail/config',{headers:DB._hdr()}).then(r=>r.json()).then(res=>{ if(res&&res.ok){ window.__mailcfg=res; if(current==='einstellungen'){views.einstellungen();paintIcons();} } }).catch(()=>{}); }
+function mailcfgSave(){ const g=id=>{const e=document.getElementById(id);return e?e.value.trim():'';}; const body={fromEmail:g('mc_from'),replyTo:g('mc_reply'),smtpHost:g('mc_host'),smtpPort:g('mc_port'),smtpUser:g('mc_user')}; const pw=g('mc_pass'); if(pw)body.smtpPass=pw; fetch(API+'/api/mail/config',{method:'POST',headers:DB._hdr(),body:JSON.stringify(body)}).then(r=>r.json()).then(res=>{ if(res&&res.ok){ toast('E-Mail-Einstellungen gespeichert'); window.__mailcfg=null; mailcfgLoad(true); } else toast('Speichern fehlgeschlagen'); }).catch(()=>toast('Keine Verbindung')); }
 function widgetBase(){ const w=ensureWidget(); if(w.embedBase&&w.embedBase.trim()) return w.embedBase.trim().replace(/\/+$/,''); try{ return new URL('.',location.href).href.replace(/\/+$/,''); }catch(e){ return location.origin; } }
 function widgetUrl(typ){ const w=ensureWidget(); const page=(typ==='anfrage'?'anfrage':'booking')+'.html'; return widgetBase()+'/'+page+'?embed=1&accent='+encodeURIComponent(w.accent.replace('#',''))+'&ws='+encodeURIComponent(SHOP.name)+(SHOP.phone?'&tel='+encodeURIComponent(SHOP.phone):''); }
 function widgetEmbed(typ){ const w=ensureWidget(); const id='reparado-'+typ; const url=widgetUrl(typ);
@@ -4916,7 +4952,7 @@ paintIcons();
 function bootApp(){ensureWorkshop(); ensureMaster(); applyMaster(); ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); ensureInv(); ensureProc(); ensureTrade(); ensureShip(); ensureContracts(); ensureInsurers(); ensureIntegrations(); const n=pullBookings(); const nq=pullRequests(); pullFeedback(); pullWarranty(); go('dashboard'); applyNavRole(); if(!curUser())showLogin();
   if(nq) setTimeout(()=>toast(nq+' neue Website-Anfrage'+(nq>1?'n':'')),900);
   if(n) setTimeout(()=>toast(n+' neue Online-Buchung'+(n>1?'en':'')+' übernommen'),500);
-  if(DB.backend==='server'){ setTimeout(()=>intakeImport(false),1500); setTimeout(()=>portalPollReplies(),2200); setTimeout(()=>ensurePubKey(),1700); setTimeout(()=>voiceLoad(),1800); if(!window.__intakePoll)window.__intakePoll=setInterval(()=>intakeImport(false),90000); if(!window.__portalPoll)window.__portalPoll=setInterval(()=>portalPollReplies(),90000); }
+  if(DB.backend==='server'){ setTimeout(()=>intakeImport(false),1500); setTimeout(()=>portalPollReplies(),2200); setTimeout(()=>ensurePubKey(),1700); setTimeout(()=>voiceLoad(),1800); setTimeout(()=>mailcfgLoad(),1900); if(!window.__intakePoll)window.__intakePoll=setInterval(()=>intakeImport(false),90000); if(!window.__portalPoll)window.__portalPoll=setInterval(()=>portalPollReplies(),90000); }
 }
 /* Frischer, komplett leerer Zustand für ein neu registriertes Konto (keine Demo-Daten). */
 function blankState(){ return {v:11, __clean:true, cust:[], ord:[], parts:[], orders:[], sold:[], counter:1000, rules:defaultRules(), sales:[], cash:{connected:''}, mailLog:[], calls:[], phone:defaultPhone(), users:[{id:'u1',name:'Inhaber',role:'inhaber',pin:'1234'}], userId:'u1', insurance:defaultInsurance(), wgLeads:[], drafts:[], quotes:[], requests:[], quoteCounter:1000, feedback:[], reactDone:[], termine:[], belege:[], proacDone:[]}; }
