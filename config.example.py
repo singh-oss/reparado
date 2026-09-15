@@ -31,3 +31,15 @@ STRIPE_WEBHOOK_SECRET = ""                   # whsec_… (aus dem Webhook-Endpun
 STRIPE_PRICE_BASIC = ""                      # price_… (Basic 49,90 €/Monat, wiederkehrend)
 STRIPE_PRICE_PRO   = ""                      # price_… (Pro 84,90 €/Monat)
 STRIPE_PRICE_AI    = ""                      # price_… (AI 99,90 €/Monat)
+
+# KI (Anthropic/Claude) – treibt „Mit KI formulieren" und den Telefon-Bot an.
+ANTHROPIC_API_KEY = ""                       # sk-ant-… (GEHEIM! nur auf dem Server)
+LLM_MODEL         = "claude-haiku-4-5"        # günstig & schnell; für den Telefon-Bot ausreichend
+
+# KI-Telefon-Empfangskraft (Voice-Bot). Nimmt Anrufe entgegen, beantwortet 3–4 Fragen,
+# nimmt Rückrufbitten auf. Läuft nur, wenn ALLE drei Schlüssel + VOICE_ENABLED gesetzt sind.
+# Kosten „maximal günstig": Twilio-Telefonie + Deepgram-Spracherkennung (Gratiskontingent).
+VOICE_ENABLED       = False                  # auf True setzen, wenn Twilio+Deepgram eingerichtet sind
+TWILIO_ACCOUNT_SID  = ""                     # aus dem Twilio-Dashboard
+TWILIO_AUTH_TOKEN   = ""                     # aus dem Twilio-Dashboard (GEHEIM) – prüft eingehende Webhooks
+DEEPGRAM_API_KEY    = ""                     # aus dem Deepgram-Dashboard (Gratis-Startguthaben)

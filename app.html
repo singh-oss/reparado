@@ -3872,6 +3872,27 @@ views.einstellungen=function(){
        <div style="border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--soft)"><iframe src="${esc(linkFull)}&embed=1" style="width:100%;height:560px;border:0" title="Vorschau"></iframe></div>
        <div class="note" style="margin-top:12px">Eingehende Anfragen erscheinen unter <b>Angebote</b> („Anfragen von der Website") und im Benachrichtigungs-Zähler oben – 1 Klick macht daraus ein Angebot oder einen Auftrag.</div>`)}
      </div>`;})()}
+     ${(function(){ if(DB.backend!=='server'){ return `<div class="card"><b>📞 KI-Telefon-Empfangskraft</b><p class="muted" style="font-size:13px;margin-top:6px">Nur im Online-Betrieb verfügbar. Der Bot nimmt Anrufe entgegen, beantwortet Fragen (Öffnungszeiten, Adresse, Reparatur-Status) und nimmt Rückrufbitten auf.</p></div>`; }
+       const vc=voiceCfg(); if(!vc){ voiceLoad(); return `<div class="card"><b>📞 KI-Telefon-Empfangskraft</b><p class="muted" style="font-size:13px;margin-top:6px">Wird geladen…</p></div>`; }
+       const p=vc.profile||{}; const on=!!p.enabled;
+       return `<div class="card"><b>📞 KI-Telefon-Empfangskraft</b>
+       <p class="muted" style="font-size:13px;margin:4px 0 12px">Nimmt Anrufe entgegen, beantwortet die 3–4 wichtigsten Fragen (Öffnungszeiten, Adresse, Reparatur-Status per Name/Auftragsnummer) und nimmt Rückrufbitten auf – die landen automatisch unter <b>Angebote</b>. Nutzt das verbundene Claude; Kosten „ganz gering" über Twilio + Deepgram.</p>
+       ${vc.voiceReady?`<div class="note" style="border-color:#16a34a;margin-bottom:12px">✓ Technik ist eingerichtet (Twilio + Deepgram + KI aktiv). Über den Schalter an-/ausschalten.</div>`:`<div class="note" style="margin-bottom:12px">⚙️ Noch nicht scharf: Twilio + Deepgram müssen einmalig eingerichtet werden (Anleitung unten). Bis dahin bleibt der Bot inaktiv – die Einstellungen kannst du aber schon speichern.</div>`}
+       <div class="row" style="align-items:center;gap:10px"><button class="switch ${on?'on':''}" onclick="voiceToggle()"><i></i></button><b>Telefon-Bot ${on?'aktiv':'aus'}</b></div>
+       <div class="grid g2" style="margin-top:12px">
+         <div><label class="f">Telefonnummer des Bots (aus Twilio)</label><input class="in" id="vc_num" value="${esc(p.number||'')}" placeholder="+49 …"></div>
+         <div><label class="f">Werkstatt</label><input class="in" value="${esc(SHOP.name)}" readonly></div>
+       </div>
+       <label class="f" style="margin-top:12px">Begrüßung</label>
+       <input class="in" id="vc_greet" value="${esc(p.greeting||('Willkommen bei '+SHOP.name+'. Ich bin die digitale Empfangskraft. Wie kann ich Ihnen helfen?'))}">
+       <label class="f" style="margin-top:12px">Zusätzliche Infos für den Bot (optional)</label>
+       <textarea class="in" id="vc_faq" rows="3" placeholder="z. B. Displaytausch meist am selben Tag, Parkplätze vorhanden, wir reparieren auch Tablets & Laptops…">${esc(p.faq||'')}</textarea>
+       <div class="muted" style="font-size:12px;margin-top:6px">Öffnungszeiten &amp; Adresse werden automatisch aus den Stammdaten übernommen (aktuell: ${esc(SHOP.hours||'—')} · ${esc(voiceAddr()||'—')}).</div>
+       <div class="row" style="margin-top:12px"><button class="btn pri" onclick="voiceSave()">Speichern</button></div>
+       <label class="f" style="margin-top:14px">Webhook-URL für Twilio (bei der Nummer unter „A CALL COMES IN" als HTTP-POST eintragen)</label>
+       <div class="row"><input class="in" style="flex:1" readonly value="${esc(vc.webhook||'')}" onclick="this.select();copyStr(this.value)"><button class="btn" onclick="copyStr('${esc(vc.webhook||'')}')">Kopieren</button></div>
+       <div class="note" style="margin-top:12px"><b>Einrichtung (einmalig):</b> Twilio-Konto anlegen → Telefonnummer holen (oder Werkstatt-Nummer dorthin umleiten) → bei der Nummer die obige Webhook-URL als „Voice / A CALL COMES IN" eintragen → Deepgram-Konto (Gratis-Guthaben) für die Spracherkennung → die Schlüssel in die Server-<span class="mono">config.py</span>. Danach hier die Nummer eintragen + aktivieren. Ausführliche Schritte: <span class="mono">TELEFON-BOT-SETUP.md</span>.</div>
+       </div>`;})()}
      <div class="card"><b>Garantie & Belege</b>
        <div class="grid g2" style="margin-top:12px"><div><label class="f">Standard-Garantie (Monate)</label><input class="in" value="${SHOP.warranty}"></div>
        <div><label class="f">Öffnungszeiten</label><input class="in" value="${SHOP.hours}"></div></div>
@@ -4541,6 +4562,15 @@ function siteFormBase(){ try{ return new URL('.',location.href).href.replace(/\/
 function siteFormShort(){ return siteFormBase()+'/anfrage.html?w='+encodeURIComponent(pubKey()); }
 function siteFormUrl(){ const p=['w='+encodeURIComponent(pubKey())]; if(SHOP.name)p.push('ws='+encodeURIComponent(SHOP.name)); if(SHOP.phone)p.push('tel='+encodeURIComponent(SHOP.phone)); return siteFormBase()+'/anfrage.html?'+p.join('&'); }
 function siteEmbedCode(){ return '<iframe src="'+siteFormUrl()+'&embed=1" style="width:100%;max-width:560px;height:680px;border:0;border-radius:14px;box-shadow:0 1px 4px rgba(0,0,0,.08)" title="Reparatur-Anfrage" loading="lazy"></iframe>'; }
+/* --- KI-Telefon-Empfangskraft (Voice-Bot) --- */
+function voiceCfg(){ return window.__voiceCfg||null; }
+function voiceLoad(force){ if(DB.backend!=='server')return; if(window.__voiceCfg&&!force)return; window.__voiceCfg=window.__voiceCfg||null;
+  fetch(API+'/api/voice/config',{headers:DB._hdr()}).then(r=>r.json()).then(res=>{ if(res&&res.ok){ window.__voiceCfg={profile:res.profile||{},webhook:res.webhook||'',voiceReady:!!res.voiceReady}; if(current==='einstellungen'){views.einstellungen();paintIcons();} } }).catch(()=>{}); }
+function voiceAddr(){ return [SHOP.street,((SHOP.zip||'')+' '+(SHOP.city||'')).trim()].filter(Boolean).join(', '); }
+function voiceSave(){ if(DB.backend!=='server'){toast('Nur im Online-Betrieb');return;} const g=id=>{const e=document.getElementById(id);return e?e.value.trim():'';}; const cur=(window.__voiceCfg&&window.__voiceCfg.profile)||{};
+  const prof={enabled:!!cur.enabled, number:g('vc_num'), name:SHOP.name, greeting:g('vc_greet'), hours:SHOP.hours||'', address:voiceAddr(), phone:SHOP.phone||'', faq:g('vc_faq')};
+  fetch(API+'/api/voice/config',{method:'POST',headers:DB._hdr(),body:JSON.stringify({profile:prof})}).then(r=>r.json()).then(res=>{ if(res&&res.ok){ window.__voiceCfg=window.__voiceCfg||{}; window.__voiceCfg.profile=prof; toast('Telefon-Bot gespeichert'); if(current==='einstellungen'){views.einstellungen();paintIcons();} } else toast('Speichern fehlgeschlagen'); }).catch(()=>toast('Keine Verbindung')); }
+function voiceToggle(){ window.__voiceCfg=window.__voiceCfg||{profile:{}}; window.__voiceCfg.profile=window.__voiceCfg.profile||{}; window.__voiceCfg.profile.enabled=!window.__voiceCfg.profile.enabled; voiceSave(); }
 function widgetBase(){ const w=ensureWidget(); if(w.embedBase&&w.embedBase.trim()) return w.embedBase.trim().replace(/\/+$/,''); try{ return new URL('.',location.href).href.replace(/\/+$/,''); }catch(e){ return location.origin; } }
 function widgetUrl(typ){ const w=ensureWidget(); const page=(typ==='anfrage'?'anfrage':'booking')+'.html'; return widgetBase()+'/'+page+'?embed=1&accent='+encodeURIComponent(w.accent.replace('#',''))+'&ws='+encodeURIComponent(SHOP.name)+(SHOP.phone?'&tel='+encodeURIComponent(SHOP.phone):''); }
 function widgetEmbed(typ){ const w=ensureWidget(); const id='reparado-'+typ; const url=widgetUrl(typ);
@@ -4812,7 +4842,7 @@ paintIcons();
 function bootApp(){ensureWorkshop(); ensureMaster(); applyMaster(); ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); ensureInv(); ensureProc(); ensureTrade(); ensureShip(); ensureContracts(); ensureInsurers(); ensureIntegrations(); const n=pullBookings(); const nq=pullRequests(); pullFeedback(); pullWarranty(); go('dashboard'); applyNavRole(); if(!curUser())showLogin();
   if(nq) setTimeout(()=>toast(nq+' neue Website-Anfrage'+(nq>1?'n':'')),900);
   if(n) setTimeout(()=>toast(n+' neue Online-Buchung'+(n>1?'en':'')+' übernommen'),500);
-  if(DB.backend==='server'){ setTimeout(()=>intakeImport(false),1500); setTimeout(()=>portalPollReplies(),2200); setTimeout(()=>ensurePubKey(),1700); if(!window.__intakePoll)window.__intakePoll=setInterval(()=>intakeImport(false),90000); if(!window.__portalPoll)window.__portalPoll=setInterval(()=>portalPollReplies(),90000); }
+  if(DB.backend==='server'){ setTimeout(()=>intakeImport(false),1500); setTimeout(()=>portalPollReplies(),2200); setTimeout(()=>ensurePubKey(),1700); setTimeout(()=>voiceLoad(),1800); if(!window.__intakePoll)window.__intakePoll=setInterval(()=>intakeImport(false),90000); if(!window.__portalPoll)window.__portalPoll=setInterval(()=>portalPollReplies(),90000); }
 }
 /* Frischer, komplett leerer Zustand für ein neu registriertes Konto (keine Demo-Daten). */
 function blankState(){ return {v:11, __clean:true, cust:[], ord:[], parts:[], orders:[], sold:[], counter:1000, rules:defaultRules(), sales:[], cash:{connected:''}, mailLog:[], calls:[], phone:defaultPhone(), users:[{id:'u1',name:'Inhaber',role:'inhaber',pin:'1234'}], userId:'u1', insurance:defaultInsurance(), wgLeads:[], drafts:[], quotes:[], requests:[], quoteCounter:1000, feedback:[], reactDone:[], termine:[], belege:[], proacDone:[]}; }

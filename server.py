@@ -349,6 +349,177 @@ def _geo_fetch(url):
     _GEO_CACHE[url] = (now + 86400, data)  # 1 Tag Cache
     return data
 
+# ---------- KI-Telefon-Empfangskraft (Voice-Bot: Twilio + Deepgram + Claude) ----------
+_VOICE_CALLS = {}   # CallSid -> {wid, turns:[(role,text)], count, frm}
+
+def _voice_on():
+    return (bool(_cfg("VOICE_ENABLED", False))
+            and bool(_cfg("TWILIO_AUTH_TOKEN", ""))
+            and bool(_cfg("DEEPGRAM_API_KEY", ""))
+            and bool(_cfg("ANTHROPIC_API_KEY", "") or _cfg("LLM_API_KEY", "")))
+
+def _xe(s):
+    return (str(s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            .replace('"', "&quot;").replace("'", "&apos;"))
+
+def _norm_num(s):
+    d = "".join(ch for ch in str(s or "") if ch.isdigit())
+    return d[-10:] if len(d) >= 10 else d
+
+def _voice_prof(wid):
+    with db() as c:
+        r = c.execute("SELECT value FROM app_data WHERE workshop_id=? AND key='voice'", (wid,)).fetchone()
+    if not r:
+        return {}
+    try: return json.loads(r["value"])
+    except Exception: return {}
+
+def _ws_by_voice_number(to):
+    to2 = _norm_num(to)
+    if not to2:
+        return None, None
+    with db() as c:
+        rows = c.execute("SELECT workshop_id, value FROM app_data WHERE key='voice'").fetchall()
+    for r in rows:
+        try: prof = json.loads(r["value"])
+        except Exception: continue
+        if prof.get("enabled") and _norm_num(prof.get("number", "")) == to2:
+            return r["workshop_id"], prof
+    return None, None
+
+def _deepgram_stt(audio, ct):
+    key = _cfg("DEEPGRAM_API_KEY", "")
+    if not key or not audio:
+        return ""
+    url = "https://api.deepgram.com/v1/listen?model=nova-2&language=de&smart_format=true&punctuate=true"
+    req = _urlreq.Request(url, data=audio, headers={"Authorization": "Token " + key, "Content-Type": ct or "audio/wav"})
+    try:
+        with _urlreq.urlopen(req, timeout=25) as r:
+            d = json.loads(r.read().decode())
+        chans = ((d.get("results") or {}).get("channels") or [])
+        alts = (chans[0].get("alternatives") if chans else []) or []
+        return (alts[0].get("transcript", "") if alts else "").strip()
+    except Exception:
+        return ""
+
+def _twilio_fetch(url):
+    sid = _cfg("TWILIO_ACCOUNT_SID", ""); tok = _cfg("TWILIO_AUTH_TOKEN", "")
+    req = _urlreq.Request(url)
+    req.add_header("Authorization", "Basic " + base64.b64encode((sid + ":" + tok).encode()).decode())
+    with _urlreq.urlopen(req, timeout=25) as r:
+        return r.read(), r.headers.get("Content-Type", "audio/wav")
+
+def _twilio_sig_ok(url, params, sig):
+    tok = _cfg("TWILIO_AUTH_TOKEN", "")
+    if not tok:
+        return False
+    s = url
+    for k in sorted(params.keys()):
+        s += k + params[k]
+    mac = hmac.new(tok.encode(), s.encode(), hashlib.sha1).digest()
+    return hmac.compare_digest(base64.b64encode(mac).decode(), sig or "")
+
+def _voice_status_lookup(wid, text):
+    """Bester Versuch: Auftrag zu genannter Auftragsnummer ODER Kundenname finden und den
+    Reparatur-Status als gesprochenen Satz formulieren. Nur Lesezugriff."""
+    import re as _re
+    low = " " + (text or "").lower() + " "
+    try:
+        with db() as c:
+            ords = c.execute("SELECT data FROM sync_items WHERE workshop_id=? AND coll='ord' AND deleted=0", (wid,)).fetchall()
+            custs = c.execute("SELECT data FROM sync_items WHERE workshop_id=? AND coll='cust' AND deleted=0", (wid,)).fetchall()
+    except Exception:
+        return ""
+    orders = []
+    for r in ords:
+        try: orders.append(json.loads(r["data"]))
+        except Exception: pass
+    cust = {}
+    for r in custs:
+        try:
+            cc = json.loads(r["data"]); cust[cc.get("id")] = cc
+        except Exception: pass
+    STL = {"offen": "ist angenommen, aber noch nicht in Bearbeitung",
+           "bearbeitung": "wird gerade repariert",
+           "warten": "wartet noch auf ein Ersatzteil",
+           "fertig": "ist fertig und abholbereit",
+           "abgeholt": "wurde bereits abgeholt"}
+    match = None
+    digits = _re.findall(r"\d{2,}", text or "")
+    for o in orders:
+        nrd = "".join(ch for ch in str(o.get("nr", "")) if ch.isdigit())
+        for dg in digits:
+            if len(dg) >= 3 and nrd.endswith(dg):
+                match = o; break
+        if match: break
+    if not match:
+        for o in orders:
+            c = cust.get(o.get("cid")) or {}
+            nm = (c.get("name") or "").strip().lower()
+            if nm and len(nm) >= 3:
+                last = nm.split()[-1]
+                if len(last) >= 3 and (" " + last + " ") in low:
+                    match = o; break
+    if not match:
+        return ""
+    st = match.get("status", "")
+    phrase = STL.get(st, "ist bei uns in Bearbeitung")
+    extra = ""
+    if st == "fertig" and match.get("repResult"):
+        rr = {"repariert": "erfolgreich repariert", "teilweise": "teilweise repariert",
+              "unrepariert": "leider nicht repariert worden", "abgelehnt": "auf Wunsch nicht repariert worden",
+              "nicht_reparierbar": "leider nicht reparierbar"}.get(match.get("repResult"), "")
+        if rr: extra = " Es wurde " + rr + "."
+    dev = (str(match.get("brand", "")) + " " + str(match.get("model", ""))).strip() or "Ihr Gerät"
+    return dev + " " + phrase + "." + extra
+
+def _voice_llm(prof, statusinfo, turns):
+    key = _cfg("ANTHROPIC_API_KEY", "") or _cfg("LLM_API_KEY", "")
+    if not key:
+        return ""
+    name = prof.get("name") or "die Werkstatt"
+    facts = []
+    if prof.get("hours"): facts.append("Öffnungszeiten: " + prof["hours"])
+    if prof.get("address"): facts.append("Adresse: " + prof["address"])
+    if prof.get("phone"): facts.append("Telefon: " + prof["phone"])
+    if prof.get("faq"): facts.append("Weitere Infos: " + prof["faq"])
+    sysmsg = ("Du bist die freundliche telefonische Empfangskraft der Reparaturwerkstatt '" + name +
+              "'. Du sprichst am Telefon mit einem Kunden. Antworte sehr KURZ (1-2 Saetze), natuerlich gesprochen, "
+              "auf Deutsch, ohne Aufzaehlungen oder Sonderzeichen. Beantworte nur Fragen zur Werkstatt "
+              "(Oeffnungszeiten, Adresse, Reparatur-Status, ungefaehre Ablaeufe, allgemeine Infos). Erfinde NIEMALS "
+              "Preise, feste Zusagen oder Termine. Wenn du etwas nicht sicher weisst oder der Kunde einen Menschen "
+              "braucht, sag freundlich, dass du gern eine Rueckrufbitte aufnimmst. Fakten: "
+              + (" | ".join(facts) or "keine hinterlegt") + ".")
+    if statusinfo:
+        sysmsg += " Aktueller Reparatur-Status (nutze ihn, wenn der Kunde danach fragt): " + statusinfo
+    msgs = [{"role": ("assistant" if role == "assistant" else "user"), "content": txt} for role, txt in turns[-6:]]
+    if not msgs:
+        return ""
+    payload = {"model": _cfg("LLM_MODEL", "claude-haiku-4-5"), "max_tokens": 160, "system": sysmsg, "messages": msgs}
+    req = _urlreq.Request("https://api.anthropic.com/v1/messages", data=json.dumps(payload).encode(),
+                          headers={"content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01"})
+    try:
+        with _urlreq.urlopen(req, timeout=25) as r:
+            res = json.loads(r.read().decode())
+        parts = res.get("content") or []
+        return "".join(b.get("text", "") for b in parts if b.get("type") == "text").strip()
+    except Exception:
+        return ""
+
+def _twiml(inner):
+    return '<?xml version="1.0" encoding="UTF-8"?><Response>' + inner + '</Response>'
+
+def _say(text):
+    return '<Say language="de-DE" voice="Polly.Vicki">' + _xe(text) + '</Say>'
+
+def _rec(action):
+    return ('<Record action="' + _xe(action) + '" method="POST" maxLength="12" timeout="4" '
+            'playBeep="true" trim="trim-silence" transcribe="false"/>')
+
+_VOICE_END = ("nein danke", "nein, danke", "tschuess", "tschuss", "tschüss", "tschüs",
+              "auf wiederhoeren", "auf wiederhören", "wiederhoeren", "wiederhören",
+              "das war es", "das wars", "das war's", "nichts weiter", "nichts mehr", "alles klar danke")
+
 # ---------- HTTP ----------
 class H(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
@@ -381,6 +552,97 @@ class H(BaseHTTPRequestHandler):
         if h.startswith("Bearer "):
             return verify_token(h[7:])
         return None
+
+    def _form(self):
+        n = int(self.headers.get("Content-Length", 0) or 0)
+        if not n:
+            return {}
+        try:
+            raw = self.rfile.read(n).decode("utf-8", "ignore")
+            return {k: v[0] for k, v in parse_qs(raw, keep_blank_values=True).items()}
+        except Exception:
+            return {}
+
+    def _send_xml(self, code, xml):
+        data = xml.encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", "text/xml; charset=utf-8")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def _voice_url(self):
+        host = self.headers.get("X-Forwarded-Host") or self.headers.get("Host") or "velqio.de"
+        proto = self.headers.get("X-Forwarded-Proto") or "https"
+        return proto + "://" + host + self.path
+
+    def _voice(self, path):
+        params = self._form()
+        if not _voice_on() or not _twilio_sig_ok(self._voice_url(), params, self.headers.get("X-Twilio-Signature", "")):
+            return self._send_xml(200, _twiml(_say("Dieser Dienst ist gerade nicht verfuegbar. Auf Wiederhoeren.")))
+        frm = params.get("From", ""); to = params.get("To", ""); sid = params.get("CallSid", "")
+        q = parse_qs(urlparse(path).query); csid = (q.get("sid") or [sid])[0]
+        if path.startswith("/api/voice/incoming"):
+            wid, prof = _ws_by_voice_number(to)
+            if not wid:
+                return self._send_xml(200, _twiml(_say("Vielen Dank fuer Ihren Anruf. Bitte versuchen Sie es spaeter erneut. Auf Wiederhoeren.")))
+            if len(_VOICE_CALLS) > 500:
+                _VOICE_CALLS.clear()
+            _VOICE_CALLS[sid] = {"wid": wid, "turns": [], "count": 0, "frm": frm}
+            greet = prof.get("greeting") or ("Willkommen bei " + (prof.get("name") or "der Werkstatt") + ". Ich bin die digitale Empfangskraft. Wie kann ich Ihnen helfen?")
+            return self._send_xml(200, _twiml(_say(greet) + _rec("/api/voice/step?sid=" + _urlparse.quote(sid))))
+        if path.startswith("/api/voice/step"):
+            st = _VOICE_CALLS.get(csid)
+            if not st:
+                return self._send_xml(200, _twiml(_say("Entschuldigung, es gab ein technisches Problem. Auf Wiederhoeren.")))
+            transcript = ""
+            rec = params.get("RecordingUrl", "")
+            if rec:
+                try:
+                    audio, ct = _twilio_fetch(rec + ".wav")
+                    transcript = _deepgram_stt(audio, "audio/wav")
+                except Exception:
+                    transcript = ""
+            st["count"] += 1
+            low = transcript.lower().strip()
+            if st["count"] > 5 or (low and any(w in low for w in _VOICE_END)):
+                return self._send_xml(200, _twiml(
+                    _say("Alles klar. Wenn Sie moechten, nennen Sie mir nach dem Signalton kurz Ihren Namen und Ihr Anliegen, dann rufen wir Sie zurueck. Sonst koennen Sie einfach auflegen. Auf Wiederhoeren.")
+                    + _rec("/api/voice/callback?sid=" + _urlparse.quote(csid))))
+            if not low:
+                if st["count"] >= 3:
+                    return self._send_xml(200, _twiml(_say("Ich konnte Sie leider nicht verstehen. Bitte nennen Sie nach dem Signalton Ihren Namen und Ihr Anliegen, wir rufen Sie zurueck.") + _rec("/api/voice/callback?sid=" + _urlparse.quote(csid))))
+                return self._send_xml(200, _twiml(_say("Entschuldigung, das habe ich nicht verstanden. Bitte wiederholen Sie es nach dem Signalton.") + _rec("/api/voice/step?sid=" + _urlparse.quote(csid))))
+            st["turns"].append(("user", transcript))
+            statusinfo = _voice_status_lookup(st["wid"], transcript)
+            answer = _voice_llm(_voice_prof(st["wid"]), statusinfo, st["turns"]) or "Das kann ich Ihnen am Telefon leider nicht sicher beantworten. Gern nehme ich eine Rueckrufbitte auf."
+            st["turns"].append(("assistant", answer))
+            return self._send_xml(200, _twiml(_say(answer) + _say("Kann ich sonst noch etwas fuer Sie tun? Wenn nicht, sagen Sie einfach: nein danke.") + _rec("/api/voice/step?sid=" + _urlparse.quote(csid))))
+        if path.startswith("/api/voice/callback"):
+            st = _VOICE_CALLS.get(csid) or {}
+            wid = st.get("wid")
+            transcript = ""
+            rec = params.get("RecordingUrl", "")
+            if rec and wid:
+                try:
+                    audio, ct = _twilio_fetch(rec + ".wav")
+                    transcript = _deepgram_stt(audio, "audio/wav")
+                except Exception:
+                    transcript = ""
+            if wid and (transcript or frm):
+                try:
+                    now = time.time()
+                    data = {"name": "Telefon-Anrufer", "tel": frm or "", "type": "", "brand": "", "model": "",
+                            "issue": "Telefon-Rueckruf", "problem": transcript or "(keine Sprachnachricht hinterlassen)",
+                            "contact": "Rückruf", "besttime": "", "at": _iso(now)}
+                    with _lock, db() as c:
+                        c.execute("INSERT INTO intake_sessions(token,workshop_id,herkunft,workshop_name,workshop_tel,data,submitted,consumed,created,expires) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                                  (uid("cb"), wid, "telefon", "", "", json.dumps(data), 1, 0, now, now + 30 * 86400))
+                except Exception:
+                    pass
+            _VOICE_CALLS.pop(csid, None)
+            return self._send_xml(200, _twiml(_say("Vielen Dank. Wir melden uns bei Ihnen. Auf Wiederhoeren.") + "<Hangup/>"))
+        return self._send_xml(200, _twiml(_say("Auf Wiederhoeren.") + "<Hangup/>"))
 
     def log_message(self, *a):  # ruhig
         pass
@@ -498,6 +760,14 @@ class H(BaseHTTPRequestHandler):
             if not p:
                 return self._send(401, {"error": "unauthorized"})
             return self._send(200, {"ok": True, "key": _ws_pub(p["wid"])})
+        if self.path == "/api/voice/config":
+            # Werkstatt liest ihre Telefon-Bot-Konfiguration + die Webhook-URL für Twilio.
+            p = self._auth()
+            if not p:
+                return self._send(401, {"error": "unauthorized"})
+            base = str(_cfg("APP_BASE_URL", "https://velqio.de")).rstrip("/")
+            return self._send(200, {"ok": True, "profile": _voice_prof(p["wid"]),
+                                    "webhook": base + "/api/voice/incoming", "voiceReady": _voice_on()})
         if self.path == "/api/intake/pending":
             # Werkstatt holt neue, noch nicht übernommene Vorab-Anfragen ab.
             p = self._auth()
@@ -569,7 +839,20 @@ class H(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path == "/api/stripe/webhook":
             return self._webhook()
+        if self.path.startswith(("/api/voice/incoming", "/api/voice/step", "/api/voice/callback")):
+            return self._voice(self.path)
         body = self._body()
+        if self.path == "/api/voice/config":
+            p = self._auth()
+            if not p:
+                return self._send(401, {"error": "unauthorized"})
+            prof = body.get("profile") or {}
+            clean = {k: (str(prof.get(k, ""))[:800]) for k in ("number", "name", "greeting", "hours", "address", "phone", "faq")}
+            clean["enabled"] = bool(prof.get("enabled"))
+            with _lock, db() as c:
+                c.execute("INSERT INTO app_data(workshop_id,key,value,updated_at) VALUES(?,?,?,?) ON CONFLICT(workshop_id,key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at",
+                          (p["wid"], "voice", json.dumps(clean), _iso()))
+            return self._send(200, {"ok": True})
 
         if self.path == "/api/auth/login":
             email = (body.get("email") or "").strip().lower()
