@@ -677,7 +677,7 @@ function devTotal(d){ return devPositions(d).reduce((s,p)=>s+(+p.price||0),0); }
 function oTotal(o){ return oDevices(o).reduce((s,d)=>s+devTotal(d),0); }
 function oDevLabel(o){ return oDevices(o).map(d=>[d.brand,d.model].filter(Boolean).join(' ')).filter(Boolean).join(' + ')||'—'; }
 function oIssueLabel(o){ return oDevices(o).reduce((a,d)=>a.concat(devPositions(d).map(p=>p.reparatur)),[]).filter(Boolean).join(' · '); }
-function posRows(o){ return oDevices(o).map(d=>devPositions(d).map(p=>`<tr><td>${esc(d.brand)} ${esc(d.model)} — ${esc(p.reparatur)} (${esc(p.qual)})${(+p.price>0)?`<div style="font-size:11px;color:#666">darin ${MWST_RATE} % MwSt: ${eur(vatOf(p.price))}</div>`:''}</td><td style="text-align:right" class="mono">${eur(p.price)}</td></tr>`).join('')).join(''); }
+function posRows(o){ return oDevices(o).map(d=>devPositions(d).map(p=>`<tr><td>${esc(d.brand)} ${esc(d.model)} — ${esc(p.reparatur)}${posQual(p)?' ('+esc(posQual(p))+')':''}${(+p.price>0)?`<div style="font-size:11px;color:#666">darin ${MWST_RATE} % MwSt: ${eur(vatOf(p.price))}</div>`:''}</td><td style="text-align:right" class="mono">${eur(p.price)}</td></tr>`).join('')).join(''); }
 function totVatLine(o){const b=oTotal(o);if(!(b>0))return '';return `<div class="between" style="font-size:13px;color:#555;margin-top:3px"><span>Netto</span><span class="mono">${eur(netOf(b))}</span></div><div class="between" style="font-size:13px;color:#555"><span>darin enthaltene MwSt. (${MWST_RATE} %)</span><span class="mono">${eur(vatOf(b))}</span></div>`;}
 /* Techniker (Mitarbeiter) sehen nur ihnen zugewiesene + noch nicht zugewiesene Aufträge */
 function visRole(){ if(curRole()==='inhaber') return S.ord; const u=S.userId; return S.ord.filter(o=>!o.technikerId||o.technikerId===u); }
@@ -1196,7 +1196,7 @@ function orderDeviceBlock(o,d,di){
   const ll=lockLabel(d);
   const ps=devPositions(d);
   const meta=[d.imei?'IMEI '+esc(d.imei):'',d.fach?esc(d.fach):'',ll?'🔒 '+esc(ll):''].filter(Boolean).join(' · ');
-  const faultTitle=ps.map(p=>esc(p.reparatur)).filter(Boolean).join(' · ');
+  const repArt=ps.map(p=>esc(p.reparatur)).filter(Boolean).join(' · ');
   const fbText=(d.fehler||'').trim();
   const zt=zustandText(d), zu=zubehoerText(d), ft=(d.fotos||[]);
   const techn=d.technikerId?techName(d.technikerId):'';
@@ -1205,15 +1205,15 @@ function orderDeviceBlock(o,d,di){
       <div style="flex:1;min-width:0"><b style="font-size:15px">${many?('Gerät '+(di+1)+': '):''}${esc(d.brand)} ${esc(d.model)}</b>${meta?`<div class="muted" style="font-size:12px;margin-top:2px">${meta}</div>`:''}</div>
       <div style="flex:none" title="${esc(d.brand)} ${esc(d.model)}">${modelThumb(d.brand,d.model,60,d.typ)}</div>
     </div>
-    ${(faultTitle||fbText)?`<div style="margin-top:8px;border-left:3px solid var(--green);background:var(--soft);border-radius:8px;padding:8px 10px">
-       <div style="font-size:11px;font-weight:800;letter-spacing:.04em;color:var(--green)">FEHLERBESCHREIBUNG</div>
-       ${faultTitle?`<div style="font-weight:700;margin-top:2px">${faultTitle}</div>`:''}
-       ${fbText?`<div style="font-size:13px;margin-top:3px;word-break:break-word;white-space:pre-wrap">${esc(fbText)}</div>`:''}
-     </div>`:''}
+    <div style="margin-top:8px;border-left:3px solid var(--green);background:var(--soft);border-radius:8px;padding:8px 10px">
+       ${repArt?`<div style="font-size:11px;font-weight:800;letter-spacing:.04em;color:var(--ink2)">REPARATURART</div><div style="font-weight:700;margin-bottom:6px">${repArt}</div>`:''}
+       <div style="font-size:11px;font-weight:800;letter-spacing:.04em;color:var(--green)">FEHLERBESCHREIBUNG / KUNDENANGABE</div>
+       ${fbText?`<div style="font-size:13px;margin-top:2px;word-break:break-word;white-space:pre-wrap">${esc(fbText)}</div>`:`<div class="muted" style="font-size:12px;margin-top:2px">Keine Kundenangabe erfasst.</div>`}
+     </div>
     ${zt?`<div style="font-size:12.5px;margin-top:8px;word-break:break-word"><b>Zustand bei Annahme:</b> ${esc(zt)}</div>`:''}
     ${zu?`<div style="font-size:12.5px;margin-top:3px;word-break:break-word"><b>Mitgegeben:</b> ${esc(zu)}</div>`:''}
     ${ft.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${ft.map(f=>`<img src="${f.src}" onclick="fotoZoom(this)" style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:1px solid var(--line);cursor:zoom-in">`).join('')}</div>`:''}
-    <div style="margin-top:8px">${ps.map(p=>`<div class="between" style="font-size:13px;padding:3px 0"><span class="muted">${esc(p.reparatur)}${p.qual?' · '+esc(p.qual):''}</span><span class="mono">${eur(p.price)}</span></div>`).join('')}</div>
+    <div style="margin-top:8px">${ps.map(p=>{const q=posQual(p);return `<div class="between" style="font-size:13px;padding:3px 0"><span class="muted">${esc(p.reparatur)}${q?' · '+esc(q):''}</span><span class="mono">${eur(p.price)}</span></div>`;}).join('')}</div>
     <div class="between" style="font-size:13px;padding-top:4px"><span class="muted">${many?('Gerät '+(di+1)+' '):''}gesamt</span><b class="mono">${eur(devTotal(d))}</b></div>
     ${techn?`<div class="muted" style="font-size:12px;margin-top:4px">👤 Techniker: ${esc(techn)}</div>`:''}
   </div>`;
@@ -1232,10 +1232,18 @@ function openOrder(id){
      <button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
    <div class="dbody">
      <div class="card" style="background:var(--soft);border:0">
-       <div class="between"><div><div style="font-weight:800;font-size:16px">${esc(c.name)}</div>
-         <div class="muted" style="font-size:13px">${esc(c.tel)}${c.mail?' · '+esc(c.mail):''}</div>
-         <div class="muted" style="font-size:13px">${esc(c.adr)}</div></div>
-         <div class="avatar" style="width:44px;height:44px">${initials(c.name)}</div></div>
+       <div class="between" style="align-items:flex-start">
+         <div style="min-width:0;flex:1">
+           <div style="font-size:10px;font-weight:800;letter-spacing:.06em;color:var(--ink2)">KUNDE</div>
+           <div style="font-weight:800;font-size:16px;margin-top:2px">${esc(c.name)||'—'}</div>
+           ${c.adr?`<div style="font-size:13px;margin-top:3px">${esc(c.adr)}</div>`:''}
+           ${(c.plz||c.stadt)?`<div style="font-size:13px">${esc(((c.plz||'')+' '+(c.stadt||'')).trim())}</div>`:''}
+           <div style="font-size:13px;margin-top:3px">${c.mail?`E-Mail: <a href="mailto:${esc(c.mail)}" style="color:var(--green)">${esc(c.mail)}</a>`:'<span class="muted">Keine E-Mail hinterlegt</span>'}</div>
+           <div style="font-size:13px">${c.tel?`Telefon: <a href="tel:${esc((c.tel||'').replace(/\\s/g,''))}" style="color:var(--green)">${esc(c.tel)}</a>`:'<span class="muted">Keine Telefonnummer</span>'}</div>
+         </div>
+         <div style="flex:none;text-align:right"><div class="avatar" style="width:44px;height:44px;margin-left:auto">${initials(c.name)}</div>
+           <button class="btn sm gho" style="margin-top:8px" onclick="closeAll();custProfile('${c.id}')">Kunde öffnen</button></div>
+       </div>
      </div>
      ${partWaitBox(o)}
      ${confirmStatusBox(o)}
@@ -1448,7 +1456,7 @@ function noCollect(){ if(!NO)return; const g=id=>{const e=document.getElementByI
   NO.devices.forEach((d,i)=>{ let w;
     w=g('dev'+i+'_typ');if(w!=null)d.typ=w; w=g('dev'+i+'_brand');if(w!=null)d.brand=w; w=g('dev'+i+'_model');if(w!=null)d.model=w; w=g('dev'+i+'_imei');if(w!=null)d.imei=w; w=g('dev'+i+'_fach');if(w!=null)d.fach=w; w=g('dev'+i+'_ref');if(w!=null)d.ref=w; w=g('dev'+i+'_fehler');if(w!=null)d.fehler=w; w=g('dev'+i+'_warranty');if(w!=null&&w!=='')d.warranty=w;
     if(!Array.isArray(d.positions)||!d.positions.length)d.positions=[blankPosition()];
-    d.positions.forEach((p,j)=>{const gr=document.getElementById('dev'+i+'_pos'+j+'_reparatur');if(gr)p.reparatur=gr.value;const gp=document.getElementById('dev'+i+'_pos'+j+'_price');if(gp)p.price=gp.value;const gq=document.getElementById('dev'+i+'_pos'+j+'_qual');if(gq)p.qual=gq.value||p.qual;});
+    d.positions.forEach((p,j)=>{const gr=document.getElementById('dev'+i+'_pos'+j+'_reparatur');if(gr)p.reparatur=gr.value;const gp=document.getElementById('dev'+i+'_pos'+j+'_price');if(gp)p.price=gp.value;const gq=document.getElementById('dev'+i+'_pos'+j+'_qual');if(gq)p.qual=gq.value||p.qual;if(!repairHasPart(p.reparatur))p.qual='';});
     const p0=d.positions[0]||{};d.reparatur=p0.reparatur||'';d.qual=p0.qual||'Original';d.price=(p0.price!==undefined?p0.price:''); /* Spiegel positions[0] */
     const lk=document.querySelector('input[name=dev'+i+'_lock]:checked');if(lk){d.lock=normLock(lk.value); if(d.lock==='PIN'){const lv=g('dev'+i+'_lockval');if(lv!=null)d.lockval=lv;} else if(d.lock==='Kein')d.lockval='';}
     ZUSTAND_SECTIONS.forEach(s=>{if(s.sonst){const _e=document.getElementById('dev'+i+'_zs_'+s.key);if(_e){d.zsonst=d.zsonst||{};d.zsonst[s.key]=_e.value;}}});
@@ -1473,11 +1481,12 @@ function geoStreet(v){ v=(v||'').trim(); if(DB.backend!=='server'||v.length<3)re
 function noPosBlock(i,j,p,n){
   return `<div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:8px;background:var(--soft)">
     <div class="between"><b style="font-size:13px">Position ${j+1}</b>${n>1?`<button type="button" class="btn sm gho" onclick="noRemovePosition(${i},${j})">Entfernen</button>`:''}</div>
-    <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin-top:8px">
-      <div><label class="f">Fehler / Reparaturart *</label><input class="in" id="dev${i}_pos${j}_reparatur" list="allRepairs" value="${esc(p.reparatur||'')}" placeholder="Standardfehler oder eintippen…" onchange="noPosPrice(${i},${j})"></div>
+    <div style="display:grid;grid-template-columns:${repairHasPart(p.reparatur)?'2fr 1fr 1fr':'2fr 1fr'};gap:12px;margin-top:8px">
+      <div><label class="f">Reparaturart / Leistung *</label><input class="in" id="dev${i}_pos${j}_reparatur" list="allRepairs" value="${esc(p.reparatur||'')}" placeholder="z. B. Displaytausch, Diagnose…" onchange="noPosPrice(${i},${j})"></div>
       <div><label class="f">Preis (€, brutto)</label><input class="in" id="dev${i}_pos${j}_price" type="number" step="0.01" value="${(p.price!==''&&p.price!=null)?p.price:''}" placeholder="0.00" oninput="noPosVat(${i},${j})"></div>
-      <div><label class="f">Qualität</label><select class="in" id="dev${i}_pos${j}_qual">${catQuals().map(q=>`<option ${p.qual===q?'selected':''}>${esc(q)}</option>`).join('')}</select></div>
+      ${repairHasPart(p.reparatur)?`<div><label class="f">Ersatzteilqualität</label><select class="in" id="dev${i}_pos${j}_qual">${catQuals().map(q=>`<option ${p.qual===q?'selected':''}>${esc(q)}</option>`).join('')}</select></div>`:''}
     </div>
+    ${(p.reparatur&&!repairHasPart(p.reparatur))?`<div class="muted" style="font-size:11px;margin-top:6px">Reine Dienstleistung – keine Ersatzteilqualität nötig.</div>`:''}
     <div id="dev${i}_pos${j}_vathint" class="muted" style="font-size:12px;margin-top:6px">${vatHint(p.price)}</div>
   </div>`;
 }
@@ -1485,7 +1494,7 @@ function noEnsurePositions(){ if(!NO||!NO.devices)return; NO.devices.forEach(d=>
 function noAddPosition(i){noCollect();NO.devices[i].positions.push(blankPosition());renderNewOrder();}
 function noRemovePosition(i,j){noCollect();NO.devices[i].positions.splice(j,1);if(!NO.devices[i].positions.length)NO.devices[i].positions.push(blankPosition());renderNewOrder();}
 function noPosVat(i,j){const e=document.getElementById('dev'+i+'_pos'+j+'_price');const h=document.getElementById('dev'+i+'_pos'+j+'_vathint');if(!e||!h)return;h.textContent=vatHint(+e.value||0);}
-function noPosPrice(i,j){noCollect();const d=NO.devices[i];const p=d.positions[j];if(d.brand&&p.reparatur){const pr=priceFor(d.brand,d.model,p.reparatur);if(pr!==''){const e=document.getElementById('dev'+i+'_pos'+j+'_price');if(e)e.value=pr;p.price=pr;}}noPosVat(i,j);noSaveDraft();}
+function noPosPrice(i,j){noCollect();const d=NO.devices[i];const p=d.positions[j];if(d.brand&&p.reparatur){const pr=priceFor(d.brand,d.model,p.reparatur);if(pr!=='')p.price=pr;}if(!repairHasPart(p.reparatur))p.qual='';noSaveDraft();renderNewOrder();}
 /* ---- P9: grafisches Entsperrmuster (3x3-Punkteraster, mit Maus/Finger zeichnen) ---- */
 let __pat={}; let __patCur=null;
 function patDot(k){return {cx:30+(k%3)*60, cy:30+Math.floor(k/3)*60};}
@@ -1803,7 +1812,7 @@ function noFinalize(){ noCollect();
 }
 function noBuildDevices(){ const built=[];
   NO.devices.forEach(d=>{ if(!(d.brand||d.model))return;
-    const ps=devPositions(d).filter(p=>p.reparatur).map(p=>({reparatur:p.reparatur,qual:p.qual||'Original',price:+p.price||0}));
+    const ps=devPositions(d).filter(p=>p.reparatur).map(p=>({reparatur:p.reparatur,qual:(repairHasPart(p.reparatur)?(p.qual||'Original'):''),price:+p.price||0}));
     if(!ps.length)return;
     ps.forEach(p=>catLearnRepair(p.reparatur));
     const p0=ps[0];
@@ -2044,7 +2053,7 @@ function openQuote(id){ const q=(S.quotes||[]).find(x=>x.id===id); if(!q)return;
    <div class="dbody">
      <div class="card" style="background:var(--soft);border:0"><div class="between"><div><div style="font-weight:800;font-size:16px">${esc(c.name)}</div><div class="muted" style="font-size:13px">${esc(c.tel)}${c.mail?' · '+esc(c.mail):''}</div></div><div class="avatar" style="width:44px;height:44px">${initials(c.name)}</div></div></div>
      <div class="grid g2" style="margin-top:14px">
-       <div style="grid-column:1/-1"><label class="f">Positionen</label>${oDevices(q).map((d,di)=>`<div style="padding:7px 0;border-bottom:1px solid var(--line)"><div class="between"><b>Gerät ${di+1}: ${esc(d.brand)} ${esc(d.model)}</b><b class="mono">${eur(devTotal(d))}</b></div>${devPositions(d).map(p=>`<div class="between" style="font-size:13px;padding:3px 0 0"><span class="muted">${esc(p.reparatur)}${p.qual?' · '+esc(p.qual):''}</span><span class="mono">${eur(p.price)}</span></div>`).join('')}</div>`).join('')}<div class="between" style="padding:9px 0"><b>Gesamt (inkl. MwSt.)</b><b style="font-size:18px">${eur(oTotal(q))}</b></div>${(oTotal(q)>0)?`<div class="between" style="font-size:12px;color:var(--ink2)"><span>Netto ${eur(netOf(oTotal(q)))}</span><span>darin ${MWST_RATE} % MwSt: ${eur(vatOf(oTotal(q)))}</span></div>`:''}</div>
+       <div style="grid-column:1/-1"><label class="f">Positionen</label>${oDevices(q).map((d,di)=>`<div style="padding:7px 0;border-bottom:1px solid var(--line)"><div class="between"><b>Gerät ${di+1}: ${esc(d.brand)} ${esc(d.model)}</b><b class="mono">${eur(devTotal(d))}</b></div>${devPositions(d).map(p=>`<div class="between" style="font-size:13px;padding:3px 0 0"><span class="muted">${esc(p.reparatur)}${posQual(p)?' · '+esc(posQual(p)):''}</span><span class="mono">${eur(p.price)}</span></div>`).join('')}</div>`).join('')}<div class="between" style="padding:9px 0"><b>Gesamt (inkl. MwSt.)</b><b style="font-size:18px">${eur(oTotal(q))}</b></div>${(oTotal(q)>0)?`<div class="between" style="font-size:12px;color:var(--ink2)"><span>Netto ${eur(netOf(oTotal(q)))}</span><span>darin ${MWST_RATE} % MwSt: ${eur(vatOf(oTotal(q)))}</span></div>`:''}</div>
        <div><label class="f">Status</label><div>${qBadge(qExpired(q)?'abgelaufen':q.status)}</div></div>
        <div><label class="f">Gültig bis</label><div style="font-weight:700">${fmtDate(q.validUntil)}</div></div>
      </div>
@@ -2307,7 +2316,7 @@ function fotoZoom(img){const w=window.open('');if(w)w.document.write('<title>Fot
 function orderAnnahmeDetail(d){const zt=zustandText(d),zu=zubehoerText(d),ft=(d.fotos||[]);let h='';if(zt)h+=`<div style="font-size:12px;margin-top:4px;word-break:break-word"><b>Zustand:</b> ${esc(zt)}</div>`;if(zu)h+=`<div style="font-size:12px;margin-top:2px;word-break:break-word"><b>Mitgegeben:</b> ${esc(zu)}</div>`;if(ft.length)h+=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${ft.map(f=>`<img src="${f.src}" onclick="fotoZoom(this)" style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:1px solid var(--line);cursor:zoom-in">`).join('')}</div>`;return h;}
 function devDetailRows(o){ return oDevices(o).map((d,i)=>{const meta=[d.imei?'IMEI/SN: '+esc(d.imei):'',d.fach?'Fach: '+esc(d.fach):'',lockLabel(d)?'Sperre: '+esc(lockLabel(d)):'',(d.technikerId&&techName(d.technikerId))?'Techniker: '+esc(techName(d.technikerId)):''].filter(Boolean).join(' · ');const name=[d.brand,d.model].filter(Boolean).join(' ')||'Gerät';const fb=(d.fehler||'').trim();return `<div style="font-size:12px;color:#333;margin-top:5px"><b>Gerät ${i+1}: ${esc(name)}</b>${meta?`<span style="color:#666"> · ${meta}</span>`:''}${fb?`<div style="color:#333;margin-top:2px;word-break:break-word"><b>Fehlerbeschreibung:</b> ${esc(fb).replace(/\n/g,'<br>')}</div>`:''}</div>`;}).join(''); }
 /* v11 #11: prominente Geräte-Blöcke für den Kundenbeleg (Hersteller+Modell fett & groß, je Gerät ein Block) */
-function receiptDeviceBlocks(o){ const devs=oDevices(o); return devs.map((d,i)=>{const name=[d.brand,d.model].filter(Boolean).join(' ')||'Gerät';const meta=[d.imei?'IMEI/SN: '+esc(d.imei):'',d.fach?'Fach: '+esc(d.fach):'',lockLabel(d)?'Sperre: '+esc(lockLabel(d)):'',(d.technikerId&&techName(d.technikerId))?'Techniker: '+esc(techName(d.technikerId)):''].filter(Boolean).join(' · ');const fb=(d.fehler||'').trim();const pos=devPositions(d).map(p=>`<div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:3px 0"><span>${esc(p.reparatur)||'Reparatur'}${p.qual?` <span style="color:#6b7280 !important">(${esc(p.qual)})</span>`:''}</span><span style="font-family:monospace;white-space:nowrap">${eur(p.price)}</span></div>`).join('');return `<div class="rc-dev">${devs.length>1?`<div class="rc-dev-idx">Gerät ${i+1} von ${devs.length}</div>`:''}<div class="rc-dev-name">${esc(name)}</div>${meta?`<div class="rc-dev-meta">${meta}</div>`:''}${(function(){const ft2=devPositions(d).map(p=>esc(p.reparatur)).filter(Boolean).join(' · ');return (ft2||fb)?('<div class="rc-dev-fb" style="margin-top:4px"><b>Fehlerbeschreibung:</b>'+(ft2?' '+ft2:'')+(fb?('<div style="margin-top:2px">'+esc(fb).replace(/\n/g,'<br>')+'</div>'):'')+'</div>'):'';})()}<div style="margin-top:6px;border-top:1px solid #eee;padding-top:4px">${pos}</div>${(function(){const zt=zustandText(d),zu=zubehoerText(d),ft=(d.fotos||[]);let h='';if(zt)h+='<div class="rc-dev-cond" style="font-size:12px;margin-top:6px"><b>Zustand bei Annahme:</b> '+esc(zt)+'</div>';if(zu)h+='<div class="rc-dev-acc" style="font-size:12px;margin-top:2px"><b>Mitgegeben:</b> '+esc(zu)+'</div>';if(ft.length)h+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:5px">'+ft.map(f=>'<img src="'+f.src+'" style="width:46px;height:46px;object-fit:cover;border-radius:6px;border:1px solid #ddd">').join('')+'</div>';return h;})()}</div>`;}).join(''); }
+function receiptDeviceBlocks(o){ const devs=oDevices(o); return devs.map((d,i)=>{const name=[d.brand,d.model].filter(Boolean).join(' ')||'Gerät';const meta=[d.imei?'IMEI/SN: '+esc(d.imei):'',d.fach?'Fach: '+esc(d.fach):'',lockLabel(d)?'Sperre: '+esc(lockLabel(d)):'',(d.technikerId&&techName(d.technikerId))?'Techniker: '+esc(techName(d.technikerId)):''].filter(Boolean).join(' · ');const fb=(d.fehler||'').trim();const pos=devPositions(d).map(p=>`<div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:3px 0"><span>${esc(p.reparatur)||'Reparatur'}${posQual(p)?` <span style="color:#6b7280 !important">(${esc(posQual(p))})</span>`:''}</span><span style="font-family:monospace;white-space:nowrap">${eur(p.price)}</span></div>`).join('');return `<div class="rc-dev">${devs.length>1?`<div class="rc-dev-idx">Gerät ${i+1} von ${devs.length}</div>`:''}<div class="rc-dev-name">${esc(name)}</div>${meta?`<div class="rc-dev-meta">${meta}</div>`:''}${(function(){const ra=devPositions(d).map(p=>esc(p.reparatur)).filter(Boolean).join(' · ');let h='';if(ra)h+='<div class="rc-dev-fb" style="margin-top:4px"><b>Reparaturart:</b> '+ra+'</div>';if(fb)h+='<div class="rc-dev-fb" style="margin-top:2px"><b>Fehlerbeschreibung:</b> '+esc(fb).replace(/\n/g,'<br>')+'</div>';return h;})()}<div style="margin-top:6px;border-top:1px solid #eee;padding-top:4px">${pos}</div>${(function(){const zt=zustandText(d),zu=zubehoerText(d),ft=(d.fotos||[]);let h='';if(zt)h+='<div class="rc-dev-cond" style="font-size:12px;margin-top:6px"><b>Zustand bei Annahme:</b> '+esc(zt)+'</div>';if(zu)h+='<div class="rc-dev-acc" style="font-size:12px;margin-top:2px"><b>Mitgegeben:</b> '+esc(zu)+'</div>';if(ft.length)h+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:5px">'+ft.map(f=>'<img src="'+f.src+'" style="width:46px;height:46px;object-fit:cover;border-radius:6px;border:1px solid #ddd">').join('')+'</div>';return h;})()}</div>`;}).join(''); }
 function sigBlock(o){ if(!o.sig)return '';
   const conf=o.sigConsents?'☑ AGB gelesen &amp; akzeptiert &nbsp;&nbsp; ☑ Hinweis zur Datensicherung bestätigt':'Der Kunde hat den Auftrag bestätigt.';
   return `<div style="margin-top:18px;padding-top:12px;border-top:1px solid #ddd">
@@ -2376,7 +2385,7 @@ function printReceipt(id){const o=S.ord.find(x=>x.id===id); if(!o)return; const 
   }
 /* ---- V4-2: automatische Auftragsbestätigung per E-Mail ---- */
 function orderConfirmBody(o){ const c=cust(o.cid);
-  const devs=oDevices(o).map((d,i)=>{ const pos=devPositions(d).map(p=>'   • '+p.reparatur+(p.qual?' ('+p.qual+')':'')+': '+eur(p.price)).join('\n');
+  const devs=oDevices(o).map((d,i)=>{ const pos=devPositions(d).map(p=>'   • '+p.reparatur+(posQual(p)?' ('+posQual(p)+')':'')+': '+eur(p.price)).join('\n');
     return 'Gerät '+(i+1)+': '+[d.brand,d.model].filter(Boolean).join(' ')+(d.imei?' · IMEI '+d.imei:'')+'\n'+pos; }).join('\n');
   return 'Guten Tag '+(c.name||'')+',\n\n'
     +'vielen Dank – wir haben Ihr Gerät zur Reparatur angenommen. Hier Ihre Auftragsbestätigung zur Kontrolle:\n\n'
@@ -3393,6 +3402,10 @@ function catModels(brand){return (ensureCat().models[brand]||[]);}
 function catModelNames(brand){return catModels(brand).map(m=>m.name);}
 function catRepairs(){return ensureCat().repairs;}
 function catQuals(){return ensureCat().quals;}
+/* v6 #2/#3: Ersatzteilqualität nur bei ersatzteilbezogenen Reparaturen (nicht bei Dienstleistungen) */
+const REPAIR_NOPART=['diagnose','reinig','prüf','pruef','datenrettung','datensicher','datenüber','datenueber','software','update','einricht','beratung','kostenvoranschlag','backup','entsperr','konfig','analyse','fehlersuche','wartung','service','überprüf','ueberpruef'];
+function repairHasPart(name){ const s=(name||'').toLowerCase().trim(); if(!s)return false; return !REPAIR_NOPART.some(w=>s.indexOf(w)>=0); }
+function posQual(p){ return (p&&p.qual&&repairHasPart(p.reparatur))?p.qual:''; }
 function catModelObj(brand,name){return catModels(brand).find(m=>m.name===name);}
 /* V4-6/V4-7: Geräte-Silhouetten (Fallback, wenn kein echtes Modellbild hinterlegt) */
 function deviceSvg(type,px){px=px||56;type=type||'Smartphone';const c='#94a3b8',bg='#f1f5f9';
