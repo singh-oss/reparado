@@ -207,7 +207,7 @@ def init_db():
           name TEXT, role TEXT, code_hash TEXT, purpose TEXT, expires REAL, tries INTEGER DEFAULT 0);
         """)
         # Abo/Stripe-Spalten (idempotent nachrüsten)
-        for col in ("plan", "sub_status", "trial_end", "stripe_customer", "stripe_sub", "current_period_end"):
+        for col in ("plan", "sub_status", "trial_end", "stripe_customer", "stripe_sub", "current_period_end", "pub"):
             try: c.execute("ALTER TABLE workshops ADD COLUMN %s TEXT" % col)
             except Exception: pass
         # Bestehende Werkstätten (Pilot) NICHT aussperren: großzügige Testphase nachtragen
@@ -263,6 +263,23 @@ def verify_reset_token(token):
 
 def uid(prefix="id"):
     return prefix + "_" + base64.b32encode(os.urandom(8)).decode().rstrip("=").lower()
+
+# ---------- Öffentlicher Werkstatt-Schlüssel (für Website-Formular) ----------
+def _ws_pub(wid):
+    """Stabiler, öffentlich teilbarer Schlüssel je Werkstatt (nur zum Einreichen von
+    Website-Anfragen; erlaubt keinerlei Lesezugriff). Wird bei Bedarf erzeugt."""
+    with _lock, db() as c:
+        row = c.execute("SELECT pub FROM workshops WHERE id=?", (wid,)).fetchone()
+        if not row:
+            return ""
+        pub = row["pub"]
+        if not pub:
+            pub = base64.b32encode(os.urandom(7)).decode().rstrip("=").lower()
+            c.execute("UPDATE workshops SET pub=? WHERE id=?", (pub, wid))
+        return pub
+
+# Einfacher Spam-Schutz für das öffentliche Formular (IP -> Zeitstempel)
+_PUB_HITS = {}
 
 # ---------- Mail ----------
 def send_mail(workshop_id, to, subject, body, html=None):
@@ -464,6 +481,23 @@ class H(BaseHTTPRequestHandler):
                 return self._send(404, {"error": "Formular-Link ungültig oder abgelaufen"})
             return self._send(200, {"ok": True, "workshop": row["workshop_name"] or "Werkstatt",
                                     "tel": row["workshop_tel"] or "", "submitted": bool(row["submitted"])})
+        if self.path.startswith("/api/intake/info"):
+            # Öffentlich: Website-Formular liest den Werkstatt-Namen anhand des öffentlichen Schlüssels.
+            q = parse_qs(urlparse(self.path).query)
+            key = (q.get("key") or [""])[0].strip().lower()
+            if not key:
+                return self._send(400, {"error": "key fehlt"})
+            with db() as c:
+                w = c.execute("SELECT name FROM workshops WHERE pub=?", (key,)).fetchone()
+            if not w:
+                return self._send(404, {"error": "nicht gefunden"})
+            return self._send(200, {"ok": True, "name": w["name"] or "Werkstatt"})
+        if self.path == "/api/intake/key":
+            # Werkstatt holt ihren stabilen öffentlichen Formular-Schlüssel (für Website-Einbindung).
+            p = self._auth()
+            if not p:
+                return self._send(401, {"error": "unauthorized"})
+            return self._send(200, {"ok": True, "key": _ws_pub(p["wid"])})
         if self.path == "/api/intake/pending":
             # Werkstatt holt neue, noch nicht übernommene Vorab-Anfragen ab.
             p = self._auth()
@@ -851,6 +885,40 @@ class H(BaseHTTPRequestHandler):
                 c.execute("INSERT INTO intake_sessions(token,workshop_id,herkunft,workshop_name,workshop_tel,data,submitted,consumed,created,expires) VALUES(?,?,?,?,?,?,?,?,?,?)",
                           (tok, p["wid"], herkunft, wname, wtel, "", 0, 0, now, exp))
             return self._send(200, {"token": tok})
+
+        if self.path == "/api/intake/public":
+            # Öffentlich: Website-Formular reicht eine Anfrage per stabilem Werkstatt-Schlüssel ein.
+            ip = (self.headers.get("X-Forwarded-For", "").split(",")[0].strip() or self.client_address[0])
+            now = time.time()
+            hits = [t for t in _PUB_HITS.get(ip, []) if t > now - 3600]
+            if len(hits) >= 20:
+                return self._send(429, {"error": "Zu viele Anfragen – bitte später erneut."})
+            key = (body.get("key") or "").strip().lower()
+            data = body.get("data")
+            herkunft = (str(body.get("herkunft") or "website")).strip()[:40] or "website"
+            if not key or not isinstance(data, dict):
+                return self._send(400, {"error": "Formular unvollständig"})
+            if not (str(data.get("name", "")).strip() and str(data.get("tel", "")).strip()):
+                return self._send(400, {"error": "Name und Telefon nötig"})
+            clean = {k: (str(data.get(k, ""))[:500]) for k in
+                     ("name", "tel", "mail", "type", "brand", "model", "issue", "problem", "contact", "besttime")}
+            clean["at"] = _iso(now)
+            with _lock, db() as c:
+                w = c.execute("SELECT id FROM workshops WHERE pub=?", (key,)).fetchone()
+                if not w:
+                    return self._send(404, {"error": "Formular nicht gefunden"})
+                c.execute("DELETE FROM intake_sessions WHERE expires<?", (now,))
+                cnt = c.execute("SELECT COUNT(*) n FROM intake_sessions WHERE workshop_id=? AND submitted=1 AND consumed=0",
+                                (w["id"],)).fetchone()["n"]
+                if cnt > 200:
+                    return self._send(429, {"error": "Posteingang voll – bitte später erneut."})
+                c.execute("INSERT INTO intake_sessions(token,workshop_id,herkunft,workshop_name,workshop_tel,data,submitted,consumed,created,expires) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                          (uid("wq"), w["id"], herkunft, "", "", json.dumps(clean), 1, 0, now, now + 30 * 86400))
+            _PUB_HITS[ip] = hits + [now]
+            if len(_PUB_HITS) > 5000:
+                for k2 in [k3 for k3, v in _PUB_HITS.items() if not [t for t in v if t > now - 3600]]:
+                    _PUB_HITS.pop(k2, None)
+            return self._send(200, {"ok": True})
 
         if self.path == "/api/intake/submit":
             # Öffentlich: Kunde reicht seine Vorab-Daten ein.

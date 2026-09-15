@@ -115,7 +115,7 @@ function render(){
       <label>E-Mail ${state.contact==='E-Mail'?'':'(optional)'}</label><input class="in" id="m" value="${esc(state.mail)}" placeholder="Für die Antwort">
       <div class="chk"><input type="checkbox" id="dsg"><label for="dsg" style="margin:0;font-weight:500;color:#444">Ich bin mit der Verarbeitung meiner Angaben zur Bearbeitung der Anfrage einverstanden.</label></div>
       <div class="note">Unverbindliche Anfrage – es entstehen keine Kosten. Der endgültige Preis wird erst nach Prüfung des Geräts genannt.</div>
-      <div class="nav"><button class="btn" onclick="setStep(2)">Zurück</button><button class="btn pri" onclick="submit()">Anfrage absenden</button></div>`;
+      <div class="nav"><button class="btn" onclick="setStep(2)">Zurück</button><button class="btn pri" id="sendBtn" onclick="submit()">Anfrage absenden</button></div>`;
   } else if(state.step===4){
     v.innerHTML=`<div class="done"><div class="ck">${CK}</div>
       <h1>Anfrage gesendet</h1><p class="sub">Vielen Dank, ${esc(state.name.split(' ')[0]||'')}. Wir melden uns zeitnah per ${esc(state.contact)} mit einem Angebot.</p>
@@ -140,11 +140,19 @@ function submit(){
   if(!state.name||!state.tel){alert('Bitte Name und Telefon angeben.');return;}
   if(!document.getElementById('dsg').checked){alert('Bitte bestätigen Sie die Verarbeitung Ihrer Angaben.');return;}
   if(state.contact==='E-Mail'&&!state.mail){alert('Bitte eine E-Mail-Adresse angeben.');return;}
-  let arr=[];try{arr=JSON.parse(localStorage.getItem('reparado_requests')||'[]');}catch(e){}
-  const rq={name:state.name,tel:state.tel,mail:state.mail,type:state.type,brand:state.brand,model:state.model,issue:state.issue,problem:state.problem,contact:state.contact,besttime:state.besttime,ts:Date.now()};
-  arr.push(rq);
-  localStorage.setItem('reparado_requests',JSON.stringify(arr));
-  if(window.parent!==window){try{window.parent.postMessage({reparadoRequest:rq},'*');}catch(e){}}
+  const rq={name:state.name,tel:state.tel,mail:state.mail,type:state.type,brand:state.brand,model:state.model,issue:state.issue,problem:state.problem,contact:state.contact,besttime:state.besttime,at:new Date().toISOString(),ts:Date.now()};
+  var w=new URLSearchParams(location.search).get('w');
+  var localSave=function(){try{var arr=JSON.parse(localStorage.getItem('reparado_requests')||'[]');arr.push(rq);localStorage.setItem('reparado_requests',JSON.stringify(arr));}catch(e){}if(window.parent!==window){try{window.parent.postMessage({reparadoRequest:rq},'*');}catch(e){}}};
+  if(w){
+    var btn=document.getElementById('sendBtn'); if(btn){btn.disabled=true;btn.textContent='Wird gesendet…';}
+    fetch('/api/intake/public',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:w,herkunft:'website',data:rq})})
+      .then(function(r){return r.json().catch(function(){return {};});}).then(function(res){
+        if(res&&res.ok){ setStep(4); }
+        else { if(btn){btn.disabled=false;btn.textContent='Anfrage absenden';} alert((res&&res.error)||'Senden fehlgeschlagen. Bitte versuchen Sie es erneut oder rufen Sie uns an.'); }
+      }).catch(function(){ if(btn){btn.disabled=false;btn.textContent='Anfrage absenden';} alert('Keine Verbindung. Bitte versuchen Sie es erneut oder rufen Sie uns an.'); });
+    return;
+  }
+  localSave();
   setStep(4);
 }
 function reset(){Object.assign(state,{step:1,type:'',brand:'',model:'',issue:'',problem:'',contact:'Rückruf',besttime:'',name:'',tel:'',mail:''});[1,2,3].forEach(i=>document.getElementById('s'+i).classList.toggle('on',i===1));render();}
@@ -152,7 +160,9 @@ function postH(){if(window.parent!==window){try{window.parent.postMessage({repar
 try{if(window.ResizeObserver)new ResizeObserver(postH).observe(document.body);}catch(e){}
 window.addEventListener('load',postH);window.addEventListener('resize',postH);
 if(new URLSearchParams(location.search).get('embed')==='1')document.body.classList.add('embedded');
-(function(){var q=new URLSearchParams(location.search);var ws=q.get('ws');if(ws){var n=document.getElementById('wsName');if(n)n.textContent=ws;var d=document.getElementById('wsDot');if(d)d.textContent=(ws.trim()[0]||'W').toUpperCase();document.title=document.title+' · '+ws;}var tel=q.get('tel');if(tel){var t=document.getElementById('wsTel');var c=document.getElementById('wsCall');if(t){t.textContent=tel;t.href='tel:'+tel.replace(/\s/g,'');}if(c)c.style.display='';}})();
+function setWsName(ws){if(!ws)return;var n=document.getElementById('wsName');if(n)n.textContent=ws;var d=document.getElementById('wsDot');if(d)d.textContent=(ws.trim()[0]||'W').toUpperCase();}
+(function(){var q=new URLSearchParams(location.search);var ws=q.get('ws');if(ws){setWsName(ws);document.title='Anfrage · '+ws;}var tel=q.get('tel');if(tel){var t=document.getElementById('wsTel');var c=document.getElementById('wsCall');if(t){t.textContent=tel;t.href='tel:'+tel.replace(/\s/g,'');}if(c)c.style.display='';}
+  var w=q.get('w');if(w&&!ws){try{fetch('/api/intake/info?key='+encodeURIComponent(w)).then(function(r){return r.ok?r.json():null;}).then(function(res){if(res&&res.name){setWsName(res.name);document.title='Anfrage · '+res.name;}}).catch(function(){});}catch(e){}}})();
 render();
 </script>
 </body>

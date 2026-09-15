@@ -2028,7 +2028,7 @@ views.angebote=function(){
    </div>
    ${reqs.length?`<div class="card" style="margin-top:16px"><div class="between"><b>Anfragen von der Website</b><span class="pill soft"><span class="d"></span>${reqs.length} neu</span></div>
      <p class="muted" style="font-size:13px;margin:4px 0 12px">Rückruf-/Angebotsanfragen über deine Website. „Angebot erstellen" öffnet das Formular mit vorausgefüllten Daten.</p>
-     ${reqs.map(r=>`<div class="listitem"><div class="avatar out">${initials(r.name)}</div><div style="flex:1;min-width:0"><b>${esc(r.name)}</b> ${r.source==='vorab'?`<span class="tag" style="border-color:#16a34a;color:#34a24a">Vorab · ${esc(HERKUNFT_LABEL[r.herkunft]||r.herkunft||'Online')}${r.via?(' ('+esc(r.via.toUpperCase())+')'):''}</span>`:`<span class="tag">${esc(r.contact||'Rückruf')}</span>`}<div class="muted" style="font-size:12px">${esc([r.brand,r.model].filter(Boolean).join(' '))} · ${esc(r.issue||'')}${r.problem?' · '+esc(r.problem):''} · ${esc(r.tel)}${r.besttime?' · '+esc(r.besttime):''}</div></div>
+     ${reqs.map(r=>`<div class="listitem"><div class="avatar out">${initials(r.name)}</div><div style="flex:1;min-width:0"><b>${esc(r.name)}</b> ${r.source==='website'?`<span class="tag" style="border-color:#16a34a;color:#34a24a">🌐 Website${r.contact?' · '+esc(r.contact):''}</span>`:(r.source==='vorab'?`<span class="tag" style="border-color:#16a34a;color:#34a24a">Vorab · ${esc(HERKUNFT_LABEL[r.herkunft]||r.herkunft||'Online')}${r.via?(' ('+esc(r.via.toUpperCase())+')'):''}</span>`:`<span class="tag">${esc(r.contact||'Rückruf')}</span>`)}<div class="muted" style="font-size:12px">${esc([r.brand,r.model].filter(Boolean).join(' '))} · ${esc(r.issue||'')}${r.problem?' · '+esc(r.problem):''} · ${esc(r.tel)}${r.besttime?' · '+esc(r.besttime):''}</div></div>
        <button class="btn sm pri" onclick="requestToQuote('${r.id}')">Angebot erstellen</button><button class="btn sm" onclick="requestToOrder('${r.id}')">Auftrag anlegen</button><button class="btn sm gho" onclick="dismissRequest('${r.id}')">Erledigt</button></div>`).join('')}
    </div>`:''}
    <div class="card" style="margin-top:16px;padding:0;overflow:auto"><table>
@@ -2127,7 +2127,7 @@ function intakeImport(silent){
     if(!res||!res.items||!res.items.length)return;
     const toks=[]; S.requests=S.requests||[]; S._intakeVia=S._intakeVia||{};
     res.items.forEach(it=>{ const d=it.data||{}; toks.push(it.token);
-      S.requests.unshift({id:uid('rq'),name:d.name||'',tel:d.tel||'',mail:d.mail||'',type:d.type||'Smartphone',brand:d.brand||'',model:d.model||'',issue:d.issue||'',ts:(d.at)||new Date().toISOString(),source:'vorab',herkunft:it.herkunft||'online',via:S._intakeVia[it.token]||''}); });
+      S.requests.unshift({id:uid('rq'),name:d.name||'',tel:d.tel||'',mail:d.mail||'',type:d.type||'Smartphone',brand:d.brand||'',model:d.model||'',issue:d.issue||'',problem:d.problem||'',besttime:d.besttime||'',contact:d.contact||'',ts:(d.at)||new Date().toISOString(),source:(it.herkunft==='website'?'website':'vorab'),herkunft:it.herkunft||'online',via:S._intakeVia[it.token]||''}); });
     fetch(API+'/api/intake/consume',{method:'POST',headers:DB._hdr(),body:JSON.stringify({tokens:toks})}).catch(()=>{});
     save(); refreshBadges&&refreshBadges(); if(current==='angebote'||current==='dashboard')(views[current]||function(){})(); paintIcons();
     if(!silent)toast(res.items.length+' neue Vorab-Anfrage'+(res.items.length>1?'n':''));
@@ -3851,28 +3851,26 @@ views.einstellungen=function(){
        <textarea class="in" rows="2" onchange="S.phone.greetingAfter=this.value;save()">${esc(S.phone.greetingAfter)}</textarea>
        <button class="btn" style="margin-top:14px" onclick="go('anrufe')">Empfang & Simulation öffnen</button>
      </div>
-     ${(function(){const w=ensureWidget();return `<div class="card"><b>Website-Widget</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Buchung, Preise & Anfrage direkt auf Ihrer Website – als Einbett-Code oder WordPress-Plugin. Kunden bleiben auf Ihrer Seite.</p>
-       <div class="row" style="margin-bottom:12px"><a class="btn pri" href="booking.html" target="_blank">Buchung öffnen</a><a class="btn" href="anfrage.html" target="_blank">Anfrage öffnen</a></div>
-       <div class="grid g2">
-         <div><label class="f">Shop-Kennung (Slug)</label><input class="in" value="${esc(w.slug)}" onchange="setWidget('slug',this.value.trim())"></div>
-         <div><label class="f">Akzentfarbe</label><input class="in" type="color" value="${w.accent}" onchange="setWidget('accent',this.value)" style="height:42px;padding:4px"></div>
+     ${(function(){const k=pubKey();const ready=(DB.backend==='server');const linkFull=siteFormUrl();return `<div class="card"><b>🌐 Website anbinden</b><p class="muted" style="font-size:13px;margin:4px 0 12px">Ein fertiges Reparatur-Anfrageformular für Ihre Website. Der Kunde wählt Gerät und Problem und hinterlässt seine Kontaktdaten – die Anfrage landet <b>automatisch</b> unter „Angebote → Anfragen von der Website". So einfach wie möglich: <b>Link teilen, QR aufhängen oder Formular einbetten.</b></p>
+       ${(!ready)?`<div class="note">Der persönliche Link wird aktiv, sobald die App online mit dem Server läuft. (Im lokalen Testmodus wird die Anfrage nur simuliert.)</div>`:(!k?`<div class="row"><button class="btn pri" onclick="ensurePubKey()">Link aktivieren</button><span class="muted" style="font-size:12px;align-self:center">erzeugt Ihren persönlichen Formular-Link</span></div>`:`
+       <label class="f">1 · Ihr fertiger Link <span class="muted">(auf der Website als Knopf „Reparatur anfragen" verlinken – oder direkt per WhatsApp/Instagram/Google teilen)</span></label>
+       <div class="row"><input class="in" style="flex:1" readonly value="${esc(linkFull)}" onclick="this.select();copyStr(this.value)"><button class="btn pri" onclick="copyStr(siteFormUrl())">Kopieren</button><button class="btn" onclick="window.open(siteFormUrl(),'_blank')">Testen</button></div>
+       <div class="grid g2" style="margin-top:16px;align-items:start">
+         <div>
+           <label class="f">2 · Auf der Website einbetten</label>
+           <textarea class="in" rows="4" readonly style="font-family:ui-monospace,monospace;font-size:12px" onclick="this.select()">${esc(siteEmbedCode())}</textarea>
+           <div class="row" style="margin-top:8px"><button class="btn sm" onclick="copyStr(siteEmbedCode())">Einbett-Code kopieren</button><button class="btn sm" onclick="downloadWpPlugin()">WordPress-Plugin</button></div>
+           <div class="muted" style="font-size:12px;margin-top:6px">Funktioniert auf jeder Website (WordPress, Wix, Jimdo, eigenes HTML). WordPress: Plugin hochladen, dann Shortcode <span class="mono">[reparado typ="anfrage"]</span>.</div>
+         </div>
+         <div>
+           <label class="f">3 · QR-Code <span class="muted">(Theke, Flyer, Schaufenster, Instagram-Bio)</span></label>
+           <div style="border:1px solid var(--line);border-radius:12px;padding:12px;background:#fff;display:inline-block">${qrSVG(siteFormShort(),150)}</div>
+           <div class="muted" style="font-size:12px;margin-top:6px">Kunde scannt → Anfrageformular öffnet sich sofort.</div>
+         </div>
        </div>
-       <label class="f" style="margin-top:12px">Anzeigen im Widget</label>
-       <div class="row">${[['buchung','Terminbuchung'],['preise','Preisrechner'],['anfrage','Anfrage/Rückruf']].map(x=>`<button class="chip ${w.show[x[0]]?'on':''}" onclick="setWidget('show',Object.assign({},ensureWidget().show,{${x[0]}:!ensureWidget().show['${x[0]}']}))">${x[1]}</button>`).join('')}</div>
-       <div class="grid g2" style="margin-top:12px">
-         <div><label class="f">Höhe (px)</label><input class="in" type="number" value="${w.height}" onchange="setWidget('height',+this.value||900)"></div>
-         <div><label class="f">Auto-Höhe</label><button class="switch ${w.autoresize?'on':''}" style="margin-top:6px" onclick="setWidget('autoresize',!ensureWidget().autoresize)"><i></i></button></div>
-       </div>
-       <label class="f" style="margin-top:12px">Basis-URL (wo Buchung/Anfrage gehostet sind)</label>
-       <input class="in" value="${esc(w.embedBase||'')}" placeholder="${esc(widgetBase())}" onchange="setWidget('embedBase',this.value.trim())">
-       <div class="muted" style="font-size:12px;margin-top:4px">Leer lassen = automatisch erkannt: <span class="mono">${esc(widgetBase())}</span>. Später eigene Domain eintragen (z. B. https://ihre-werkstatt.de).</div>
-       <label class="f" style="margin-top:14px">Live-Vorschau (so sieht es auf Ihrer Website aus)</label>
-       <div style="border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--soft)"><iframe src="${widgetUrl('buchung')}" style="width:100%;height:${Math.min(w.height,560)}px;border:0" title="Vorschau"></iframe></div>
-       <label class="f" style="margin-top:14px">Einbett-Code · Buchung</label>
-       <textarea class="in" rows="3" readonly style="font-family:ui-monospace,monospace;font-size:12px">${esc(widgetEmbed('buchung'))}</textarea>
-       <div class="row" style="margin-top:8px"><button class="btn sm" onclick="copyEmbed('buchung')">Buchungs-Code kopieren</button><button class="btn sm" onclick="copyEmbed('anfrage')">Anfrage-Code kopieren</button><button class="btn sm" onclick="copyStr(widgetUrl('buchung'))">Direktlink kopieren</button></div>
-       <div class="note" style="margin-top:14px"><b>WordPress?</b> Laden Sie das fertige Plugin herunter und laden es unter <i>Plugins → Installieren → Plugin hochladen</i> hoch. Danach überall per Shortcode: <span class="mono">[reparado]</span> (Buchung) oder <span class="mono">[reparado typ="anfrage"]</span>. Der Einbett-Code funktioniert auf jeder Website (auch Wix, Jimdo, HTML) – Auto-Höhe inklusive.</div>
-       <div class="row" style="margin-top:10px"><button class="btn pri" onclick="downloadWpPlugin()">WordPress-Plugin herunterladen</button><input class="in" style="flex:1" readonly value='[reparado typ="buchung"]' onclick="this.select();copyStr(this.value)"></div>
+       <label class="f" style="margin-top:16px">Vorschau (so sieht es für Ihre Kunden aus)</label>
+       <div style="border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--soft)"><iframe src="${esc(linkFull)}&embed=1" style="width:100%;height:560px;border:0" title="Vorschau"></iframe></div>
+       <div class="note" style="margin-top:12px">Eingehende Anfragen erscheinen unter <b>Angebote</b> („Anfragen von der Website") und im Benachrichtigungs-Zähler oben – 1 Klick macht daraus ein Angebot oder einen Auftrag.</div>`)}
      </div>`;})()}
      <div class="card"><b>Garantie & Belege</b>
        <div class="grid g2" style="margin-top:12px"><div><label class="f">Standard-Garantie (Monate)</label><input class="in" value="${SHOP.warranty}"></div>
@@ -4535,6 +4533,14 @@ function addDaysStr(n){const x=new Date();x.setDate(x.getDate()+n);return x.toIS
 let empfFilter='alle', simChannel='anruf', simAfter=false;
 /* P10 – Website-Widget: Embed-Code, Konfiguration & WordPress-Plugin */
 function ensureWidget(){ if(!S.widget){ S.widget={slug:'meine-werkstatt',accent:'#34a24a',show:{preise:true,buchung:true,anfrage:true},height:900,autoresize:true,embedBase:''}; save(); } if(S.widget.embedBase===undefined){S.widget.embedBase='';save();} return S.widget; }
+/* --- Website anbinden: stabiler öffentlicher Formular-Link je Werkstatt --- */
+function pubKey(){ return (ensureWorkshop().pub)||''; }
+function ensurePubKey(cb){ const w=ensureWorkshop(); if(w.pub){ if(cb)cb(w.pub); return; } if(DB.backend!=='server'){ if(cb)cb(''); return; }
+  fetch(API+'/api/intake/key',{headers:DB._hdr()}).then(r=>r.json()).then(res=>{ if(res&&res.key){ ensureWorkshop().pub=res.key; save(); if(current==='einstellungen'){views.einstellungen();paintIcons();} if(cb)cb(res.key); } }).catch(()=>{}); }
+function siteFormBase(){ try{ return new URL('.',location.href).href.replace(/\/+$/,''); }catch(e){ return location.origin; } }
+function siteFormShort(){ return siteFormBase()+'/anfrage.html?w='+encodeURIComponent(pubKey()); }
+function siteFormUrl(){ const p=['w='+encodeURIComponent(pubKey())]; if(SHOP.name)p.push('ws='+encodeURIComponent(SHOP.name)); if(SHOP.phone)p.push('tel='+encodeURIComponent(SHOP.phone)); return siteFormBase()+'/anfrage.html?'+p.join('&'); }
+function siteEmbedCode(){ return '<iframe src="'+siteFormUrl()+'&embed=1" style="width:100%;max-width:560px;height:680px;border:0;border-radius:14px;box-shadow:0 1px 4px rgba(0,0,0,.08)" title="Reparatur-Anfrage" loading="lazy"></iframe>'; }
 function widgetBase(){ const w=ensureWidget(); if(w.embedBase&&w.embedBase.trim()) return w.embedBase.trim().replace(/\/+$/,''); try{ return new URL('.',location.href).href.replace(/\/+$/,''); }catch(e){ return location.origin; } }
 function widgetUrl(typ){ const w=ensureWidget(); const page=(typ==='anfrage'?'anfrage':'booking')+'.html'; return widgetBase()+'/'+page+'?embed=1&accent='+encodeURIComponent(w.accent.replace('#',''))+'&ws='+encodeURIComponent(SHOP.name)+(SHOP.phone?'&tel='+encodeURIComponent(SHOP.phone):''); }
 function widgetEmbed(typ){ const w=ensureWidget(); const id='reparado-'+typ; const url=widgetUrl(typ);
@@ -4806,7 +4812,7 @@ paintIcons();
 function bootApp(){ensureWorkshop(); ensureMaster(); applyMaster(); ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); ensureInv(); ensureProc(); ensureTrade(); ensureShip(); ensureContracts(); ensureInsurers(); ensureIntegrations(); const n=pullBookings(); const nq=pullRequests(); pullFeedback(); pullWarranty(); go('dashboard'); applyNavRole(); if(!curUser())showLogin();
   if(nq) setTimeout(()=>toast(nq+' neue Website-Anfrage'+(nq>1?'n':'')),900);
   if(n) setTimeout(()=>toast(n+' neue Online-Buchung'+(n>1?'en':'')+' übernommen'),500);
-  if(DB.backend==='server'){ setTimeout(()=>intakeImport(false),1500); setTimeout(()=>portalPollReplies(),2200); if(!window.__intakePoll)window.__intakePoll=setInterval(()=>intakeImport(false),90000); if(!window.__portalPoll)window.__portalPoll=setInterval(()=>portalPollReplies(),90000); }
+  if(DB.backend==='server'){ setTimeout(()=>intakeImport(false),1500); setTimeout(()=>portalPollReplies(),2200); setTimeout(()=>ensurePubKey(),1700); if(!window.__intakePoll)window.__intakePoll=setInterval(()=>intakeImport(false),90000); if(!window.__portalPoll)window.__portalPoll=setInterval(()=>portalPollReplies(),90000); }
 }
 /* Frischer, komplett leerer Zustand für ein neu registriertes Konto (keine Demo-Daten). */
 function blankState(){ return {v:11, __clean:true, cust:[], ord:[], parts:[], orders:[], sold:[], counter:1000, rules:defaultRules(), sales:[], cash:{connected:''}, mailLog:[], calls:[], phone:defaultPhone(), users:[{id:'u1',name:'Inhaber',role:'inhaber',pin:'1234'}], userId:'u1', insurance:defaultInsurance(), wgLeads:[], drafts:[], quotes:[], requests:[], quoteCounter:1000, feedback:[], reactDone:[], termine:[], belege:[], proacDone:[]}; }
