@@ -434,6 +434,60 @@ def _deepgram_stt(audio, ct):
     except Exception:
         return ""
 
+def _twilio_api(method, path, params=None):
+    """Ruft die Twilio-REST-API mit den zentralen Velqio-Zugangsdaten auf (für automatische
+    Nummern-Bereitstellung). Wirft RuntimeError mit der Twilio-Meldung bei Fehlern."""
+    sid = _cfg("TWILIO_ACCOUNT_SID", ""); tok = _cfg("TWILIO_AUTH_TOKEN", "")
+    if not (sid and tok):
+        raise RuntimeError("Twilio ist nicht konfiguriert.")
+    url = "https://api.twilio.com/2010-04-01/Accounts/" + sid + "/" + path
+    data = _urlparse.urlencode(params, doseq=True).encode() if params is not None else None
+    req = _urlreq.Request(url, data=data, method=method)
+    req.add_header("Authorization", "Basic " + base64.b64encode((sid + ":" + tok).encode()).decode())
+    if data is not None:
+        req.add_header("Content-Type", "application/x-www-form-urlencoded")
+    try:
+        with _urlreq.urlopen(req, timeout=30) as r:
+            return json.loads(r.read().decode())
+    except _urlerr.HTTPError as e:
+        try:
+            msg = json.loads(e.read().decode()).get("message", "")
+        except Exception:
+            msg = ""
+        raise RuntimeError(msg or ("Twilio-Fehler " + str(e.code)))
+
+def _voice_provision(wid, country="DE", area=""):
+    """Sucht eine freie, Voice-fähige Nummer, kauft sie, setzt den Webhook und ordnet sie
+    der Werkstatt zu – alles automatisch. Gibt die Nummer zurück."""
+    prof = _voice_prof(wid)
+    if prof.get("number"):
+        return prof["number"], True  # schon vorhanden
+    base = str(_cfg("APP_BASE_URL", "https://velqio.de")).rstrip("/")
+    country = (country or "DE").upper()[:2]
+    cand = None
+    for kind in ("Local", "Mobile", "TollFree", "National"):
+        q = "AvailablePhoneNumbers/" + country + "/" + kind + ".json?VoiceEnabled=true&PageSize=1"
+        if area:
+            q += "&AreaCode=" + _urlparse.quote(str(area))
+        try:
+            av = _twilio_api("GET", q)
+        except RuntimeError:
+            continue
+        lst = av.get("available_phone_numbers") or []
+        if lst:
+            cand = lst[0].get("phone_number"); break
+    if not cand:
+        raise RuntimeError("Keine verfügbare Voice-Nummer für " + country + " gefunden.")
+    bought = _twilio_api("POST", "IncomingPhoneNumbers.json",
+                         {"PhoneNumber": cand, "VoiceUrl": base + "/api/voice/incoming", "VoiceMethod": "POST"})
+    num = bought.get("phone_number") or cand
+    prof["number"] = num
+    prof["enabled"] = True
+    with _lock, db() as c:
+        c.execute("INSERT INTO app_data(workshop_id,key,value,updated_at) VALUES(?,?,?,?) ON CONFLICT(workshop_id,key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at",
+                  (wid, "voice", json.dumps(prof), _iso()))
+    return num, False
+
 def _twilio_fetch(url):
     sid = _cfg("TWILIO_ACCOUNT_SID", ""); tok = _cfg("TWILIO_AUTH_TOKEN", "")
     req = _urlreq.Request(url)
@@ -894,6 +948,17 @@ class H(BaseHTTPRequestHandler):
                 c.execute("INSERT INTO app_data(workshop_id,key,value,updated_at) VALUES(?,?,?,?) ON CONFLICT(workshop_id,key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at",
                           (p["wid"], "voice", json.dumps(clean), _iso()))
             return self._send(200, {"ok": True})
+
+        if self.path == "/api/voice/provision":
+            # Automatische Nummern-Bereitstellung: freie Nummer suchen, kaufen, Webhook setzen, zuordnen.
+            p = self._auth()
+            if not p:
+                return self._send(401, {"error": "unauthorized"})
+            try:
+                num, existed = _voice_provision(p["wid"], body.get("country") or "DE", body.get("areaCode") or "")
+                return self._send(200, {"ok": True, "number": num, "existed": existed})
+            except Exception as e:
+                return self._send(200, {"ok": False, "error": str(e)[:240]})
 
         if self.path == "/api/auth/login":
             email = (body.get("email") or "").strip().lower()
