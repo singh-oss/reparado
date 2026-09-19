@@ -1812,8 +1812,30 @@ function noFinalize(){ noCollect();
   stampOrderCreate(o); /* Welle 2 #6: Ersteller/Filiale + Protokoll */
   S.ord.unshift(o); sendOrderConfirmation(o,{silent:false}); /* V4-2: automatische Auftragsbestätigung */
   S.drafts=(S.drafts||[]).filter(x=>x.id!==NO.draftId); save();
-  const wasSigned=!!o.sig; toast('Auftrag '+nr+' angelegt'+(devs.length>1?(' · '+devs.length+' Geräte'):'')); NO=null; go('auftraege');
+  const wasSigned=!!o.sig; toast('Auftrag '+nr+' angelegt'+(devs.length>1?(' · '+devs.length+' Geräte'):'')); sendIntakePhotos(o); NO=null; go('auftraege');
   if(wasSigned)setTimeout(function(){printReceipt(o.id);},150); /* P8: nach Abschluss direkt Druckvorschau */
+}
+/* Annahme-Fotos nach dem Speichern an die in den Einstellungen hinterlegte Foto-E-Mail senden (Betreff+Dateiname: Auftragsnr., Kundenname, Datum; Format JPEG) */
+function _toJpegDataUrl(src,cb){ try{ const im=new Image(); im.onload=function(){ try{ const cv=document.createElement('canvas'); cv.width=im.width||1024; cv.height=im.height||1024; const cx=cv.getContext('2d'); cx.fillStyle='#fff'; cx.fillRect(0,0,cv.width,cv.height); cx.drawImage(im,0,0); cb(cv.toDataURL('image/jpeg',0.85)); }catch(e){ cb(src); } }; im.onerror=function(){ cb(src); }; im.src=src; }catch(e){ cb(src); } }
+function _fnSafe(s){ return String(s||'').replace(/[^\wäöüÄÖÜß .-]/g,'').replace(/\s+/g,'_').slice(0,40)||'x'; }
+function sendIntakePhotos(o){
+  if(DB.backend!=='server')return; /* Versand nur über den Server möglich */
+  const email=((ensureSettings().photoEmail)||'').trim(); if(!email)return;
+  const srcs=[]; (o.devices||[]).forEach(d=>(d.fotos||[]).forEach(f=>{ if(f&&f.src)srcs.push(f.src); }));
+  (o.photos||[]).forEach(p=>{ const s=(typeof p==='string')?p:(p&&p.src); if(s)srcs.push(s); });
+  if(!srcs.length)return;
+  const c=cust(o.cid); const nm=(c&&c.name)||'Kunde'; const date=(o.created||today());
+  const base=_fnSafe(o.nr)+'_'+_fnSafe(nm)+'_'+date;
+  let pend=srcs.length; const atts=[];
+  srcs.forEach((src,i)=>_toJpegDataUrl(src,function(j){
+    atts.push({filename:base+'_'+(i+1)+'.jpg',dataUrl:j});
+    if(--pend===0){
+      const subj='Annahme-Fotos · Auftrag '+o.nr+' · '+nm+' · '+date;
+      const bodyTxt='Fotos zur Geräteannahme.\n\nAuftrag: '+o.nr+'\nKunde: '+nm+'\nDatum: '+date+'\nAnzahl Fotos: '+atts.length+'\n\n– automatisch gesendet von '+SHOP.name;
+      fetch(API+'/api/mail/send',{method:'POST',headers:DB._hdr(),body:JSON.stringify({to:email,subject:subj,body:bodyTxt,fromName:SHOP.name,replyTo:(SHOP.email||''),attachments:atts})})
+        .then(r=>r.json()).then(res=>{ if(res&&res.sent)toast('📷 Annahme-Fotos an '+email+' gesendet'); else toast('Fotos konnten nicht gesendet werden'); }).catch(()=>{});
+    }
+  }));
 }
 function noBuildDevices(){ const built=[];
   NO.devices.forEach(d=>{ if(!(d.brand||d.model))return;
@@ -4116,6 +4138,9 @@ views.einstellungen=function(){
        <label class="f" style="margin-top:12px">Pflichtfelder bei der Annahme</label>
        <div class="row" style="flex-wrap:wrap;gap:8px">${[['mail','E-Mail'],['adr','Adresse'],['imei','IMEI/Seriennummer'],['sig','Unterschrift']].map(f=>`<button class="chip ${st.required[f[0]]?'on':''}" onclick="var s=ensureSettings();s.required['${f[0]}']=!s.required['${f[0]}'];save();views.einstellungen();paintIcons()">${f[1]}</button>`).join('')}</div>
        <div class="muted" style="font-size:12px;margin-top:6px">Aktive Pflichtfelder blockieren das Anlegen eines Auftrags, bis sie ausgefüllt sind.</div>
+       <label class="f" style="margin-top:12px">📷 E-Mail für Annahme-Fotos</label>
+       <input class="in" type="email" value="${esc(st.photoEmail||'')}" placeholder="fotos@deinhandydoc.de" onchange="ensureSettings().photoEmail=this.value.trim();save()">
+       <div class="muted" style="font-size:12px;margin-top:6px">Nach dem Speichern eines Auftrags werden die bei der Annahme aufgenommenen Fotos automatisch als <b>JPEG</b> an diese Adresse gesendet – Betreff und Dateiname enthalten Auftragsnummer, Kundenname und Datum. Leer lassen = kein Versand.${DB.backend!=='server'?' <b>Hinweis:</b> Versand nur im Online-Betrieb.':''}</div>
        <label class="f" style="margin-top:12px">AGB / Hinweistext (erscheint auf dem Beleg)</label>
        <textarea class="in" rows="4" onchange="ensureSettings().agb=this.value;save()">${esc(st.agb)}</textarea>`;})()}
      </div>

@@ -291,7 +291,7 @@ def _ws_mailcfg(wid):
     try: return json.loads(r["value"])
     except Exception: return {}
 
-def send_mail(workshop_id, to, subject, body, html=None, from_name=None, reply_to=None):
+def send_mail(workshop_id, to, subject, body, html=None, from_name=None, reply_to=None, attachments=None):
     """White-Label: Kunden-Mails (mit from_name) erscheinen unter dem Namen des Betriebs;
     wenn der Betrieb ein eigenes SMTP-Konto hinterlegt hat, wird darüber versendet (echte
     Domain/SPF/DKIM). Plattform-Mails (2FA/Reset, ohne from_name) laufen über das Master-Konto."""
@@ -325,6 +325,13 @@ def send_mail(workshop_id, to, subject, body, html=None, from_name=None, reply_t
     msg.set_content(body or "")
     if html:
         msg.add_alternative(html, subtype="html")
+    for att in (attachments or []):
+        try:
+            msg.add_attachment(att["data"], maintype=att.get("maintype", "application"),
+                               subtype=att.get("subtype", "octet-stream"),
+                               filename=att.get("filename", "anhang"))
+        except Exception:
+            pass
     try:
         ctx = ssl.create_default_context()
         if port == 465:
@@ -1405,7 +1412,24 @@ class H(BaseHTTPRequestHandler):
             to = body.get("to"); subj = body.get("subject", ""); text = body.get("body", "")
             if not to:
                 return self._send(400, {"error": "Empfaenger fehlt"})
-            ok, note = send_mail(p["wid"], to, subj, text, body.get("html"), body.get("fromName"), body.get("replyTo"))
+            atts = []
+            for a in (body.get("attachments") or [])[:30]:
+                du = a.get("dataUrl") or ""
+                if not du.startswith("data:") or ";base64," not in du:
+                    continue
+                head, b64 = du.split(";base64,", 1)
+                ctype = head[5:] or "application/octet-stream"
+                try:
+                    data = base64.b64decode(b64)
+                except Exception:
+                    continue
+                if not data or len(data) > 10 * 1024 * 1024:  # max 10 MB/Datei
+                    continue
+                mt, _, st = ctype.partition("/")
+                atts.append({"data": data, "maintype": mt or "application",
+                             "subtype": st or "octet-stream",
+                             "filename": str(a.get("filename") or "anhang.jpg")[:120]})
+            ok, note = send_mail(p["wid"], to, subj, text, body.get("html"), body.get("fromName"), body.get("replyTo"), atts)
             return self._send(200, {"sent": ok, "note": note})
 
         if self.path == "/api/mail/config":
