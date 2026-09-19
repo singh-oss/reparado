@@ -4056,10 +4056,17 @@ views.statistik=function(){
 };
 
 /* ============================ EINSTELLUNGEN ============================ */
+let setTab=(function(){try{return localStorage.getItem('rep_settab')||'betrieb';}catch(e){return 'betrieb';}})();
+const ES_TABS=[['betrieb','🏢 Betrieb'],['belege','🧾 Aufträge & Belege'],['komm','✉️ Kommunikation'],['kasse','💳 Kasse & Buchhaltung'],['hardware','🖨️ Geräte & Hardware']];
+/* Karten den Reitern zuordnen (Titel enthält Schlüssel → Kategorie) */
+const ES_CATMAP={'Werkstatt-Account':'betrieb','Stammdaten':'betrieb','Benutzer':'betrieb','Systemeinstellungen':'belege','Automatisierungen':'belege','Garantie':'belege','Kasse anbinden':'kasse','TSE-Anbindung':'kasse','Buchhaltung':'kasse','Integrationen':'kasse','Kundenkommunikation':'komm','Benachrichtigungen':'komm','WhatsApp-Vorlagen':'komm','Website anbinden':'komm','Empfangskraft':'komm','Etikettendruck':'hardware','Hardware':'hardware','Geräteversicher':'hardware'};
+function esApplyTab(){ document.querySelectorAll('#main .card').forEach(function(card){ if(card.parentElement&&card.parentElement.closest('.card'))return; const b=card.querySelector('b'); const title=(b?b.textContent:'').trim(); let cat=null; for(const k in ES_CATMAP){ if(title.indexOf(k)>=0){cat=ES_CATMAP[k];break;} } if(cat){ card.style.display=(cat===setTab)?'':'none'; } }); }
+function esTab(t){ setTab=t; try{localStorage.setItem('rep_settab',t);}catch(e){} document.querySelectorAll('#esTabs .estab').forEach(function(c){c.classList.toggle('on',c.dataset.t===t);}); esApplyTab(); window.scrollTo(0,0); }
 views.einstellungen=function(){
   const m=document.getElementById('main');
   const cashConn=S.cash.connected;
-  m.innerHTML=`<div class="between"><div><h1 class="h1">Einstellungen</h1><p class="sub">Stammdaten, Kassen und Integrationen</p></div></div>${billPanel()}
+  m.innerHTML=`<div class="between"><div><h1 class="h1">Einstellungen</h1><p class="sub">In Kategorien unterteilt – oben umschalten</p></div></div>${billPanel()}
+   <div class="row" id="esTabs" style="gap:8px;flex-wrap:wrap;margin:14px 0 2px">${ES_TABS.map(t=>`<button class="chip estab ${setTab===t[0]?'on':''}" data-t="${t[0]}" onclick="esTab('${t[0]}')">${t[1]}</button>`).join('')}</div>
    ${(function(){const w=ensureWorkshop();const members=(S.users||[]).length;return `<div class="card" style="margin-top:16px;border:1px solid var(--green,#34a24a)">
      <div class="between" style="flex-wrap:wrap;gap:10px"><div><b>Werkstatt-Account</b> <span class="tag">${esc(PLAN_LBL[w.plan]||w.plan)}</span> <span class="pill ${w.status==='active'?'soft':'dash'}"><span class="d"></span>${w.status==='active'?'Aktiv':(w.status==='trial'?'Testphase':'Gesperrt')}</span>
        <div class="muted" style="font-size:12px;margin-top:2px">Werkstatt-ID <span class="mono">${esc(w.id)}</span> · Kürzel <span class="mono">${esc(w.slug)}</span> · ${members} Nutzer · seit ${fmtDate(w.createdAt)}</div></div>
@@ -4276,6 +4283,7 @@ views.einstellungen=function(){
        <div class="muted" style="font-size:12px;margin-top:6px">Grün = für Mitarbeiter sichtbar. Umsätze/Marge bleiben unabhängig davon der Geschäftsführung vorbehalten.</div>
      </div>
    </div>`;
+  esApplyTab();
 };
 function connectCash(p){ S.cash.connected=p; save(); toast(p+' verbunden – Kartenzahlung aktiv'); views.einstellungen();paintIcons(); }
 /* P11 – Integrationen (SumUp, HelloCash, Lexware, Google Bewertungen) */
