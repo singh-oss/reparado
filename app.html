@@ -3461,6 +3461,76 @@ const CATALOG={
   Realme:['Realme 12 Pro+','Realme 11 Pro','Realme 10','Realme C55','Realme GT Neo 3'],
   Sonstige:[],
 };
+/* Erweiterter Katalog nach Gerätetyp (Marke → Modelle). Jedes Modell wird mit genau diesem Typ hinterlegt,
+   damit die Kaskade (Typ → passende Marken → passende Modelle) für alle Kategorien vollständig ist. Web-recherchiert 09/2026. */
+const CATALOG_EXT={
+  'Tablet':{
+    Apple:['iPad Pro 13" (M4)','iPad Pro 11" (M4)','iPad Air 13" (M3)','iPad Air 11" (M3)','iPad Air 13" (M2)','iPad Air 11" (M2)','iPad 11 (A16)','iPad mini (A17 Pro)'],
+    Samsung:['Galaxy Tab S11 Ultra','Galaxy Tab S11','Galaxy Tab S10 FE+','Galaxy Tab S10 FE','Galaxy Tab S9 Ultra','Galaxy Tab S9+','Galaxy Tab S9 FE+','Galaxy Tab S9 FE','Galaxy Tab S8 Ultra','Galaxy Tab S8+','Galaxy Tab S8','Galaxy Tab A9+'],
+    Lenovo:['Tab P12','Tab P11 (2. Gen)','Tab M11','Tab M10 (3. Gen)','Yoga Tab 13','Tab Plus'],
+    Xiaomi:['Pad 7 Pro','Pad 7','Pad 6S Pro','Pad 6','Redmi Pad Pro','Redmi Pad SE'],
+    Huawei:['MatePad 11.5 S','MatePad Pro 13.2','MatePad 11.5','MatePad SE'],
+    Microsoft:['Surface Pro 11','Surface Pro 10','Surface Pro 9','Surface Go 4'],
+    Amazon:['Fire HD 10','Fire HD 8','Fire 7'],
+  },
+  'Smartwatch':{
+    Apple:['Apple Watch Ultra 3','Apple Watch Ultra 2','Apple Watch Series 11','Apple Watch Series 10','Apple Watch Series 9','Apple Watch Series 8','Apple Watch Series 7','Apple Watch Series 6','Apple Watch Series 5','Apple Watch Series 4','Apple Watch SE (3. Gen)','Apple Watch SE (2. Gen)'],
+    Samsung:['Galaxy Watch 8','Galaxy Watch 8 Classic','Galaxy Watch Ultra','Galaxy Watch 7','Galaxy Watch FE','Galaxy Watch 6','Galaxy Watch 6 Classic','Galaxy Watch 5','Galaxy Watch 5 Pro','Galaxy Watch 4','Galaxy Watch 4 Classic'],
+    Garmin:['Fenix 8','Fenix 7','epix Pro','Venu 3','Venu 2 Plus','Forerunner 965','Forerunner 570','Forerunner 265','Forerunner 165','vívoactive 6','vívoactive 5','Instinct 3','Instinct 2'],
+    Huawei:['Watch GT 5 Pro','Watch GT 5','Watch GT 4','Watch GT 3','Watch 5','Watch Fit 3','Watch Ultimate'],
+    Google:['Pixel Watch 4','Pixel Watch 3','Pixel Watch 2','Pixel Watch'],
+    Amazfit:['Active 2','Balance','GTR 4','GTS 4','Bip 6','T-Rex 3','Cheetah Pro'],
+    Fitbit:['Charge 6','Charge 5','Inspire 3','Versa 4','Sense 2','Ace LTE'],
+    Xiaomi:['Watch S4','Watch 2 Pro','Watch 2','Redmi Watch 5','Redmi Watch 5 Active','Smart Band 9','Smart Band 8'],
+    Fossil:['Gen 6','Gen 5'],
+    Withings:['ScanWatch 2','ScanWatch Light'],
+  },
+  'E-Scooter':{
+    Xiaomi:['Electric Scooter 5 Pro','Electric Scooter 4 Ultra','Electric Scooter 4 Pro Max','Electric Scooter 4 Pro','Electric Scooter 4','Electric Scooter 4 Lite','Electric Scooter 4 Go','Electric Scooter 3','Mi Electric Scooter Pro 2','Mi Electric Scooter Essential','Mi Electric Scooter 1S'],
+    'Segway-Ninebot':['KickScooter Max G3D','KickScooter Max G2 D','KickScooter Max G30D','KickScooter F2 Pro','KickScooter F40','KickScooter F30','KickScooter E2 Plus','KickScooter D28E','KickScooter D18E','ZT3 Pro','Air T15'],
+    SoFlow:['SO4 Pro (2. Gen)','SO4 Pro','SO6','SO3','SO ONE'],
+    ePowerFun:['ePF-2 Pro','ePF-2','ePF-1 Pro','ePF-1'],
+    VMAX:['VX2 Pro','VX2','VX5 Pro GT','R25','T25'],
+    Trittbrett:['Kalle','Paul','Fritz'],
+    Odys:['Alpha X5 Pro','Pro X8','Viper'],
+    Metz:['Moover','Moover 2021'],
+    Egret:['Pro','X','One','Eight V2'],
+    'IO Hawk':['Legend','Sparrow','Exit-Cross','Circle S'],
+    Streetbooster:['One','Two','Sirius'],
+    Teverun:['Fighter Supreme','Blade GT','Blade Mini'],
+  },
+  'Laptop':{
+    Apple:['MacBook Air 15" (M4)','MacBook Air 13" (M4)','MacBook Air 15" (M3)','MacBook Air 13" (M3)','MacBook Air (M2)','MacBook Pro 16" (M4)','MacBook Pro 14" (M5)','MacBook Pro 14" (M4)','MacBook Pro 16" (M3)','MacBook Pro 14" (M3)','MacBook Pro 13" (M2)','MacBook Air (M1)'],
+    Lenovo:['ThinkPad X1 Carbon','ThinkPad T14','ThinkPad E14','IdeaPad Slim 5','IdeaPad 5','Yoga Slim 7','Yoga 7i','Legion 5','Legion Pro 5','LOQ 15'],
+    HP:['Pavilion 15','Pavilion x360','Envy x360','Spectre x360','EliteBook 840','ProBook 450','Omen 16','Victus 15'],
+    Dell:['XPS 13','XPS 15','XPS 16','Inspiron 15','Inspiron 14','Latitude 7440','Latitude 5540','Alienware m16','G15'],
+    Asus:['Zenbook 14 OLED','Zenbook 14','Vivobook 15','Vivobook S 15','ROG Zephyrus G14','ROG Strix G16','TUF Gaming A15'],
+    Acer:['Aspire 5','Aspire 3','Swift 3','Swift Go 14','Nitro 5','Predator Helios 16'],
+    Microsoft:['Surface Laptop 7','Surface Laptop 6','Surface Laptop 5','Surface Laptop Go 3'],
+    Medion:['Akoya E15','Akoya S15','Akoya P15'],
+    MSI:['Katana 15','Cyborg 15','Modern 14','Prestige 14'],
+  },
+  'Kopfhörer':{
+    Apple:['AirPods Pro 3','AirPods Pro 2','AirPods 4 (ANC)','AirPods 4','AirPods 3','AirPods (2. Gen)','AirPods Max (USB-C)','AirPods Max'],
+    Samsung:['Galaxy Buds 3 Pro','Galaxy Buds 3','Galaxy Buds FE','Galaxy Buds 2 Pro','Galaxy Buds 2','Galaxy Buds Live'],
+    Sony:['WF-1000XM5','WF-1000XM4','WH-1000XM6','WH-1000XM5','WF-C710','WF-C700N','LinkBuds S','ULT Wear'],
+    Bose:['QuietComfort Ultra Earbuds','QuietComfort Earbuds II','QuietComfort Ultra Headphones','QuietComfort Headphones','QuietComfort 45'],
+    JBL:['Live Pro 2','Live Beam 3','Tune 230NC','Tune Flex','Tune Beam','Wave Beam','Reflect Aero'],
+    Jabra:['Elite 10','Elite 8 Active','Elite 7 Pro','Elite 5','Elite 4'],
+    Sennheiser:['Momentum True Wireless 4','Momentum True Wireless 3','Momentum 4 Wireless','CX Plus','Accentum True Wireless'],
+    Nothing:['Ear (3)','Ear (2)','Ear','Ear (a)','Ear (stick)'],
+    Beats:['Studio Buds +','Studio Buds','Fit Pro','Powerbeats Pro 2','Powerbeats Pro','Studio Pro','Solo 4'],
+    Xiaomi:['Redmi Buds 6','Redmi Buds 6 Pro','Buds 5','Buds 5 Pro','Redmi Buds 5'],
+  },
+  'Konsole':{
+    Sony:['PlayStation 5 Pro','PlayStation 5 Slim','PlayStation 5','PlayStation 4 Pro','PlayStation 4 Slim','PlayStation 4','DualSense Edge Controller','DualSense Controller','DualShock 4 Controller','PlayStation VR2','PlayStation Portal'],
+    Microsoft:['Xbox Series X','Xbox Series S','Xbox One X','Xbox One S','Xbox One','Xbox Wireless Controller','Elite Wireless Controller Series 2'],
+    Nintendo:['Switch 2','Switch OLED','Switch','Switch Lite','Switch 2 Pro Controller','Joy-Con 2','Joy-Con','Pro Controller'],
+    Valve:['Steam Deck OLED','Steam Deck LCD'],
+    Asus:['ROG Ally X','ROG Ally'],
+    Lenovo:['Legion Go','Legion Go S'],
+  },
+};
 const REPTYPES=['Displaytausch','Akkutausch','Ladebuchse','Kameraglas','Backcover','Software'];
 const BASEPRICE={Displaytausch:129,Akkutausch:59,Ladebuchse:69,Kameraglas:39,Backcover:79,Software:49,'Backcover / Rückglas':79,'Rückkamera':89,'Frontkamera':69,'Hörmuschel (Ohrlautsprecher)':49,'Lautsprecher':49,'Mikrofon':49,'Power-Button':45,'Lautstärke-Taste':45,'Wasserschaden-Behandlung':79,'Datenrettung':99,'SIM-Kartenleser':55,'Vibrationsmotor':45,'Diagnose':0,'Gerät ohne Funktion':0,'Displayglas (nur Glas)':89,'Face ID / Touch ID':79,'Netzwerk / Antenne':69,'Reinigung / Wartung':29};
 const REPAIRS=['Displaytausch','Displayglas (nur Glas)','Akkutausch','Ladebuchse','Rückkamera','Frontkamera','Kameraglas','Backcover / Rückglas','Hörmuschel (Ohrlautsprecher)','Lautsprecher','Mikrofon','Power-Button','Lautstärke-Taste','Face ID / Touch ID','Wasserschaden-Behandlung','Datenrettung','SIM-Kartenleser','Vibrationsmotor','Netzwerk / Antenne','Reinigung / Wartung','Gerät ohne Funktion','Software','Diagnose'];
@@ -3481,6 +3551,15 @@ function ensureCat(){ if(!S.cat){
   if((c._modelMig||0)<3){let ch=false;c.models=c.models||{};c.brands=c.brands||[];Object.keys(CATALOG).forEach(b=>{ if(!c.brands.includes(b)){ c.brands.push(b); ch=true; } c.models[b]=c.models[b]||[]; CATALOG[b].forEach(nm=>{ if(!c.models[b].some(m=>m.name===nm)){ c.models[b].push({name:nm,type:_devType(nm),img:''}); ch=true; } }); }); if(c.brands.indexOf('Sonstige')>=0){ c.brands=c.brands.filter(x=>x!=='Sonstige'); c.brands.push('Sonstige'); } c._modelMig=3; if(ch)save(); }
   /* v2 Doc #1: Gerätedatenbank aktualisiert (S26/A57-Serie, Xiaomi 15/POCO X7/F7, Pixel 10 …) – neueste Modelle nachziehen, historische Daten unberührt */
   if((c._modelMig||0)<4){let ch=false;c.models=c.models||{};c.brands=c.brands||[];Object.keys(CATALOG).forEach(b=>{ if(!c.brands.includes(b)){c.brands.push(b);ch=true;} c.models[b]=c.models[b]||[]; for(let k=CATALOG[b].length-1;k>=0;k--){const nm=CATALOG[b][k]; if(!c.models[b].some(m=>m.name===nm)){ c.models[b].unshift({name:nm,type:_devType(nm),img:''}); ch=true; }}}); c._modelMig=4; if(ch)save(); }
+  /* v?-Doc: vollständiger Geräte-Katalog nach Typ (Tablet/Smartwatch/E-Scooter/Laptop/Kopfhörer/Konsole) – Marken + Modelle mit korrektem Typ nachziehen */
+  if((c._modelMig||0)<5){let ch=false;c.models=c.models||{};c.brands=c.brands||[];
+    Object.keys(CATALOG_EXT).forEach(typ=>{ const byBrand=CATALOG_EXT[typ]; Object.keys(byBrand).forEach(b=>{
+      if(!c.brands.includes(b)){ c.brands.push(b); ch=true; }
+      c.models[b]=c.models[b]||[];
+      byBrand[b].forEach(nm=>{ if(!c.models[b].some(m=>m.name===nm)){ c.models[b].push({name:nm,type:typ,img:''}); ch=true; } });
+    }); });
+    if(c.brands.indexOf('Sonstige')>=0){ c.brands=c.brands.filter(x=>x!=='Sonstige'); c.brands.push('Sonstige'); }
+    c._modelMig=5; if(ch)save(); }
   return c; }
 function _devType(nm){ nm=String(nm||''); if(/iPad|Galaxy Tab|\bTab\b/i.test(nm))return 'Tablet'; if(/Watch/i.test(nm))return 'Smartwatch'; return 'Smartphone'; }
 function qa(s){return String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
