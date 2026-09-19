@@ -1534,23 +1534,18 @@ function noAddDevice(){noCollect();NO.devices.push(blankDevice());renderNewOrder
 /* ---- v2 Doc #3/#4/#6: Zustand + Zubehör + Fotos bei Annahme (je Gerät) ---- */
 function fFotoTs(ts){if(!ts)return '';try{const d=new Date(ts);return d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})+' '+d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});}catch(e){return '';}}
 function noAnnahmeBlock(d,i){
-  const secs=ZUSTAND_SECTIONS.map(s=>{
+  const secs=`<div class="grid g2" style="gap:10px;margin-top:6px">`+ZUSTAND_SECTIONS.map(s=>{
     const sel=(d.zustand&&d.zustand[s.key])||[];
-    const open=!!ZOPEN[i+'_'+s.key];
-    const sumTxt=sel.length?sel.join(', '):'– antippen zum Dokumentieren –';
-    const bar=`<button type="button" onclick="noZustandSecToggle(${i},'${s.key}')" style="width:100%;display:flex;align-items:center;gap:10px;justify-content:space-between;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:9px 12px;cursor:pointer;text-align:left">
-        <span style="font-weight:700;min-width:104px;flex:none">${esc(s.label)}</span>
-        <span style="flex:1;min-width:0;font-size:13px;${sel.length?'':'color:var(--ink2)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(sumTxt)}</span>
-        <span style="flex:none;color:var(--ink2)">${open?'▲':'▾'}</span></button>`;
-    let body='';
-    if(open){
-      const tiles=s.opts.map(o=>{const on=sel.indexOf(o)>=0;return `<button type="button" class="ztile${on?' on':''}" onclick="noZustandToggle(${i},'${s.key}','${o.replace(/'/g,"\\'")}')">${esc(o)}</button>`;}).join('');
-      const showSonst=sel.indexOf(s.sonstOpt)>=0;
-      const note=(d.zsonst&&d.zsonst[s.key])||'';
-      body=`<div style="margin-top:8px"><div class="ztiles">${tiles}</div>${showSonst?`<textarea class="in" id="dev${i}_zs_${s.key}" rows="1" placeholder="${esc(s.sonstOpt)} – kurz beschreiben…" style="margin-top:8px">${esc(note)}</textarea>`:''}</div>`;
-    }
-    return `<div class="zsec" style="margin-top:8px">${bar}${body}</div>`;
-  }).join('');
+    const cur=sel.length?sel[0]:'';
+    const inList=s.opts.indexOf(cur)>=0;
+    const opts=['<option value="">– bitte wählen –</option>'].concat(s.opts.map(o=>`<option ${cur===o?'selected':''}>${esc(o)}</option>`));
+    if(cur&&!inList)opts.push(`<option selected>${esc(cur)}</option>`); /* Altdaten (Mehrfachauswahl) nicht verlieren */
+    const showSonst=(cur===s.sonstOpt);
+    const note=(d.zsonst&&d.zsonst[s.key])||'';
+    return `<div><label class="f" style="margin-bottom:4px">${esc(s.label)}</label>
+      <select class="in" onchange="noZustandPick(${i},'${s.key}',this.value)">${opts.join('')}</select>
+      ${showSonst?`<textarea class="in" id="dev${i}_zs_${s.key}" rows="1" placeholder="${esc(s.sonstOpt)} – kurz beschreiben…" style="margin-top:6px">${esc(note)}</textarea>`:''}</div>`;
+  }).join('')+`</div>`;
   const zub=(d.zubehoer)||[];
   const ztiles=ZUBEHOER_OPTS.map(o=>`<button type="button" class="ztile${zub.indexOf(o)>=0?' on':''}" onclick="noZubehoerToggle(${i},'${o.replace(/'/g,"\\'")}')">${esc(o)}</button>`).join('');
   const keinTile=`<button type="button" class="ztile alt${zub.indexOf(ZUBEHOER_KEIN)>=0?' on':''}" onclick="noZubehoerToggle(${i},'${ZUBEHOER_KEIN}')">${ZUBEHOER_KEIN}</button>`;
@@ -1558,7 +1553,7 @@ function noAnnahmeBlock(d,i){
   const thumbs=fotos.map((f,k)=>`<div class="zfoto"><img src="${f.src}" alt=""><span class="zfx" onclick="noRemoveFoto(${i},${k})">×</span><span class="zft">${esc(fFotoTs(f.ts))}</span></div>`).join('');
   return `<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line)" id="dev${i}_annahme">
     <div class="between" style="flex-wrap:wrap;gap:8px"><label class="f" style="margin:0">Zustand bei Annahme *</label><button type="button" class="btn sm gho" onclick="noZustandUeblich(${i})">Übliche Gebrauchsspuren</button></div>
-    <div class="muted" style="font-size:11px;margin-top:2px">Bereich antippen, passende Zustände wählen (Mehrfachauswahl möglich).</div>
+    <div class="muted" style="font-size:11px;margin-top:2px">Je Bereich den Zustand aus der Liste wählen.</div>
     ${secs}
     <label class="f" style="margin-top:14px" id="dev${i}_zublabel">Mitgegebenes Zubehör *</label>
     <div class="ztiles">${ztiles}${keinTile}</div>
@@ -1569,6 +1564,7 @@ function noAnnahmeBlock(d,i){
 }
 function noZustandSecToggle(i,key){noCollect();ZOPEN[i+'_'+key]=!ZOPEN[i+'_'+key];renderNewOrder();}
 function noZustandToggle(i,sec,opt){noCollect();const d=NO.devices[i];if(!d.zustand)d.zustand=blankZustand();let a=d.zustand[sec]||(d.zustand[sec]=[]);const idx=a.indexOf(opt);if(idx>=0)a.splice(idx,1);else a.push(opt);d.zustand[sec]=a;ZOPEN[i+'_'+sec]=true;renderNewOrder();}
+function noZustandPick(i,sec,val){noCollect();const d=NO.devices[i];if(!d.zustand)d.zustand=blankZustand();d.zustand[sec]=val?[val]:[];renderNewOrder();}
 function noZustandUeblich(i){noCollect();const d=NO.devices[i];if(!d.zustand)d.zustand=blankZustand();d.zustand.display=['Leichte Gebrauchsspuren'];d.zustand.rahmen=['Leichte Gebrauchsspuren'];d.zustand.rueck=['Leichte Gebrauchsspuren'];renderNewOrder();}
 function noZubehoerToggle(i,opt){noCollect();const d=NO.devices[i];let a=d.zubehoer||(d.zubehoer=[]);
   if(opt===ZUBEHOER_KEIN){d.zubehoer=(a.indexOf(ZUBEHOER_KEIN)>=0)?[]:[ZUBEHOER_KEIN];}
@@ -1578,7 +1574,7 @@ function noAddFoto(i,input){const files=Array.from(input.files||[]);if(!files.le
 function noRemoveFoto(i,k){noCollect();const d=NO.devices[i];if(d.fotos)d.fotos.splice(k,1);renderNewOrder();}
 /* ---- v2 Doc #9: Pflichtfeld-/Vollständigkeitsprüfung ---- */
 function inUseDev(d){return !!(d.brand||d.model||devPositions(d).some(p=>p.reparatur)||(d.zustand&&['display','rueck','rahmen','weitere'].some(k=>((d.zustand[k])||[]).length))||((d.zubehoer||[]).length));}
-function noValidate(){ return [].concat(noStepMiss(2),noStepMiss(3),noStepMiss(4)); }
+function noValidate(){ return [].concat(noStepMiss(2),noStepMiss(3)); }
 function noShowMissing(miss){
   document.querySelectorAll('.field-missing').forEach(e=>e.classList.remove('field-missing'));
   miss.forEach(m=>{const el=document.getElementById(m.el);if(el)el.classList.add('field-missing');});
@@ -1956,16 +1952,16 @@ function noDevBlock(d,i){
   </div>`;
 }
 /* v9 #8: geführte Auftragsannahme (Kunde → Gerät → Fehler → Zustand → Auftrag) */
-const WSTEPS=[[1,'Kunde'],[2,'Gerät'],[3,'Fehler'],[4,'Zustand'],[5,'Auftrag']];
+const WSTEPS=[[1,'Kunde'],[2,'Gerät'],[3,'Diagnose'],[4,'Auftrag']];
 function noStepMiss(step){ const miss=[];
   if(step===1){ if(!(NO.vorname||NO.nachname||NO.firma))miss.push({t:'Kundenname',el:'no_vorname'}); if((NO.tel||'').replace(/\D/g,'').length<5)miss.push({t:'Telefonnummer',el:'no_tel'}); }
   if(step===2){ let any=false; NO.devices.forEach((d,i)=>{ if(i>0&&!inUseDev(d))return; if(d.brand&&d.model)any=true; if(!d.brand||!d.model)miss.push({t:(NO.devices.length>1?('Gerät '+(i+1)+': '):'')+'Hersteller & Modell',el:'dev'+i+'_model'}); }); if(!any&&!miss.length)miss.push({t:'mindestens ein Gerät',el:'dev0_brand'}); }
-  if(step===3){ NO.devices.forEach((d,i)=>{ if(i>0&&!inUseDev(d))return; if(!devPositions(d).some(p=>p.reparatur))miss.push({t:(NO.devices.length>1?('Gerät '+(i+1)+': '):'')+'Fehler / Reparatur',el:'dev'+i+'_pos0_reparatur'}); }); }
-  if(step===4&&NO.mode!=='angebot'){ NO.devices.forEach((d,i)=>{ if(i>0&&!inUseDev(d))return; const pre=NO.devices.length>1?('Gerät '+(i+1)+': '):''; const z=d.zustand||{}; if(!(((z.display||[]).length)&&((z.rueck||[]).length)&&((z.rahmen||[]).length)))miss.push({t:pre+'Gerätezustand',el:'dev'+i+'_annahme'}); if(!((d.zubehoer||[]).length))miss.push({t:pre+'Mitgegebenes Zubehör',el:'dev'+i+'_zublabel'}); if(!d.lockSet)miss.push({t:pre+'Displaysperre',el:'dev'+i+'_lockrow'}); else if(normLock(d.lock)==='PIN'&&!((d.lockval||'').trim()))miss.push({t:pre+'PIN / Passwort',el:'dev'+i+'_lockval'}); else if(normLock(d.lock)==='Muster'&&!((d.lockval||'').trim()))miss.push({t:pre+'Entsperrmuster einzeichnen',el:'dev'+i+'_lockpat'}); }); }
+  if(step===3){ NO.devices.forEach((d,i)=>{ if(i>0&&!inUseDev(d))return; if(!devPositions(d).some(p=>p.reparatur))miss.push({t:(NO.devices.length>1?('Gerät '+(i+1)+': '):'')+'Fehler / Reparatur',el:'dev'+i+'_pos0_reparatur'}); });
+    if(NO.mode!=='angebot'){ NO.devices.forEach((d,i)=>{ if(i>0&&!inUseDev(d))return; const pre=NO.devices.length>1?('Gerät '+(i+1)+': '):''; const z=d.zustand||{}; if(!(((z.display||[]).length)&&((z.rueck||[]).length)&&((z.rahmen||[]).length)))miss.push({t:pre+'Gerätezustand',el:'dev'+i+'_annahme'}); if(!((d.zubehoer||[]).length))miss.push({t:pre+'Mitgegebenes Zubehör',el:'dev'+i+'_zublabel'}); if(!d.lockSet)miss.push({t:pre+'Displaysperre',el:'dev'+i+'_lockrow'}); else if(normLock(d.lock)==='PIN'&&!((d.lockval||'').trim()))miss.push({t:pre+'PIN / Passwort',el:'dev'+i+'_lockval'}); else if(normLock(d.lock)==='Muster'&&!((d.lockval||'').trim()))miss.push({t:pre+'Entsperrmuster einzeichnen',el:'dev'+i+'_lockpat'}); }); } }
   return miss; }
 function noStepComplete(step){ return noStepMiss(step).length===0; }
-function noStepOfMiss(m){ const el=(m&&m.el)||''; if(el.indexOf('no_')===0)return 1; if(/_model$|_brand$|_typ$/.test(el))return 2; if(el.indexOf('_pos')>=0||el.indexOf('_fehler')>=0)return 3; if(el.indexOf('_annahme')>=0||el.indexOf('_zub')>=0||el.indexOf('_lock')>=0)return 4; return 5; }
-function noGo(step){ noCollect(); NO.step=Math.max(1,Math.min(5,step)); renderNewOrder(); window.scrollTo(0,0); }
+function noStepOfMiss(m){ const el=(m&&m.el)||''; if(el.indexOf('no_')===0)return 1; if(/_model$|_brand$|_typ$/.test(el))return 2; if(el.indexOf('_pos')>=0||el.indexOf('_fehler')>=0||el.indexOf('_annahme')>=0||el.indexOf('_zub')>=0||el.indexOf('_lock')>=0)return 3; return 4; }
+function noGo(step){ noCollect(); NO.step=Math.max(1,Math.min(4,step)); renderNewOrder(); window.scrollTo(0,0); }
 function noBack(){ noGo((NO.step||1)-1); }
 function noNext(){ noCollect(); const miss=noStepMiss(NO.step||1); if(miss.length){ noShowMissing(miss); return; } noGo((NO.step||1)+1); }
 function noJumpAndShow(miss){ if(!miss||!miss.length)return; const stp=noStepOfMiss(miss[0]); if(stp!==NO.step){ NO.step=stp; renderNewOrder(); } noShowMissing(miss.filter(m=>noStepOfMiss(m)===NO.step)); }
@@ -1974,8 +1970,7 @@ function noSummary(n){
   const chip=(lbl,txt)=>`<div class="card" style="margin-top:10px;padding:10px 12px;background:var(--soft);border:0"><div class="between" style="gap:10px"><div style="min-width:0"><div style="font-size:11px;font-weight:800;color:var(--green)">${lbl} ✓</div><div style="font-size:13px;margin-top:2px;word-break:break-word">${txt||'—'}</div></div><button class="btn sm gho" style="flex:none" onclick="noGo(${n})">Ändern</button></div></div>`;
   if(n===1)return chip('KUNDE',esc(name)+(NO.tel?' · '+esc(NO.tel):''));
   if(n===2)return chip('GERÄT',NO.devices.filter(d=>d.brand||d.model).map(d=>esc([d.brand,d.model].filter(Boolean).join(' '))).join(' · ')||'—');
-  if(n===3)return chip('FEHLER',NO.devices.filter(d=>d.brand||d.model).map(d=>{const t=devPositions(d).map(p=>esc(p.reparatur)).filter(Boolean).join(', ');const f=(d.fehler||'').trim();return (t||'—')+(f?(' — '+esc(f)):'');}).join(' · '));
-  if(n===4)return chip('ZUSTAND',NO.devices.filter(d=>d.brand||d.model).map(d=>{const z=esc(zustandText(d))||'—';const zu=esc(zubehoerText(d));return z+(zu?(' · Zubehör: '+zu):'');}).join(' | '));
+  if(n===3)return chip('DIAGNOSE',NO.devices.filter(d=>d.brand||d.model).map(d=>{const t=devPositions(d).map(p=>esc(p.reparatur)).filter(Boolean).join(', ');const f=(d.fehler||'').trim();const z=esc(zustandText(d));const zu=esc(zubehoerText(d));let s=(t||'—')+(f?(' — '+esc(f)):'');if(z)s+=' · Zustand: '+z;if(zu)s+=' · Zubehör: '+zu;return s;}).join(' | '));
   return '';
 }
 function noCustomerContent(){ const c=NO;
@@ -2049,10 +2044,8 @@ function renderNewOrder(){
   else if(step===2){ content=`<b>Gerät</b><p class="muted" style="font-size:12px;margin-top:2px">Gerätetyp, Hersteller und Modell wählen.</p>`
      +NO.devices.map((d,i)=>`<div class="card" style="background:var(--soft);border:0;margin-top:12px"><div class="between"><b>Gerät ${i+1}</b>${i>0?`<button class="btn sm gho" onclick="noRemoveDevice(${i})">Entfernen</button>`:''}</div>${noGeraetFields(d,i)}</div>`).join('')
      +(NO.devices.length<4?`<button class="btn" style="margin-top:12px;width:100%" onclick="noAddDevice()">+ Weiteres Gerät hinzufügen (optional)</button>`:''); }
-  else if(step===3){ content=`<b>Fehler</b><p class="muted" style="font-size:12px;margin-top:2px">Was ist das Problem? Fehlerart wählen und beschreiben.</p>`
-     +NO.devices.map((d,i)=>{ if(i>0&&!inUseDev(d))return ''; return `<div class="card" style="background:var(--soft);border:0;margin-top:12px"><b>Gerät ${i+1}: ${esc([d.brand,d.model].filter(Boolean).join(' '))||'—'}</b>${noFehlerFields(d,i)}</div>`; }).join(''); }
-  else if(step===4){ content=`<b>Zustand &amp; Zubehör${isQ?" <span class=\"muted\" style=\"font-weight:400\">(optional)</span>":""}</b><p class="muted" style="font-size:12px;margin-top:2px">Annahmezustand dokumentieren, Zubehör und Displaysperre erfassen.${isQ?" Für ein Angebot optional.":""}</p>`
-     +NO.devices.map((d,i)=>{ if(i>0&&!inUseDev(d))return ''; return `<div class="card" style="background:var(--soft);border:0;margin-top:12px"><b>Gerät ${i+1}: ${esc([d.brand,d.model].filter(Boolean).join(' '))||'—'}</b>${noAnnahmeBlock(d,i)}${noLockBlock(d,i)}</div>`; }).join(''); }
+  else if(step===3){ content=`<b>Diagnose</b><p class="muted" style="font-size:12px;margin-top:2px">Fehler dokumentieren und Annahmezustand${isQ?' (für Angebot optional)':''} erfassen – Fehler, Gerätezustand, Zubehör und Displaysperre.</p>`
+     +NO.devices.map((d,i)=>{ if(i>0&&!inUseDev(d))return ''; return `<div class="card" style="background:var(--soft);border:0;margin-top:12px"><b>Gerät ${i+1}: ${esc([d.brand,d.model].filter(Boolean).join(' '))||'—'}</b>${noFehlerFields(d,i)}${noAnnahmeBlock(d,i)}${noLockBlock(d,i)}</div>`; }).join(''); }
   else { content=isQ?noAngebotContent():noAuftragContent(); }
   let summaries=''; for(let n=1;n<step;n++)summaries+=noSummary(n);
   const footer=`<div class="row" style="margin:16px 0 48px;gap:10px;flex-wrap:wrap;align-items:center">
@@ -2060,13 +2053,13 @@ function renderNewOrder(){
      ${isQ?`<button class="btn" onclick="noQuoteSave('entwurf')">Als Entwurf speichern</button>`:(NO.editId?'':`<button class="btn" onclick="noSaveExit()">Als Entwurf speichern</button>`)}
      <span style="flex:1"></span>
      ${step>1?`<button class="btn" onclick="noBack()">← Zurück</button>`:''}
-     ${step<5?`<button class="btn pri cta" onclick="noNext()">Weiter →</button>`:(isQ?`<button class="btn pri cta" onclick="noQuoteSave('offen')">${NO.quoteEditId?'Angebot speichern':'Angebot erstellen'}</button>`:`<button class="btn pri cta" onclick="noFinalize()">${NO.editId?'Speichern':'Auftrag erstellen'}</button>`)}
+     ${step<4?`<button class="btn pri cta" onclick="noNext()">Weiter →</button>`:(isQ?`<button class="btn pri cta" onclick="noQuoteSave('offen')">${NO.quoteEditId?'Angebot speichern':'Angebot erstellen'}</button>`:`<button class="btn pri cta" onclick="noFinalize()">${NO.editId?'Speichern':'Auftrag erstellen'}</button>`)}
    </div>`;
   m.innerHTML=dls+`<div id="noForm">
    <div class="between" style="flex-wrap:wrap;gap:12px">
      <div><button class="btn sm gho" onclick="noCancel()">← Abbrechen</button>
        <h1 class="h1" style="margin-top:8px">${isQ?(NO.quoteEditId?'Angebot bearbeiten':'Neues Angebot'):(NO.editId?'Auftrag bearbeiten':'Neuer Auftrag')}</h1>
-       <p class="sub">${isQ?'Kostenvoranschlag':'Reparatur-Eingang'} · Schritt ${step} von 5</p></div>
+       <p class="sub">${isQ?'Kostenvoranschlag':'Reparatur-Eingang'} · Schritt ${step} von ${WSTEPS.length}</p></div>
    </div>
    <div class="card" style="margin-top:14px"><div class="row" style="gap:2px;align-items:flex-start">${bar}</div></div>
    ${summaries}
@@ -2074,7 +2067,7 @@ function renderNewOrder(){
    ${footer}
   </div>`;
   const f=document.getElementById('noForm'); if(f){f.addEventListener('input',noSaveDraftDebounced);f.addEventListener('change',noSaveDraftDebounced);}
-  if(step===4){ NO.devices.forEach((d,i)=>{if(normLock(d.lock)==='Muster')patBind(i);}); }
+  if(step===3){ NO.devices.forEach((d,i)=>{if(normLock(d.lock)==='Muster')patBind(i);}); }
   paintIcons(); window.scrollTo(0,_sy);
 }
 views.neworder=function(){ if(!NO)NO=blankForm(); renderNewOrder(); };
