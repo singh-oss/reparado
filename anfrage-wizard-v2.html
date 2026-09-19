@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reparatur anfragen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root{--ink:#0f2318;--ink2:#5f6b64;--line:#e7ebe8;--soft:#f5f8f6;--green:#0e7a3c;--green2:#12a24c;--ring:0 0 0 3px rgba(14,122,60,.15)}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:#fff;letter-spacing:-.006em;-webkit-font-smoothing:antialiased}
+  [dir=rtl]{letter-spacing:0}
+  svg{display:block}
+  .top{border-bottom:1px solid var(--line);padding:14px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;background:#fff;z-index:6}
+  .top .dot{width:30px;height:30px;border-radius:9px;background:var(--green);color:#fff;display:grid;place-items:center;font-weight:800;flex:none}
+  .top b{font-size:16px;letter-spacing:-.3px}
+  .lang{margin-inline-start:auto;position:relative}
+  .lang button{border:1px solid var(--line);background:#fff;border-radius:20px;padding:7px 12px;font-weight:700;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:7px;font-family:inherit}
+  .lang .menu{position:absolute;inset-inline-end:0;top:110%;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 34px rgba(0,0,0,.12);padding:6px;min-width:170px;z-index:20;display:none}
+  .lang .menu.on{display:block}
+  .lang .menu a{display:flex;gap:9px;align-items:center;padding:9px 10px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600}
+  .lang .menu a:hover{background:var(--soft)}
+  .wrap{max-width:760px;margin:0 auto;padding:18px 18px 70px}
+  /* Stepper */
+  .stepper{display:flex;align-items:center;gap:0;margin:8px 0 22px;overflow-x:auto;padding:4px 2px}
+  .stp{display:flex;flex-direction:column;align-items:center;gap:6px;flex:none;min-width:64px}
+  .stp .cir{width:38px;height:38px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-weight:800;color:var(--ink2);background:#fff;transition:.15s}
+  .stp .cir svg{width:18px;height:18px}
+  .stp .lbl{font-size:11px;font-weight:700;color:var(--ink2);white-space:nowrap}
+  .stp.on .cir{border-color:var(--green);background:var(--green);color:#fff}
+  .stp.done .cir{border-color:var(--green);background:#eaf6ee;color:var(--green)}
+  .stp.on .lbl,.stp.done .lbl{color:var(--ink)}
+  .stpline{flex:1;height:2px;background:var(--line);min-width:12px;margin-top:-18px}
+  .stpline.done{background:var(--green)}
+  h1{font-size:24px;letter-spacing:-.6px;margin-bottom:4px;text-align:center}
+  h1 .hl{color:var(--green)}
+  .sub{color:var(--ink2);margin-bottom:18px;text-align:center;font-size:14px}
+  .grid{display:grid;gap:10px}
+  .g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(4,1fr)}
+  @media(max-width:640px){.g4{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr 1fr}}
+  /* Category / generic tiles */
+  .cat{border:1px solid var(--line);border-radius:16px;padding:18px 10px;cursor:pointer;transition:.14s;text-align:center;background:#fff;font-weight:700;font-size:13.5px;display:flex;flex-direction:column;align-items:center;gap:10px}
+  .cat:hover{border-color:var(--green);transform:translateY(-2px);box-shadow:0 8px 22px rgba(14,122,60,.08)}
+  .cat.on{border-color:var(--green);box-shadow:var(--ring)}
+  .cat .ic{width:38px;height:38px;color:var(--ink)}
+  .cat.on .ic{color:var(--green)}
+  /* Brand tiles */
+  .brand{border:1px solid var(--line);border-radius:14px;padding:20px 10px;cursor:pointer;transition:.14s;text-align:center;background:#fff;display:flex;flex-direction:column;align-items:center;gap:8px;min-height:92px;justify-content:center}
+  .brand:hover{border-color:var(--green);transform:translateY(-2px)}
+  .brand.on{border-color:var(--green);box-shadow:var(--ring)}
+  .brand .wm{font-weight:800;font-size:17px;letter-spacing:-.4px}
+  .brand .mono{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;color:#fff;font-weight:800;font-size:17px}
+  /* Model cards */
+  .mcard{border:1px solid var(--line);border-radius:14px;padding:12px;cursor:pointer;transition:.14s;background:#fff;display:flex;align-items:center;gap:12px;text-align:start}
+  .mcard:hover{border-color:var(--green)}
+  .mcard.on{border-color:var(--green);box-shadow:var(--ring)}
+  .mcard .thumb{width:50px;height:50px;border-radius:10px;background:var(--soft);display:grid;place-items:center;flex:none;color:#8a968f}
+  .mcard .thumb img{width:100%;height:100%;object-fit:contain;border-radius:10px}
+  .mcard .mn{font-weight:800;font-size:15px}
+  .mcard .mnr{font-size:11px;color:var(--ink2);margin-top:2px;font-variant-numeric:tabular-nums}
+  .mcard .dots{display:flex;gap:5px;margin-top:5px}
+  .mcard .dots i{width:12px;height:12px;border-radius:50%;border:1px solid rgba(0,0,0,.15);display:inline-block}
+  /* Repair cards */
+  .rcard{border:1px solid var(--line);border-radius:16px;padding:16px;cursor:pointer;transition:.14s;background:#fff;position:relative;display:flex;flex-direction:column;gap:8px}
+  .rcard:hover{border-color:var(--green)}
+  .rcard.on{border-color:var(--green);box-shadow:var(--ring);background:#fbfefc}
+  .rcard .rico{width:34px;height:34px;color:var(--green)}
+  .rcard .rname{font-weight:800;font-size:15px}
+  .rcard .rmeta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--ink2)}
+  .rcard .rdesc{font-size:12.5px;color:#4a564f;line-height:1.5}
+  .rcard .rpick{position:absolute;inset-inline-end:12px;top:12px;width:24px;height:24px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;color:#fff}
+  .rcard.on .rpick{background:var(--green);border-color:var(--green)}
+  .badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px}
+  .badge.dur{background:var(--soft);color:#3a463f}
+  .badge.q{background:#eaf6ee;color:var(--green)}
+  .badge.price{background:#fff5e6;color:#b45309}
+  /* Selection summary */
+  .selbar{border:1px solid var(--line);border-radius:14px;padding:12px 14px;background:linear-gradient(180deg,#fbfefc,#fff);margin-bottom:16px;display:flex;align-items:center;gap:12px}
+  .selbar .thumb{width:46px;height:46px;border-radius:10px;background:var(--soft);display:grid;place-items:center;flex:none;color:#8a968f}
+  .selbar .thumb img{width:100%;height:100%;object-fit:contain;border-radius:10px}
+  .selbar .t{font-size:11px;font-weight:800;color:var(--green);letter-spacing:.4px}
+  .selbar .m{font-weight:800;font-size:15px;margin-top:1px}
+  .selbar .d{font-size:12px;color:var(--ink2);margin-top:1px}
+  /* Inputs */
+  .in{width:100%;border:1px solid var(--line);border-radius:12px;padding:13px 14px;outline:0;font-size:15px;font-family:inherit;background:#fff}
+  .in:focus{border-color:var(--green);box-shadow:var(--ring)}
+  textarea.in{min-height:84px;resize:vertical}
+  label{font-size:12px;font-weight:700;color:#333;display:block;margin-top:16px;margin-bottom:4px}
+  .search{position:relative;margin-bottom:14px}
+  .search input{padding-inline-start:40px}
+  .search svg{position:absolute;inset-inline-start:13px;top:50%;transform:translateY(-50%);color:var(--ink2);width:18px;height:18px}
+  .toggle{display:inline-flex;align-items:center;gap:9px;border:1px solid var(--line);border-radius:22px;padding:7px 13px;cursor:pointer;font-weight:700;font-size:13px;user-select:none}
+  .toggle .sw{width:34px;height:20px;border-radius:20px;background:#d7ddd9;position:relative;transition:.15s;flex:none}
+  .toggle .sw i{position:absolute;top:2px;inset-inline-start:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.15s}
+  .toggle.on .sw{background:var(--green)}.toggle.on .sw i{inset-inline-start:16px}
+  .nav{display:flex;gap:10px;margin-top:24px}
+  .btn{flex:1;border:1px solid var(--line);background:#fff;border-radius:12px;padding:15px;font-weight:800;font-size:15px;cursor:pointer;font-family:inherit;transition:.12s}
+  .btn.pri{background:var(--green);color:#fff;border-color:var(--green)}
+  .btn.pri:hover{background:#0c6a34}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn.ghost{flex:none;padding-inline:18px}
+  .note{background:var(--soft);border-radius:12px;padding:12px 14px;font-size:13px;color:#4a564f;margin-top:16px}
+  .chk{display:flex;gap:10px;align-items:flex-start;margin-top:16px;font-size:13px;color:#4a564f}
+  .chk input{margin-top:2px;width:18px;height:18px;flex:none;accent-color:var(--green)}
+  .summary{border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:8px}
+  .summary .r{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line);gap:12px;font-size:14px}
+  .summary .r:last-child{border:0}.summary .r b{font-weight:800;text-align:end}
+  .donescreen{text-align:center;padding:26px 6px}
+  .donescreen .ck{width:66px;height:66px;border-radius:50%;background:var(--green);color:#fff;display:grid;place-items:center;margin:0 auto 16px}
+  .callnow{display:flex;align-items:center;gap:10px;background:var(--soft);border-radius:12px;padding:11px 14px;margin-bottom:16px;font-size:14px}
+  .callnow a{color:var(--green);font-weight:800;text-decoration:none;margin-inline-start:auto}
+  .foot{text-align:center;color:var(--ink2);font-size:12px;margin-top:26px}
+  body.embedded{background:transparent}body.embedded .top{position:static}
+  .empty{color:var(--ink2);font-size:14px;text-align:center;padding:18px}
+</style>
+</head>
+<body>
+<div class="top"><span class="dot" id="wsDot">W</span><b id="wsName">Werkstatt</b>
+  <div class="lang">
+    <button id="langBtn" onclick="toggleLang()"><span id="langFlag">🇩🇪</span><span id="langName">Deutsch</span> ▾</button>
+    <div class="menu" id="langMenu"></div>
+  </div>
+</div>
+<div class="wrap">
+  <div class="callnow" id="wsCall" style="display:none"><span id="callTxt"></span> <a id="wsTel"></a></div>
+  <div class="stepper" id="stepper"></div>
+  <div id="view"></div>
+  <div class="foot" id="wsFoot"></div>
+</div>
+
+<script>
+/* ---------- i18n (Untermenge der 17 Sprachen; leicht erweiterbar) ---------- */
+const LANGS=[['de','🇩🇪','Deutsch'],['en','🇬🇧','English'],['tr','🇹🇷','Türkçe'],['ar','🇸🇦','العربية'],['ru','🇷🇺','Русский'],['fr','🇫🇷','Français']];
+const I18N={
+ de:{cat:'Wählen Sie Ihre <span class="hl">Kategorie</span>',brand:'Welchen <span class="hl">Hersteller</span> haben Sie?',model:'Welches <span class="hl">Modell</span> haben Sie?',color:'Wählen Sie eine <span class="hl">Farbe</span>',rep:'Welche <span class="hl">Reparatur</span> wünschen Sie?',data:'Ihre <span class="hl">Kontaktdaten</span>',
+  subCat:'Gerätetyp auswählen – Schritt für Schritt zur Anfrage.',subBrand:'Hersteller suchen oder direkt wählen.',subModel:'Modell wählen oder Namen eintippen.',subRep:'Eine oder mehrere Reparaturen auswählen.',subData:'Wir melden uns mit einem unverbindlichen Angebot.',
+  next:'Weiter',back:'Zurück',send:'Anfrage absenden',sending:'Wird gesendet…',searchBrand:'Hersteller suchen…',searchModel:'z. B. iPhone 15 Pro',searchRep:'Reparatur suchen…',b2b:'B2B / Geschäftskunde',price:'Preis auf Anfrage',
+  yourSel:'IHRE AUSWAHL',other:'Anderes / weiß ich nicht',name:'Name',tel:'Telefon',mail:'E-Mail',namePh:'Vor- und Nachname',telPh:'Für den Rückruf',mailPh:'Für die Antwort',optional:'(optional)',
+  consent:'Ich bin mit der Verarbeitung meiner Angaben zur Bearbeitung der Anfrage einverstanden.',noteData:'Unverbindliche Anfrage – es entstehen keine Kosten. Der endgültige Preis wird nach Prüfung des Geräts genannt.',
+  doneT:'Anfrage gesendet',doneS:'Vielen Dank, {n}. Wir melden uns zeitnah mit einem Angebot.',noteDone:'In der Regel antworten wir innerhalb eines Werktags.',newReq:'Neue Anfrage',device:'Gerät',concern:'Anliegen',callHint:'Lieber direkt sprechen?',errName:'Bitte Name und Telefon angeben.',errConsent:'Bitte bestätigen Sie die Verarbeitung Ihrer Angaben.',errSend:'Senden fehlgeschlagen. Bitte erneut versuchen oder anrufen.',min:'Min'},
+ en:{cat:'Choose your <span class="hl">category</span>',brand:'Which <span class="hl">manufacturer</span>?',model:'Which <span class="hl">model</span>?',color:'Choose a <span class="hl">colour</span>',rep:'Which <span class="hl">repair</span> do you need?',data:'Your <span class="hl">contact details</span>',
+  subCat:'Pick the device type – step by step.',subBrand:'Search or pick a manufacturer.',subModel:'Choose a model or type its name.',subRep:'Select one or more repairs.',subData:'We’ll get back to you with a no-obligation quote.',
+  next:'Next',back:'Back',send:'Send request',sending:'Sending…',searchBrand:'Search manufacturer…',searchModel:'e.g. iPhone 15 Pro',searchRep:'Search repair…',b2b:'B2B / business',price:'Price on request',
+  yourSel:'YOUR SELECTION',other:'Other / not sure',name:'Name',tel:'Phone',mail:'Email',namePh:'First and last name',telPh:'For the callback',mailPh:'For the reply',optional:'(optional)',
+  consent:'I agree to my data being processed to handle this request.',noteData:'Non-binding request – no costs. The final price is given after inspection.',
+  doneT:'Request sent',doneS:'Thank you, {n}. We’ll get back to you shortly with a quote.',noteDone:'We usually reply within one business day.',newReq:'New request',device:'Device',concern:'Repair',callHint:'Prefer to call?',errName:'Please enter name and phone.',errConsent:'Please confirm data processing.',errSend:'Sending failed. Please retry or call us.',min:'min'},
+ tr:{cat:'<span class="hl">Kategori</span> seçin',brand:'Hangi <span class="hl">marka</span>?',model:'Hangi <span class="hl">model</span>?',color:'Bir <span class="hl">renk</span> seçin',rep:'Hangi <span class="hl">tamir</span>?',data:'<span class="hl">İletişim bilgileriniz</span>',
+  subCat:'Cihaz türünü seçin – adım adım.',subBrand:'Marka arayın veya seçin.',subModel:'Model seçin veya yazın.',subRep:'Bir veya daha fazla tamir seçin.',subData:'Bağlayıcı olmayan teklifle döneceğiz.',
+  next:'Devam',back:'Geri',send:'Talebi gönder',sending:'Gönderiliyor…',searchBrand:'Marka ara…',searchModel:'örn. iPhone 15 Pro',searchRep:'Tamir ara…',b2b:'Kurumsal / B2B',price:'Fiyat talep üzerine',
+  yourSel:'SEÇİMİNİZ',other:'Diğer / emin değilim',name:'Ad',tel:'Telefon',mail:'E-posta',namePh:'Ad ve soyad',telPh:'Geri arama için',mailPh:'Cevap için',optional:'(isteğe bağlı)',
+  consent:'Talebin işlenmesi için verilerimin işlenmesini kabul ediyorum.',noteData:'Bağlayıcı olmayan talep – ücret yok. Kesin fiyat inceleme sonrası verilir.',
+  doneT:'Talep gönderildi',doneS:'Teşekkürler {n}. Kısa süre içinde teklifle döneceğiz.',noteDone:'Genelde bir iş günü içinde yanıtlıyoruz.',newReq:'Yeni talep',device:'Cihaz',concern:'Tamir',callHint:'Aramak mı istersiniz?',errName:'Lütfen ad ve telefon girin.',errConsent:'Lütfen veri işlemeyi onaylayın.',errSend:'Gönderilemedi. Tekrar deneyin veya arayın.',min:'dk'},
+ ar:{cat:'اختر <span class="hl">الفئة</span>',brand:'أي <span class="hl">شركة مصنعة</span>؟',model:'أي <span class="hl">طراز</span>؟',color:'اختر <span class="hl">لوناً</span>',rep:'أي <span class="hl">إصلاح</span> تريد؟',data:'<span class="hl">بيانات التواصل</span>',
+  subCat:'اختر نوع الجهاز خطوة بخطوة.',subBrand:'ابحث أو اختر الشركة المصنعة.',subModel:'اختر الطراز أو اكتب اسمه.',subRep:'اختر إصلاحاً واحداً أو أكثر.',subData:'سنعاود الاتصال بعرض غير ملزم.',
+  next:'التالي',back:'رجوع',send:'إرسال الطلب',sending:'جارٍ الإرسال…',searchBrand:'ابحث عن الشركة…',searchModel:'مثال: iPhone 15 Pro',searchRep:'ابحث عن إصلاح…',b2b:'شركات / B2B',price:'السعر عند الطلب',
+  yourSel:'اختيارك',other:'أخرى / لست متأكداً',name:'الاسم',tel:'الهاتف',mail:'البريد الإلكتروني',namePh:'الاسم الكامل',telPh:'لمعاودة الاتصال',mailPh:'للرد',optional:'(اختياري)',
+  consent:'أوافق على معالجة بياناتي لمعالجة هذا الطلب.',noteData:'طلب غير ملزم – بدون تكلفة. يُحدَّد السعر النهائي بعد الفحص.',
+  doneT:'تم إرسال الطلب',doneS:'شكراً {n}. سنعاود الاتصال قريباً بعرض.',noteDone:'عادةً نرد خلال يوم عمل واحد.',newReq:'طلب جديد',device:'الجهاز',concern:'الإصلاح',callHint:'تفضل الاتصال؟',errName:'يرجى إدخال الاسم والهاتف.',errConsent:'يرجى تأكيد معالجة البيانات.',errSend:'فشل الإرسال. حاول مجدداً أو اتصل بنا.',min:'دقيقة'},
+ ru:{cat:'Выберите <span class="hl">категорию</span>',brand:'Какой <span class="hl">производитель</span>?',model:'Какая <span class="hl">модель</span>?',color:'Выберите <span class="hl">цвет</span>',rep:'Какой <span class="hl">ремонт</span>?',data:'Ваши <span class="hl">контакты</span>',
+  subCat:'Выберите тип устройства – шаг за шагом.',subBrand:'Найдите или выберите производителя.',subModel:'Выберите модель или введите название.',subRep:'Выберите один или несколько ремонтов.',subData:'Мы свяжемся с вами с необязывающим предложением.',
+  next:'Далее',back:'Назад',send:'Отправить запрос',sending:'Отправка…',searchBrand:'Поиск производителя…',searchModel:'напр. iPhone 15 Pro',searchRep:'Поиск ремонта…',b2b:'B2B / бизнес',price:'Цена по запросу',
+  yourSel:'ВАШ ВЫБОР',other:'Другое / не уверен',name:'Имя',tel:'Телефон',mail:'Эл. почта',namePh:'Имя и фамилия',telPh:'Для обратного звонка',mailPh:'Для ответа',optional:'(необязательно)',
+  consent:'Я согласен на обработку моих данных для этого запроса.',noteData:'Необязывающий запрос – без затрат. Итоговая цена после осмотра.',
+  doneT:'Запрос отправлен',doneS:'Спасибо, {n}. Скоро свяжемся с предложением.',noteDone:'Обычно отвечаем в течение рабочего дня.',newReq:'Новый запрос',device:'Устройство',concern:'Ремонт',callHint:'Хотите позвонить?',errName:'Укажите имя и телефон.',errConsent:'Подтвердите обработку данных.',errSend:'Не удалось отправить. Повторите или позвоните.',min:'мин'},
+ fr:{cat:'Choisissez votre <span class="hl">catégorie</span>',brand:'Quel <span class="hl">fabricant</span> ?',model:'Quel <span class="hl">modèle</span> ?',color:'Choisissez une <span class="hl">couleur</span>',rep:'Quelle <span class="hl">réparation</span> ?',data:'Vos <span class="hl">coordonnées</span>',
+  subCat:'Choisissez le type d’appareil, étape par étape.',subBrand:'Recherchez ou choisissez un fabricant.',subModel:'Choisissez un modèle ou saisissez son nom.',subRep:'Sélectionnez une ou plusieurs réparations.',subData:'Nous revenons vers vous avec un devis sans engagement.',
+  next:'Suivant',back:'Retour',send:'Envoyer la demande',sending:'Envoi…',searchBrand:'Rechercher un fabricant…',searchModel:'ex. iPhone 15 Pro',searchRep:'Rechercher une réparation…',b2b:'B2B / pro',price:'Prix sur demande',
+  yourSel:'VOTRE SÉLECTION',other:'Autre / je ne sais pas',name:'Nom',tel:'Téléphone',mail:'E-mail',namePh:'Nom et prénom',telPh:'Pour le rappel',mailPh:'Pour la réponse',optional:'(facultatif)',
+  consent:'J’accepte le traitement de mes données pour cette demande.',noteData:'Demande sans engagement – sans frais. Le prix final est donné après contrôle.',
+  doneT:'Demande envoyée',doneS:'Merci {n}. Nous revenons vers vous rapidement avec un devis.',noteDone:'Nous répondons généralement sous un jour ouvré.',newReq:'Nouvelle demande',device:'Appareil',concern:'Réparation',callHint:'Vous préférez appeler ?',errName:'Veuillez indiquer nom et téléphone.',errConsent:'Veuillez confirmer le traitement des données.',errSend:'Échec de l’envoi. Réessayez ou appelez-nous.',min:'min'}
+};
+let LANG='de';
+function t(k){return (I18N[LANG]&&I18N[LANG][k])||I18N.de[k]||k;}
+
+/* ---------- Icons ---------- */
+const SVG=(p,vb)=>`<svg viewBox="${vb||'0 0 24 24'}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const ICONS={
+ Smartphone:SVG('<rect x="7" y="2.5" width="10" height="19" rx="2.4"/><line x1="10.5" y1="5.2" x2="13.5" y2="5.2"/><circle cx="12" cy="18.4" r=".7" fill="currentColor"/>'),
+ Tablet:SVG('<rect x="4.5" y="3" width="15" height="18" rx="2.2"/><circle cx="12" cy="18.2" r=".7" fill="currentColor"/>'),
+ Smartwatch:SVG('<rect x="7.5" y="7" width="9" height="10" rx="2.6"/><path d="M9 7l.8-3.6h4.4L15 7M9 17l.8 3.6h4.4L15 17"/>'),
+ 'Macbook/Laptop':SVG('<rect x="4" y="5" width="16" height="11" rx="1.6"/><path d="M2.5 19h19l-1.4-2.5H3.9z"/>'),
+ Konsole:SVG('<rect x="3" y="8.5" width="18" height="8" rx="4"/><line x1="8" y1="12.5" x2="8" y2="12.5"/><path d="M6.5 12.5h3M8 11v3"/><circle cx="16" cy="11.6" r=".9" fill="currentColor"/><circle cx="17.6" cy="13.4" r=".9" fill="currentColor"/>'),
+ 'E-Scooter':SVG('<circle cx="5.5" cy="18" r="2.2"/><circle cx="18.5" cy="18" r="2.2"/><path d="M7.5 18h8.5l-4-11h-2.5M9 7h2.5"/>'),
+ Drohne:SVG('<circle cx="6" cy="6" r="2.4"/><circle cx="18" cy="6" r="2.4"/><circle cx="6" cy="18" r="2.4"/><circle cx="18" cy="18" r="2.4"/><rect x="9.5" y="9.5" width="5" height="5" rx="1.2"/><path d="M8 8l1.5 1.5M16 8l-1.5 1.5M8 16l1.5-1.5M16 16l-1.5-1.5"/>'),
+ 'RC-Auto':SVG('<path d="M3 14l2-4h11l3 4"/><path d="M2.5 14h19v2.5h-19z"/><circle cx="7" cy="17.5" r="2"/><circle cx="17" cy="17.5" r="2"/>'),
+ 'Kopfhörer':SVG('<path d="M5 14v-2a7 7 0 0 1 14 0v2"/><rect x="3.5" y="13.5" width="3.5" height="6" rx="1.6"/><rect x="17" y="13.5" width="3.5" height="6" rx="1.6"/>'),
+ Kamera:SVG('<rect x="3" y="7" width="18" height="12" rx="2.2"/><circle cx="12" cy="13" r="3.2"/><path d="M8 7l1.4-2h5.2L16 7"/>'),
+ Sonstiges:SVG('<rect x="4" y="4" width="16" height="16" rx="2.2"/><path d="M9 10a3 3 0 1 1 4 2.8c-.7.4-1 .8-1 1.7M12 17.2h.01"/>')
+};
+const RICONS={
+ display:SVG('<rect x="7" y="2.5" width="10" height="19" rx="2.4"/><path d="M8 8l8 8M16 8l-8 8" stroke-width="1.2"/>'),
+ glas:SVG('<rect x="7" y="2.5" width="10" height="19" rx="2.4"/><path d="M9 6l6 4-6 4" stroke-width="1.2"/>'),
+ akku:SVG('<rect x="4" y="8" width="15" height="8" rx="2"/><path d="M19 11v2h1.5v-2z"/><path d="M9 10l-1.5 2.5H11L9.5 15"/>'),
+ lade:SVG('<path d="M12 3v6M9 6l3-3 3 3"/><rect x="7" y="9" width="10" height="12" rx="2"/>'),
+ kamera:SVG('<rect x="4" y="7" width="16" height="11" rx="2"/><circle cx="12" cy="12.5" r="3"/>'),
+ back:SVG('<rect x="7" y="2.5" width="10" height="19" rx="2.4"/><circle cx="12" cy="8" r="2"/>'),
+ wasser:SVG('<path d="M12 3s6 6.5 6 10.5a6 6 0 0 1-12 0C6 9.5 12 3 12 3z"/>'),
+ soft:SVG('<path d="M4 6h16v10H4z"/><path d="M8 20h8M12 16v4"/>'),
+ other:SVG('<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .8-1 1.7M12 16.5h.01"/>')
+};
+const SEARCHI=SVG('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>');
+const CK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" width="32" height="32"><path d="M20 6L9 17l-5-5"/></svg>';
+
+/* ---------- Katalog ---------- */
+const CATS=['Smartphone','Tablet','Smartwatch','Macbook/Laptop','Konsole','E-Scooter','Drohne','RC-Auto','Kopfhörer','Kamera','Sonstiges'];
+const CATALOG={
+ Smartphone:{
+  Apple:['iPhone 15 Pro Max','iPhone 15 Pro','iPhone 15','iPhone 14 Pro','iPhone 14','iPhone 13','iPhone 12','iPhone 11','iPhone SE','iPhone XR'],
+  Samsung:['Galaxy S24 Ultra','Galaxy S24','Galaxy S23','Galaxy A55','Galaxy A54','Galaxy A34','Galaxy A15','Galaxy S22'],
+  Xiaomi:['Redmi Note 14 Pro','Redmi Note 13','Redmi Note 12','Xiaomi 14','Poco X6 Pro','Poco F5'],
+  Google:['Pixel 9 Pro','Pixel 9','Pixel 8 Pro','Pixel 8','Pixel 7a'],
+  Huawei:['P60 Pro','P40 Lite','Mate 20 Pro','Nova 11'],Honor:['Magic6 Pro','Honor 90','Honor 70'],
+  OnePlus:['OnePlus 12','OnePlus 11','Nord 3'],Motorola:['Edge 50 Pro','Moto G84'],Oppo:['Reno 12','Find X7'],Nothing:['Phone (2)','Phone (2a)']
+ },
+ Tablet:{Apple:['iPad Pro 12,9"','iPad Pro 11"','iPad Air','iPad 10','iPad mini'],Samsung:['Galaxy Tab S9','Galaxy Tab S8','Galaxy Tab A9'],Lenovo:['Tab P12','Tab M11'],Huawei:['MatePad 11.5'],Xiaomi:['Pad 6']},
+ Smartwatch:{Apple:['Apple Watch Ultra 2','Apple Watch Series 9','Apple Watch SE'],Samsung:['Galaxy Watch 7','Galaxy Watch 6'],Garmin:['Fenix 7','Venu 3'],Huawei:['Watch GT 5'],Google:['Pixel Watch 3']},
+ 'Macbook/Laptop':{Apple:['MacBook Air M3','MacBook Pro 14"','MacBook Pro 16"','MacBook Air M2'],Lenovo:['ThinkPad X1','IdeaPad 5'],HP:['Pavilion 15','EliteBook 840'],Dell:['XPS 13','Inspiron 15'],Asus:['Zenbook 14','ROG Strix'],Acer:['Aspire 5']},
+ Konsole:{Sony:['PlayStation 5','PlayStation 5 Slim','PlayStation 4','DualSense Controller'],Microsoft:['Xbox Series X','Xbox Series S','Xbox One'],Nintendo:['Switch 2','Switch OLED','Switch','Joy-Con'],Valve:['Steam Deck OLED']},
+ 'E-Scooter':{Xiaomi:['Electric Scooter 4 Pro','Electric Scooter 4','Mi Scooter Pro 2'],'Segway-Ninebot':['KickScooter Max G2','KickScooter F40'],SoFlow:['SO4 Pro'],ePowerFun:['ePF-2 Pro'],VMAX:['VX2 Pro']},
+ Drohne:{DJI:['Mini 4 Pro','Air 3','Mavic 3','Avata 2'],Autel:['EVO Lite'],Parrot:['Anafi']},
+ 'RC-Auto':{Traxxas:['Slash','Rustler'],Arrma:['Kraton','Typhon'],'Andere Marke':['Anderes Modell']},
+ 'Kopfhörer':{Apple:['AirPods Pro 2','AirPods 3','AirPods Max'],Samsung:['Galaxy Buds 3 Pro','Galaxy Buds 2'],Sony:['WF-1000XM5','WH-1000XM5'],Bose:['QC Ultra Earbuds'],JBL:['Tune 230NC']},
+ Kamera:{Sony:['Alpha 7 IV','ZV-1'],Canon:['EOS R6','EOS 250D'],Nikon:['Z6 II'],GoPro:['Hero 12','Hero 11']},
+ Sonstiges:{'Andere Marke':['Anderes Gerät']}
+};
+const COLORS={
+ 'iPhone 15 Pro Max':['#3b3b3d|Titan Schwarz','#f2f1ec|Titan Weiß','#3a4a5a|Titan Blau','#c8bfae|Titan Natur'],
+ 'iPhone 15 Pro':['#3b3b3d|Titan Schwarz','#f2f1ec|Titan Weiß','#3a4a5a|Titan Blau','#c8bfae|Titan Natur'],
+ 'iPhone 15':['#1c1c1e|Schwarz','#d7e3ec|Blau','#c9d9c2|Grün','#f4e7a8|Gelb','#f3cddd|Pink'],
+ 'Galaxy S24 Ultra':['#2b2b2b|Titanium Black','#c8c3bd|Titanium Gray','#e5d9c8|Titanium Violet','#e8e2d6|Titanium Yellow'],
+ 'Galaxy S24':['#2b2b2b|Onyx Black','#c9ccc6|Marble Gray','#b6a7d6|Cobalt Violet','#f2dd8f|Amber Yellow']
+};
+const MODELNR={
+ 'iPhone 15 Pro Max':'A2849, A3105, A3106','iPhone 15 Pro':'A2848, A3101, A3102','iPhone 15':'A2846, A3089, A3090',
+ 'iPhone 14 Pro':'A2650, A2889, A2890','iPhone 14':'A2649, A2881','Galaxy S24 Ultra':'SM-S928B','Galaxy S24':'SM-S921B'
+};
+const REPAIRS=[
+ {id:'display',key:'display',name:'Displaytausch',dur:'30–60',part:true,desc:'Risse, Linien oder Touch-Aussetzer – wir ersetzen das komplette Display-Modul inkl. Test.'},
+ {id:'glas',key:'glas',name:'Displayglas (nur Glas)',dur:'45–90',part:true,desc:'Nur das Frontglas ist gesprungen, das Bild funktioniert einwandfrei.'},
+ {id:'akku',key:'akku',name:'Akkutausch',dur:'20–40',part:true,desc:'Schnelle Entladung oder spontane Abschaltungen. Neuer Akku inkl. Prüfung.'},
+ {id:'lade',key:'lade',name:'Ladebuchse',dur:'30–60',part:true,desc:'Gerät lädt nicht mehr oder nur mit Wackelkontakt.'},
+ {id:'kamera',key:'kamera',name:'Kamera / Kameraglas',dur:'20–40',part:true,desc:'Verschwommene Bilder, Flecken oder gebrochenes Kameraglas.'},
+ {id:'back',key:'back',name:'Backcover / Rückglas',dur:'30–60',part:true,desc:'Gebrochene Rückseite – wir tauschen das Rückglas bzw. den Deckel.'},
+ {id:'wasser',key:'wasser',name:'Wasserschaden-Behandlung',dur:'60–120',part:false,desc:'Ins Wasser gefallen? Reinigung, Trocknung und Funktionsprüfung.'},
+ {id:'soft',key:'soft',name:'Software / Datenrettung',dur:'variabel',part:false,desc:'Startet nicht, Bootloop oder Daten sollen gerettet werden.'},
+ {id:'other',key:'other',name:'Weiß ich nicht / anderes',dur:'',part:false,desc:'Nicht sicher? Beschreiben Sie das Problem – wir finden es heraus.'}
+];
+const MONO=['#0e7a3c','#2563eb','#d97706','#7c3aed','#dc2626','#0891b2','#be185d','#4338ca','#15803d','#b45309'];
+function monoColor(s){let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return MONO[h%MONO.length];}
+
+/* ---------- State ---------- */
+const state={step:1,cat:'',brand:'',model:'',color:'',repairs:[],b2b:false,problem:'',name:'',tel:'',mail:'',bsearch:'',msearch:'',rsearch:''};
+const STEPS=[['cat','Kategorie',ICONS.Sonstiges],['brand','Gerät',ICONS.Smartphone],['model','Modell',ICONS.Tablet],['rep','Reparatur',RICONS.display],['data','Daten',SVG('<path d="M20 21a8 8 0 1 0-16 0"/><circle cx="12" cy="8" r="4"/>')]];
+function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function qa(s){return String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
+function brands(){return CATALOG[state.cat]||{'Andere Marke':['Anderes Gerät']};}
+function models(){return (brands()[state.brand]||[]);}
+function catThumb(){const m=state.model;return `<div style="color:#8a968f;width:100%;height:100%">${ICONS[state.cat]||ICONS.Sonstiges}</div>`;}
+
+/* ---------- Stepper ---------- */
+function renderStepper(){
+  const cur=state.step; let h='';
+  STEPS.forEach((s,ix)=>{const n=ix+1;const cls=n===cur?'on':(n<cur?'done':'');
+    h+=`<div class="stp ${cls}"><div class="cir">${n<cur?CK.replace('width="32" height="32"','width="16" height="16"'):(n===cur?`<span style="width:16px;height:16px">${s[2]}</span>`:n)}</div><div class="lbl">${s[1]}</div></div>`;
+    if(ix<STEPS.length-1)h+=`<div class="stpline ${n<cur?'done':''}"></div>`;
+  });
+  document.getElementById('stepper').innerHTML=h;
+}
+
+/* ---------- Selection bar ---------- */
+function selBar(){
+  if(!state.model&&!state.brand)return '';
+  const reps=state.repairs.map(id=>{const r=REPAIRS.find(x=>x.id===id);return r?r.name:'';}).filter(Boolean).join(', ');
+  return `<div class="selbar"><div class="thumb">${ICONS[state.cat]||ICONS.Sonstiges}</div>
+    <div style="min-width:0"><div class="t">${t('yourSel')}</div>
+      <div class="m">${esc([state.brand,state.model].filter(Boolean).join(' '))||esc(state.cat)}</div>
+      <div class="d">${[state.color?esc(state.color.split('|')[1]||state.color):'',reps].filter(Boolean).join(' · ')||esc(state.cat)}</div></div></div>`;
+}
+
+/* ---------- Render ---------- */
+function render(){
+  renderStepper();
+  document.documentElement.dir = (LANG==='ar')?'rtl':'ltr';
+  const v=document.getElementById('view');
+  if(state.step===1){
+    v.innerHTML=`<h1>${t('cat')}</h1><p class="sub">${t('subCat')}</p>
+      <div class="grid g4">${CATS.map(c=>`<div class="cat ${state.cat===c?'on':''}" onclick="pickCat('${qa(c)}')"><span class="ic">${ICONS[c]||ICONS.Sonstiges}</span>${esc(c)}</div>`).join('')}</div>`;
+  } else if(state.step===2){
+    const list=Object.keys(brands()).filter(b=>b.toLowerCase().includes(state.bsearch.toLowerCase()));
+    v.innerHTML=`<h1>${t('brand')}</h1><p class="sub">${t('subBrand')}</p>
+      <div class="search">${SEARCHI}<input class="in" placeholder="${t('searchBrand')}" value="${esc(state.bsearch)}" oninput="state.bsearch=this.value;renderBody()"></div>
+      <div class="grid g4" id="brandGrid">${brandTiles(list)}</div>
+      <div class="nav"><button class="btn ghost" onclick="setStep(1)">${t('back')}</button></div>`;
+  } else if(state.step===3){
+    const ml=models().filter(m=>m.toLowerCase().includes(state.msearch.toLowerCase()));
+    v.innerHTML=`${selBar()}<h1>${t('model')}</h1><p class="sub">${t('subModel')}</p>
+      <div class="search">${SEARCHI}<input class="in" placeholder="${t('searchModel')}" value="${esc(state.msearch)}" oninput="state.msearch=this.value;renderBody()"></div>
+      <div class="grid g2" id="modelGrid">${modelCards(ml)}</div>
+      <div class="nav"><button class="btn ghost" onclick="setStep(2)">${t('back')}</button></div>`;
+  } else if(state.step===4){
+    const rl=REPAIRS.filter(r=>r.name.toLowerCase().includes(state.rsearch.toLowerCase()));
+    v.innerHTML=`${selBar()}<h1>${t('rep')}</h1><p class="sub">${t('subRep')}</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+        <div class="search" style="flex:1;margin:0;min-width:180px">${SEARCHI}<input class="in" placeholder="${t('searchRep')}" value="${esc(state.rsearch)}" oninput="state.rsearch=this.value;renderBody()"></div>
+        <div class="toggle ${state.b2b?'on':''}" onclick="state.b2b=!state.b2b;render()"><span class="sw"><i></i></span>${t('b2b')}</div>
+      </div>
+      <div class="grid g2" id="repGrid">${repCards(rl)}</div>
+      <label>${t('concern')} – ${t('optional')}</label>
+      <textarea class="in" id="pb" placeholder="${t('subData')}" oninput="state.problem=this.value">${esc(state.problem)}</textarea>
+      <div class="nav"><button class="btn ghost" onclick="grabProblem();setStep(3)">${t('back')}</button><button class="btn pri" ${state.repairs.length?'':'disabled'} onclick="grabProblem();setStep(5)">${t('next')}</button></div>`;
+  } else if(state.step===5){
+    const reps=state.repairs.map(id=>{const r=REPAIRS.find(x=>x.id===id);return r?r.name:'';}).filter(Boolean).join(', ');
+    v.innerHTML=`<h1>${t('data')}</h1><p class="sub">${t('subData')}</p>
+      <div class="summary">
+        <div class="r"><span>${t('device')}</span><b>${esc([state.brand,state.model].filter(Boolean).join(' '))}${state.color?' · '+esc(state.color.split('|')[1]||''):''}</b></div>
+        <div class="r"><span>${t('concern')}</span><b>${esc(reps)}</b></div>
+        ${state.b2b?`<div class="r"><span>B2B</span><b>✓</b></div>`:''}
+        ${state.problem?`<div class="r"><span>Info</span><b>${esc(state.problem)}</b></div>`:''}
+      </div>
+      <label>${t('name')}</label><input class="in" id="n" value="${esc(state.name)}" placeholder="${t('namePh')}">
+      <label>${t('tel')}</label><input class="in" id="tl" value="${esc(state.tel)}" placeholder="${t('telPh')}">
+      <label>${t('mail')} ${t('optional')}</label><input class="in" id="ml" value="${esc(state.mail)}" placeholder="${t('mailPh')}">
+      <div class="chk"><input type="checkbox" id="dsg"><label for="dsg" style="margin:0;font-weight:500;color:#4a564f">${t('consent')}</label></div>
+      <div class="note">${t('noteData')}</div>
+      <div class="nav"><button class="btn ghost" onclick="setStep(4)">${t('back')}</button><button class="btn pri" id="sendBtn" onclick="submit()">${t('send')}</button></div>`;
+  } else if(state.step===6){
+    const reps=state.repairs.map(id=>{const r=REPAIRS.find(x=>x.id===id);return r?r.name:'';}).filter(Boolean).join(', ');
+    v.innerHTML=`<div class="donescreen"><div class="ck">${CK}</div>
+      <h1>${t('doneT')}</h1><p class="sub">${t('doneS').replace('{n}',esc(state.name.split(' ')[0]||''))}</p>
+      <div class="summary" style="text-align:start">
+        <div class="r"><span>${t('device')}</span><b>${esc([state.brand,state.model].filter(Boolean).join(' '))}</b></div>
+        <div class="r"><span>${t('concern')}</span><b>${esc(reps)}</b></div>
+      </div>
+      <div class="note">${t('noteDone')}</div>
+      <div class="nav"><button class="btn pri" onclick="resetAll()">${t('newReq')}</button></div></div>`;
+  }
+  postH();
+}
+function renderBody(){ /* Teil-Neuzeichnen der Grids (Suche) ohne Fokusverlust der Sucheingabe */
+  if(state.step===2){const list=Object.keys(brands()).filter(b=>b.toLowerCase().includes(state.bsearch.toLowerCase()));const g=document.getElementById('brandGrid');if(g)g.innerHTML=brandTiles(list);}
+  else if(state.step===3){const ml=models().filter(m=>m.toLowerCase().includes(state.msearch.toLowerCase()));const g=document.getElementById('modelGrid');if(g)g.innerHTML=modelCards(ml);}
+  else if(state.step===4){const rl=REPAIRS.filter(r=>r.name.toLowerCase().includes(state.rsearch.toLowerCase()));const g=document.getElementById('repGrid');if(g)g.innerHTML=repCards(rl);}
+}
+function brandTiles(list){
+  if(!list.length)return `<div class="empty" style="grid-column:1/-1">—</div>`;
+  return list.map(b=>`<div class="brand ${state.brand===b?'on':''}" onclick="pickBrand('${qa(b)}')"><div class="mono" style="background:${monoColor(b)}">${esc(b.trim()[0]||'?')}</div><div class="wm" style="font-size:14px">${esc(b)}</div></div>`).join('');
+}
+function modelCards(list){
+  const cards=list.map(m=>{const nr=MODELNR[m];const cols=COLORS[m]||[];
+    return `<div class="mcard ${state.model===m?'on':''}" onclick="pickModel('${qa(m)}')">
+      <div class="thumb">${ICONS[state.cat]||ICONS.Sonstiges}</div>
+      <div style="min-width:0"><div class="mn">${esc(m)}</div>${nr?`<div class="mnr">${esc(nr)}</div>`:''}
+      ${cols.length?`<div class="dots">${cols.slice(0,5).map(c=>`<i style="background:${c.split('|')[0]}"></i>`).join('')}</div>`:''}</div></div>`;}).join('');
+  return cards+`<div class="mcard" onclick="pickModel('__other__')"><div class="thumb">${RICONS.other}</div><div><div class="mn">${t('other')}</div></div></div>`;
+}
+function repCards(list){
+  return list.map(r=>{const on=state.repairs.includes(r.id);
+    return `<div class="rcard ${on?'on':''}" onclick="toggleRep('${r.id}')">
+      <div class="rpick">${on?CK.replace('width="32" height="32"','width="14" height="14"'):''}</div>
+      <div class="rico">${RICONS[r.key]||RICONS.other}</div>
+      <div class="rname">${esc(r.name)}</div>
+      <div class="rmeta">${r.dur?`<span class="badge dur">⏱ ${esc(r.dur)} ${t('min')}</span>`:''}${r.part?`<span class="badge q">${LANG==='de'?'Original / Ersatzteil':'Original / OEM'}</span>`:''}<span class="badge price">${t('price')}</span></div>
+      <div class="rdesc">${esc(r.desc)}</div></div>`;}).join('');
+}
+
+/* ---------- Actions ---------- */
+function pickCat(c){state.cat=c;state.brand='';state.model='';state.color='';state.bsearch='';setStep(2);}
+function pickBrand(b){state.brand=b;state.model='';state.color='';state.msearch='';setStep(3);}
+function pickModel(m){
+  if(m==='__other__'){state.model='';const nm=prompt(t('searchModel'));if(nm)state.model=nm;else return;}
+  else state.model=m;
+  const cols=COLORS[state.model]||[];
+  if(cols.length){state.color='';showColor(cols);}
+  else{state.color='';setStep(4);}
+}
+function showColor(cols){
+  const v=document.getElementById('view');
+  v.innerHTML=`${selBar()}<h1>${t('color')}</h1><p class="sub">${esc([state.brand,state.model].filter(Boolean).join(' '))}</p>
+    <div class="grid g2">${cols.map(c=>{const [hex,name]=c.split('|');return `<div class="opt-color mcard" onclick="pickColor('${qa(c)}')"><div class="thumb" style="background:${hex};border:1px solid rgba(0,0,0,.12)"></div><div class="mn">${esc(name)}</div></div>`;}).join('')}</div>
+    <div class="nav"><button class="btn ghost" onclick="setStep(3)">${t('back')}</button><button class="btn pri" onclick="setStep(4)">${t('next')} ›</button></div>`;
+  postH();
+}
+function pickColor(c){state.color=c;setStep(4);}
+function toggleRep(id){const i=state.repairs.indexOf(id);if(i>=0)state.repairs.splice(i,1);else state.repairs.push(id);renderBody();}
+function grabProblem(){const p=document.getElementById('pb');if(p)state.problem=p.value;}
+function setStep(n){state.step=n;render();window.scrollTo(0,0);}
+function resetAll(){Object.assign(state,{step:1,cat:'',brand:'',model:'',color:'',repairs:[],b2b:false,problem:'',name:'',tel:'',mail:'',bsearch:'',msearch:'',rsearch:''});render();}
+
+function submit(){
+  state.name=document.getElementById('n').value.trim();
+  state.tel=document.getElementById('tl').value.trim();
+  state.mail=document.getElementById('ml').value.trim();
+  if(!state.name||!state.tel){alert(t('errName'));return;}
+  if(!document.getElementById('dsg').checked){alert(t('errConsent'));return;}
+  const reps=state.repairs.map(id=>{const r=REPAIRS.find(x=>x.id===id);return r?r.name:'';}).filter(Boolean);
+  const issue=reps.join(', ')||'Anfrage';
+  const rq={name:state.name,tel:state.tel,mail:state.mail,type:state.cat,brand:state.brand,model:state.model+(state.color?(' · '+(state.color.split('|')[1]||'')):''),issue:issue,problem:state.problem,contact:'Rückruf',besttime:'',b2b:state.b2b,lang:LANG,repairs:reps,at:new Date().toISOString(),ts:Date.now()};
+  const w=new URLSearchParams(location.search).get('w');
+  const localSave=function(){try{const arr=JSON.parse(localStorage.getItem('reparado_requests')||'[]');arr.push(rq);localStorage.setItem('reparado_requests',JSON.stringify(arr));}catch(e){}if(window.parent!==window){try{window.parent.postMessage({reparadoRequest:rq},'*');}catch(e){}}};
+  if(w){
+    const btn=document.getElementById('sendBtn');if(btn){btn.disabled=true;btn.textContent=t('sending');}
+    fetch('/api/intake/public',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:w,herkunft:'website',data:rq})})
+      .then(r=>r.json().catch(()=>({}))).then(res=>{ if(res&&res.ok){setStep(6);} else {if(btn){btn.disabled=false;btn.textContent=t('send');}alert((res&&res.error)||t('errSend'));} })
+      .catch(()=>{if(btn){btn.disabled=false;btn.textContent=t('send');}alert(t('errSend'));});
+    return;
+  }
+  localSave();setStep(6);
+}
+
+/* ---------- Language ---------- */
+function buildLangMenu(){document.getElementById('langMenu').innerHTML=LANGS.map(l=>`<a onclick="setLang('${l[0]}')"><span>${l[1]}</span>${l[2]}</a>`).join('');}
+function toggleLang(){document.getElementById('langMenu').classList.toggle('on');}
+function setLang(code){LANG=code;const l=LANGS.find(x=>x[0]===code)||LANGS[0];document.getElementById('langFlag').textContent=l[1];document.getElementById('langName').textContent=l[2];document.getElementById('langMenu').classList.remove('on');try{localStorage.setItem('anfrage_lang',code);}catch(e){}render();}
+document.addEventListener('click',e=>{if(!e.target.closest('.lang'))document.getElementById('langMenu').classList.remove('on');});
+
+/* ---------- Embed / workshop ---------- */
+function postH(){if(window.parent!==window){try{window.parent.postMessage({reparadoHeight:Math.ceil(document.documentElement.getBoundingClientRect().height)+2},'*');}catch(e){}}}
+try{if(window.ResizeObserver)new ResizeObserver(postH).observe(document.body);}catch(e){}
+window.addEventListener('load',postH);window.addEventListener('resize',postH);
+if(new URLSearchParams(location.search).get('embed')==='1')document.body.classList.add('embedded');
+function setWsName(ws){if(!ws)return;const n=document.getElementById('wsName');if(n)n.textContent=ws;const d=document.getElementById('wsDot');if(d)d.textContent=(ws.trim()[0]||'W').toUpperCase();}
+(function(){
+  buildLangMenu();
+  try{const sl=localStorage.getItem('anfrage_lang');if(sl&&I18N[sl])setLang(sl);}catch(e){}
+  const q=new URLSearchParams(location.search);const ws=q.get('ws');
+  if(ws){setWsName(ws);document.title='Anfrage · '+ws;}
+  const tel=q.get('tel');if(tel){const tl=document.getElementById('wsTel');const c=document.getElementById('wsCall');const ct=document.getElementById('callTxt');if(ct)ct.textContent=t('callHint');if(tl){tl.textContent=tel;tl.href='tel:'+tel.replace(/\s/g,'');}if(c)c.style.display='';}
+  const w=q.get('w');if(w&&!ws){try{fetch('/api/intake/info?key='+encodeURIComponent(w)).then(r=>r.ok?r.json():null).then(res=>{if(res&&res.name){setWsName(res.name);document.title='Anfrage · '+res.name;}}).catch(()=>{});}catch(e){}}
+  render();
+})();
+</script>
+</body>
+</html>
