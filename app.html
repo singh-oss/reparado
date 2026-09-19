@@ -1257,7 +1257,7 @@ function openOrder(id){
          ${oDevices(o).map((d,di)=>orderDeviceBlock(o,d,di)).join('')}
          <div class="between" style="padding:9px 0"><b>Gesamt (inkl. MwSt.)</b><b style="font-size:18px">${eur(oTotal(o))}</b></div>${(oTotal(o)>0)?`<div class="between" style="font-size:12px;color:var(--ink2)"><span>Netto ${eur(netOf(oTotal(o)))}</span><span>darin ${MWST_RATE} % MwSt: ${eur(vatOf(oTotal(o)))}</span></div>`:''}</div>
        <div><label class="f">Priorität</label><div style="font-weight:700">${esc(o.prio)}</div></div>
-       <div><label class="f">Termin / Fällig</label><div style="font-weight:700">${o.appt?'Termin '+fmtDate(o.appt)+' · ':''}Fällig ${fmtDate(o.due)}</div></div>
+       <div><label class="f">Termin / Fällig</label><div style="font-weight:700">${o.appt?'Termin '+fmtDate(o.appt)+(o.apptTime?' · '+o.apptTime+' Uhr':'')+' · ':''}Fällig ${fmtDate(o.due)}</div></div>
        <div><label class="f">Garantie</label><div style="font-weight:700">${o.warranty} Monate${warrUntil?' · bis '+fmtDate(warrUntil):' (ab Abholung)'}</div></div>
        <div><label class="f">Annahme</label><div style="font-weight:700">${o.sig?'Unterschrieben':'Keine Unterschrift'}</div>${o.sig?`<img src="${o.sig}" alt="Unterschrift" style="height:40px;margin-top:4px;border:1px solid var(--line);border-radius:6px;background:#fff">`:''}</div>
      </div>
@@ -1423,7 +1423,7 @@ function blankDevice(){return {typ:'Smartphone',brand:'',model:'',imei:'',fach:'
 function normLock(s){s=s||'';if(/PIN|Passwort/i.test(s))return 'PIN';if(/Muster|Pattern/i.test(s))return 'Muster';return 'Kein';}
 function lockLabel(d){const l=normLock(d&&d.lock);if(l==='PIN')return 'PIN'+((d&&d.lockval)?' · '+d.lockval:'');if(l==='Muster')return 'Muster'+((d&&d.lockval)?' · '+d.lockval:'');return '';}
 function techName(id){const u=(typeof S!=='undefined'&&S.users||[]).find(x=>x.id===id);return u?u.name:'';}
-function blankForm(){return {mode:'auftrag',draftId:'',editId:'',quoteEditId:'',fromRequest:'',cid:'',typ:'Privat',anrede:'Herr',firma:'',vorname:'',nachname:'',tel:'+49 ',mail:'',plz:'',stadt:'',adr:'',lock:'Keine',lockval:'',devices:[blankDevice()],prio:'Standard',technikerId:'',notes:'',terminMode:'kein',appt:'',due:today(),sig:''};}
+function blankForm(){return {mode:'auftrag',draftId:'',editId:'',quoteEditId:'',fromRequest:'',cid:'',typ:'Privat',anrede:'Herr',firma:'',vorname:'',nachname:'',tel:'+49 ',mail:'',plz:'',stadt:'',adr:'',lock:'Keine',lockval:'',devices:[blankDevice()],prio:'Standard',technikerId:'',notes:'',terminMode:'kein',appt:'',apptTime:'',due:today(),sig:''};}
 function dPlus(n){const x=new Date();x.setDate(x.getDate()+(+n||0));return x.toISOString().slice(0,10);}
 function newQuote(pref){ closeAll(); NO=blankForm(); NO.mode='angebot'; NO.draftId=uid('dr'); NO.due=dPlus(14); if(pref)Object.assign(NO,pref); current='neworder'; renderNewOrder(); window.scrollTo(0,0); }
 function editQuote(id){ closeAll(); const q=(S.quotes||[]).find(x=>x.id===id); if(!q)return; NO=quoteToForm(q); NO.mode='angebot'; NO.quoteEditId=id; NO.draftId=uid('dr'); current='neworder'; renderNewOrder(); window.scrollTo(0,0); }
@@ -1446,13 +1446,13 @@ let NO=null;
 function newOrder(){ closeAll(); NO=blankForm(); NO.draftId=uid('dr'); current='neworder'; renderNewOrder(); window.scrollTo(0,0); }
 function editOrder(id){ closeAll(); const o=S.ord.find(x=>x.id===id); if(!o)return; NO=orderToForm(o); NO.editId=id; current='neworder'; renderNewOrder(); window.scrollTo(0,0); }
 function resumeDraft(did){ closeAll(); const d=(S.drafts||[]).find(x=>x.id===did); if(!d)return; NO=Object.assign(blankForm(),JSON.parse(JSON.stringify(d.data))); NO.draftId=did; NO.editId=''; current='neworder'; renderNewOrder(); window.scrollTo(0,0); }
-function orderToForm(o){const c=cust(o.cid);const nm=(c.name||'').split(' ');const f=blankForm();f.cid=o.cid;f.typ=c.typ||'Privat';f.firma=c.firma||'';f.anrede=c.anrede||'Herr';f.vorname=nm.slice(0,-1).join(' ')||nm[0]||'';f.nachname=nm.length>1?nm[nm.length-1]:'';f.tel=c.tel||'+49 ';f.mail=c.mail||'';f.plz=c.plz||'';f.stadt=c.stadt||'';f.adr=c.adr||'';f.lock=o.lock||'Keine';f.lockval=o.lockval||'';f.prio=o.prio||'Standard';f.technikerId=o.technikerId||'';f.notes=o.notes||'';f.due=o.due||today();f.appt=o.appt||'';f.terminMode=o.appt?'termin':'kein';f.sig=o.sig||'';f.devices=oDevices(o).map((d,idx)=>({typ:d.typ||'Smartphone',brand:d.brand||'',model:d.model||'',imei:d.imei||'',fach:d.fach||'',ref:d.ref||'',fehler:d.fehler||'',reparatur:d.reparatur||'',price:(d.price!==undefined&&d.price!==0?d.price:(d.price===0?0:'')),qual:d.qual||'Original',warranty:d.warranty||6,lock:normLock(d.lock!==undefined?d.lock:(idx===0?o.lock:'')),lockval:(d.lockval!==undefined?d.lockval:(idx===0?(o.lockval||''):'')),technikerId:d.technikerId||'',zustand:(d.zustand?JSON.parse(JSON.stringify(d.zustand)):blankZustand()),zsonst:(d.zsonst?JSON.parse(JSON.stringify(d.zsonst)):{}),zubehoer:((d.zubehoer||[]).slice()),zubehoerNote:(d.zubehoerNote||''),fotos:((d.fotos||[]).slice()),lockSet:(d.lockSet!==undefined?d.lockSet:(normLock(d.lock)!=='Kein')),positions:(Array.isArray(d.positions)&&d.positions.length?d.positions.map(p=>({reparatur:p.reparatur||'',qual:p.qual||'Original',price:(p.price!==undefined&&p.price!==''?p.price:'')})):[{reparatur:d.reparatur||'',qual:d.qual||'Original',price:(d.price!==undefined&&d.price!==0?d.price:(d.price===0?0:''))}])}));return f;}
+function orderToForm(o){const c=cust(o.cid);const nm=(c.name||'').split(' ');const f=blankForm();f.cid=o.cid;f.typ=c.typ||'Privat';f.firma=c.firma||'';f.anrede=c.anrede||'Herr';f.vorname=nm.slice(0,-1).join(' ')||nm[0]||'';f.nachname=nm.length>1?nm[nm.length-1]:'';f.tel=c.tel||'+49 ';f.mail=c.mail||'';f.plz=c.plz||'';f.stadt=c.stadt||'';f.adr=c.adr||'';f.lock=o.lock||'Keine';f.lockval=o.lockval||'';f.prio=o.prio||'Standard';f.technikerId=o.technikerId||'';f.notes=o.notes||'';f.due=o.due||today();f.appt=o.appt||'';f.apptTime=o.apptTime||'';f.terminMode=o.appt?'termin':'kein';f.sig=o.sig||'';f.devices=oDevices(o).map((d,idx)=>({typ:d.typ||'Smartphone',brand:d.brand||'',model:d.model||'',imei:d.imei||'',fach:d.fach||'',ref:d.ref||'',fehler:d.fehler||'',reparatur:d.reparatur||'',price:(d.price!==undefined&&d.price!==0?d.price:(d.price===0?0:'')),qual:d.qual||'Original',warranty:d.warranty||6,lock:normLock(d.lock!==undefined?d.lock:(idx===0?o.lock:'')),lockval:(d.lockval!==undefined?d.lockval:(idx===0?(o.lockval||''):'')),technikerId:d.technikerId||'',zustand:(d.zustand?JSON.parse(JSON.stringify(d.zustand)):blankZustand()),zsonst:(d.zsonst?JSON.parse(JSON.stringify(d.zsonst)):{}),zubehoer:((d.zubehoer||[]).slice()),zubehoerNote:(d.zubehoerNote||''),fotos:((d.fotos||[]).slice()),lockSet:(d.lockSet!==undefined?d.lockSet:(normLock(d.lock)!=='Kein')),positions:(Array.isArray(d.positions)&&d.positions.length?d.positions.map(p=>({reparatur:p.reparatur||'',qual:p.qual||'Original',price:(p.price!==undefined&&p.price!==''?p.price:'')})):[{reparatur:d.reparatur||'',qual:d.qual||'Original',price:(d.price!==undefined&&d.price!==0?d.price:(d.price===0?0:''))}])}));return f;}
 function noHasContent(){ if(!NO)return false; const d=NO.devices[0]||{}; return !!(NO.vorname||NO.nachname||(NO.tel||'').replace(/\D/g,'').length>3||NO.firma||NO.mail||d.brand||d.model||d.reparatur||(d.positions&&d.positions.some(p=>p.reparatur))||NO.notes); }
 function noTitleOf(){const nm=((NO.vorname+' '+NO.nachname).trim())||NO.firma||'Unbenannter Kunde';const d=NO.devices[0]||{};const dev=[d.brand,d.model].filter(Boolean).join(' ');return nm+(dev?' · '+dev:'');}
 function noCollect(){ if(!NO)return; const g=id=>{const e=document.getElementById(id);return e?e.value:null;}; let v;
   /* step-sicher: nur überschreiben, wenn das Feld gerade sichtbar/gerendert ist */
   v=g('no_typ');if(v!=null)NO.typ=v; v=g('no_anrede');if(v!=null)NO.anrede=v; v=g('no_firma');if(v!=null)NO.firma=v; v=g('no_vorname');if(v!=null)NO.vorname=v; v=g('no_nachname');if(v!=null)NO.nachname=v; v=g('no_tel');if(v!=null)NO.tel=v; v=g('no_mail');if(v!=null)NO.mail=v; v=g('no_plz');if(v!=null)NO.plz=v; v=g('no_stadt');if(v!=null)NO.stadt=v; v=g('no_adr');if(v!=null)NO.adr=v;
-  v=g('no_prio');if(v!=null)NO.prio=v; v=g('no_tech');if(v!=null)NO.technikerId=v; v=g('no_notes');if(v!=null)NO.notes=v; v=g('no_due');if(v!=null)NO.due=v; v=g('no_appt');if(v!=null)NO.appt=v;
+  v=g('no_prio');if(v!=null)NO.prio=v; v=g('no_tech');if(v!=null)NO.technikerId=v; v=g('no_notes');if(v!=null)NO.notes=v; v=g('no_due');if(v!=null)NO.due=v; v=g('no_appt');if(v!=null)NO.appt=v; v=g('no_appttime');if(v!=null)NO.apptTime=v;
   const tm=document.querySelector('input[name=no_termin]:checked');if(tm)NO.terminMode=tm.value;
   NO.devices.forEach((d,i)=>{ let w;
     w=g('dev'+i+'_typ');if(w!=null)d.typ=w; w=g('dev'+i+'_brand');if(w!=null)d.brand=w; w=g('dev'+i+'_model');if(w!=null)d.model=w; w=g('dev'+i+'_imei');if(w!=null)d.imei=w; w=g('dev'+i+'_fach');if(w!=null)d.fach=w; w=g('dev'+i+'_ref');if(w!=null)d.ref=w; w=g('dev'+i+'_fehler');if(w!=null)d.fehler=w; w=g('dev'+i+'_warranty');if(w!=null&&w!=='')d.warranty=w;
@@ -1805,15 +1805,22 @@ function noFinalize(){ noCollect();
   if(req.imei&&NO.devices.some(d=>(d.brand||d.model)&&!(d.imei||'').trim())){toast('Pflichtfeld: IMEI/Seriennummer je Gerät angeben');return;}
   if(req.sig&&!NO.sig){toast('Pflichtfeld: Unterschrift des Kunden erfassen');return;}
   const devs=noBuildDevices();
-  if(NO.editId){const o=S.ord.find(x=>x.id===NO.editId);if(o){const _oT=o.technikerId||'';const _oTot=oTotal(o);Object.assign(o,{cid:c.id,devices:devs},noMirror(devs),{lock:NO.lock,lockval:NO.lockval,prio:NO.prio,appt:NO.terminMode==='termin'?NO.appt:'',due:NO.due,notes:NO.notes,technikerId:NO.technikerId,sig:NO.sig||o.sig,sigConsents:NO.sigConsents||o.sigConsents||null,sigVia:NO.sigVia||o.sigVia||''});const _p=[];if(oTotal(o)!==_oTot)_p.push('Preis');if((o.technikerId||'')!==_oT)logActivity(o,'assign',o.technikerId?('an '+techName(o.technikerId)):'Zuweisung entfernt');logActivity(o,'edit',_p.length?_p.join(', '):'Auftragsdaten aktualisiert');}save();toast('Auftrag gespeichert');NO=null;go('auftraege');return;}
+  if(NO.editId){const o=S.ord.find(x=>x.id===NO.editId);if(o){const _oT=o.technikerId||'';const _oTot=oTotal(o);Object.assign(o,{cid:c.id,devices:devs},noMirror(devs),{lock:NO.lock,lockval:NO.lockval,prio:NO.prio,appt:NO.terminMode==='termin'?NO.appt:'',apptTime:NO.terminMode==='termin'?(NO.apptTime||''):'',due:NO.due,notes:NO.notes,technikerId:NO.technikerId,sig:NO.sig||o.sig,sigConsents:NO.sigConsents||o.sigConsents||null,sigVia:NO.sigVia||o.sigVia||''});const _p=[];if(oTotal(o)!==_oTot)_p.push('Preis');if((o.technikerId||'')!==_oT)logActivity(o,'assign',o.technikerId?('an '+techName(o.technikerId)):'Zuweisung entfernt');logActivity(o,'edit',_p.length?_p.join(', '):'Auftragsdaten aktualisiert');noSyncTermin(o);}save();toast('Auftrag gespeichert');NO=null;go('auftraege');return;}
   const nr=nextOrderNr();
-  const o=Object.assign({id:uid('o'),nr,cid:c.id,devices:devs,lock:NO.lock,lockval:NO.lockval,status:'offen',prio:NO.prio,created:today(),due:NO.due,appt:NO.terminMode==='termin'?NO.appt:'',notes:NO.notes,readyAt:'',sig:NO.sig||'',sigConsents:NO.sigConsents||null,sigVia:NO.sigVia||'',source:(NO.herkunft?'vorab':''),herkunft:NO.herkunft||'',via:NO.reqVia||'',technikerId:NO.technikerId},noMirror(devs));
+  const o=Object.assign({id:uid('o'),nr,cid:c.id,devices:devs,lock:NO.lock,lockval:NO.lockval,status:'offen',prio:NO.prio,created:today(),due:NO.due,appt:NO.terminMode==='termin'?NO.appt:'',apptTime:NO.terminMode==='termin'?(NO.apptTime||''):'',notes:NO.notes,readyAt:'',sig:NO.sig||'',sigConsents:NO.sigConsents||null,sigVia:NO.sigVia||'',source:(NO.herkunft?'vorab':''),herkunft:NO.herkunft||'',via:NO.reqVia||'',technikerId:NO.technikerId},noMirror(devs));
   if(NO.diagPhoto)o.photos=[NO.diagPhoto];
   stampOrderCreate(o); /* Welle 2 #6: Ersteller/Filiale + Protokoll */
   S.ord.unshift(o); sendOrderConfirmation(o,{silent:false}); /* V4-2: automatische Auftragsbestätigung */
-  S.drafts=(S.drafts||[]).filter(x=>x.id!==NO.draftId); save();
+  noSyncTermin(o); S.drafts=(S.drafts||[]).filter(x=>x.id!==NO.draftId); save();
   const wasSigned=!!o.sig; toast('Auftrag '+nr+' angelegt'+(devs.length>1?(' · '+devs.length+' Geräte'):'')); sendIntakePhotos(o); NO=null; go('auftraege');
   if(wasSigned)setTimeout(function(){printReceipt(o.id);},150); /* P8: nach Abschluss direkt Druckvorschau */
+}
+/* Kalender-Termin für einen Auftrag anlegen/aktualisieren/entfernen. Wird nur ein echter Kalendereintrag,
+   wenn eine Uhrzeit gewählt wurde – sonst bleibt es beim reinen Datum am Auftrag. */
+function noSyncTermin(o){ if(!o||typeof ensureTermine!=='function')return; const tid='tmord_'+o.id; const arr=ensureTermine(); const idx=arr.findIndex(t=>t.id===tid);
+  if(o.appt&&o.apptTime){ const prev=(idx>=0?arr[idx]:null); const rec={ id:tid, date:o.appt, start:o.apptTime, dur:(prev&&prev.dur)||30, cid:o.cid, orderId:o.id, technikerId:o.technikerId||'', reason:(typeof oIssueLabel==='function'?oIssueLabel(o):'')||'', note:'', status:'offen', branch:(typeof curBranch==='function'?curBranch():''), createdBy:(prev&&prev.createdBy)||(S.userId||''), createdByName:(prev&&prev.createdByName)||(typeof curUserName==='function'?curUserName():''), createdAt:(prev&&prev.createdAt)||new Date().toISOString(), updatedAt:new Date().toISOString() };
+    if(idx>=0)arr[idx]=rec; else arr.unshift(rec); }
+  else if(idx>=0){ arr.splice(idx,1); } /* Termin/Uhrzeit entfernt → Kalendereintrag löschen */
 }
 /* Annahme-Fotos nach dem Speichern an die in den Einstellungen hinterlegte Foto-E-Mail senden (Betreff+Dateiname: Auftragsnr., Kundenname, Datum; Format JPEG) */
 function _toJpegDataUrl(src,cb){ try{ const im=new Image(); im.onload=function(){ try{ const cv=document.createElement('canvas'); cv.width=im.width||1024; cv.height=im.height||1024; const cx=cv.getContext('2d'); cx.fillStyle='#fff'; cx.fillRect(0,0,cv.width,cv.height); cx.drawImage(im,0,0); cb(cv.toDataURL('image/jpeg',0.85)); }catch(e){ cb(src); } }; im.onerror=function(){ cb(src); }; im.src=src; }catch(e){ cb(src); } }
@@ -1830,9 +1837,18 @@ function sendIntakePhotos(o){
   srcs.forEach((src,i)=>_toJpegDataUrl(src,function(j){
     atts.push({filename:base+'_'+(i+1)+'.jpg',dataUrl:j});
     if(--pend===0){
-      const subj='Annahme-Fotos · Auftrag '+o.nr+' · '+nm+' · '+date;
-      const bodyTxt='Fotos zur Geräteannahme.\n\nAuftrag: '+o.nr+'\nKunde: '+nm+'\nDatum: '+date+'\nAnzahl Fotos: '+atts.length+'\n\n– automatisch gesendet von '+SHOP.name;
-      fetch(API+'/api/mail/send',{method:'POST',headers:DB._hdr(),body:JSON.stringify({to:email,subject:subj,body:bodyTxt,fromName:SHOP.name,replyTo:(SHOP.email||''),attachments:atts})})
+      const subj='Annahme-Fotos Auftrag '+o.nr+' – '+nm+' ('+date+')';
+      const bodyTxt='Guten Tag,\n\nanbei die Fotos zur Geräteannahme.\n\nAuftrag: '+o.nr+'\nKunde: '+nm+'\nDatum: '+date+'\nAnzahl Fotos: '+atts.length+'\n\nDiese Nachricht wurde automatisch von '+SHOP.name+' erstellt.';
+      const html='<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#1a2b22;line-height:1.5">'
+        +'<h2 style="color:#0d5a3f;margin:0 0 10px">Annahme-Fotos</h2>'
+        +'<p style="margin:0 0 12px">Guten Tag, anbei die Fotos zur Geräteannahme.</p>'
+        +'<table style="border-collapse:collapse;font-size:14px;margin:0 0 12px">'
+        +'<tr><td style="padding:3px 14px 3px 0;color:#6b7280">Auftrag</td><td><b>'+esc(o.nr)+'</b></td></tr>'
+        +'<tr><td style="padding:3px 14px 3px 0;color:#6b7280">Kunde</td><td>'+esc(nm)+'</td></tr>'
+        +'<tr><td style="padding:3px 14px 3px 0;color:#6b7280">Datum</td><td>'+esc(date)+'</td></tr>'
+        +'<tr><td style="padding:3px 14px 3px 0;color:#6b7280">Fotos</td><td>'+atts.length+'</td></tr></table>'
+        +'<p style="color:#8a96a3;font-size:12px;margin:14px 0 0">Automatisch erstellt von '+esc(SHOP.name)+(SHOP.email?' · '+esc(SHOP.email):'')+'</p></div>';
+      fetch(API+'/api/mail/send',{method:'POST',headers:DB._hdr(),body:JSON.stringify({to:email,subject:subj,body:bodyTxt,html:html,fromName:SHOP.name,replyTo:(SHOP.email||''),attachments:atts})})
         .then(r=>r.json()).then(res=>{ if(res&&res.sent)toast('📷 Annahme-Fotos an '+email+' gesendet'); else toast('Fotos konnten nicht gesendet werden'); }).catch(()=>{});
     }
   }));
@@ -1952,7 +1968,7 @@ function noAuftragContent(){ const techs=S.users||[];
        <div><label class="f">Zuständiger Techniker / Bearbeiter</label><select class="in" id="no_tech"><option value="">— noch nicht zugewiesen —</option>${techs.map(u=>`<option value="${u.id}" ${NO.technikerId===u.id?'selected':''}>${esc(u.name)} (${ROLE_LABEL[u.role]})</option>`).join('')}</select></div>
        <div><label class="f">Fällig bis</label><input class="in" id="no_due" type="date" value="${NO.due}"></div>
        <div><label class="f">Termin</label><div class="row">${[['kein','Kein Termin'],['termin','Termin vereinbaren']].map(t=>`<label class="chip ${NO.terminMode===t[0]?'on':''}" style="cursor:pointer"><input type="radio" name="no_termin" value="${t[0]}" ${NO.terminMode===t[0]?'checked':''} onchange="noTermin()" style="display:none">${t[1]}</label>`).join('')}</div></div>
-       <div id="no_apptwrap" style="${NO.terminMode==='termin'?'':'display:none'}"><label class="f">Termin-Datum</label><input class="in" id="no_appt" type="date" value="${NO.appt}"></div>
+       <div id="no_apptwrap" style="${NO.terminMode==='termin'?'':'display:none'}"><label class="f">Termin (Datum &amp; Uhrzeit)</label><div class="grid g2"><input class="in" id="no_appt" type="date" value="${NO.appt}"><input class="in" id="no_appttime" type="time" value="${esc(NO.apptTime||'')}"></div><div class="muted" style="font-size:11px;margin-top:4px">Mit Uhrzeit erscheint der Termin im Kalender.</div></div>
      </div>
      <label class="f" style="margin-top:14px">Detaillierte Informationen &amp; Notizen</label>
      <textarea class="in" id="no_notes" rows="3" placeholder="z. B. Daten sichern, Schutzfolie aufbringen, Kundenhinweise…">${esc(NO.notes)}</textarea>
@@ -2601,8 +2617,10 @@ function calSyncDir(p,d){const cs=ensureCalSync();cs[p].dir=d;save();views.kalen
 function calSyncNow(){const cs=ensureCalSync();const conn=CAL_PROVIDERS.filter(x=>cs[x[0]].connected);if(!conn.length){toast('Kein Kalender verbunden');return;}cs.lastSync=today();const n=visibleOrders().filter(o=>o.appt).length;save();views.kalender();paintIcons();toast(n+' Termine synchronisiert ('+conn.map(x=>x[1]).join(', ')+')');}
 function calICS(){ const pad=n=>String(n).padStart(2,'0'); const now=new Date();
   const stamp=now.getUTCFullYear()+pad(now.getUTCMonth()+1)+pad(now.getUTCDate())+'T'+pad(now.getUTCHours())+pad(now.getUTCMinutes())+pad(now.getUTCSeconds())+'Z';
-  const ev=visibleOrders().filter(o=>o.appt).map(o=>{const c=cust(o.cid);const d=o.appt.replace(/-/g,'');const nx=new Date(o.appt+'T00:00:00');nx.setDate(nx.getDate()+1);const dn=nx.getFullYear()+pad(nx.getMonth()+1)+pad(nx.getDate());
-    return ['BEGIN:VEVENT','UID:'+o.id+'@reparado','DTSTAMP:'+stamp,'DTSTART;VALUE=DATE:'+d,'DTEND;VALUE=DATE:'+dn,'SUMMARY:Termin: '+(c.name||'Kunde')+' · '+oDevLabel(o),'DESCRIPTION:Auftrag '+o.nr+' · '+oIssueLabel(o),'END:VEVENT'].join('\r\n');});
+  const ev=visibleOrders().filter(o=>o.appt).map(o=>{const c=cust(o.cid);let dtstart,dtend;
+    if(o.apptTime&&/^\d{1,2}:\d{2}/.test(o.apptTime)){const s=new Date(o.appt+'T'+(o.apptTime.length===4?'0'+o.apptTime:o.apptTime)+':00');const e=new Date(s.getTime()+30*60000);const f=x=>x.getFullYear()+pad(x.getMonth()+1)+pad(x.getDate())+'T'+pad(x.getHours())+pad(x.getMinutes())+'00';dtstart='DTSTART:'+f(s);dtend='DTEND:'+f(e);}
+    else{const d=o.appt.replace(/-/g,'');const nx=new Date(o.appt+'T00:00:00');nx.setDate(nx.getDate()+1);const dn=nx.getFullYear()+pad(nx.getMonth()+1)+pad(nx.getDate());dtstart='DTSTART;VALUE=DATE:'+d;dtend='DTEND;VALUE=DATE:'+dn;}
+    return ['BEGIN:VEVENT','UID:'+o.id+'@reparado','DTSTAMP:'+stamp,dtstart,dtend,'SUMMARY:Termin: '+(c.name||'Kunde')+' · '+oDevLabel(o),'DESCRIPTION:Auftrag '+o.nr+' · '+oIssueLabel(o),'END:VEVENT'].join('\r\n');});
   return ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Velqio//Werkstatt//DE','CALSCALE:GREGORIAN','X-WR-CALNAME:'+ensureWorkshop().name+' Termine',...ev,'END:VCALENDAR'].join('\r\n');
 }
 function downloadICS(){const ics=calICS();const blob=new Blob([ics],{type:'text/calendar'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='reparado-termine.ics';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},100);toast('Kalender exportiert (.ics) – in jeden Kalender importierbar');}
@@ -2913,8 +2931,8 @@ function computeQueue(){
   S.ord.forEach(o=>{
     const c=cust(o.cid); let r;
     if(o.appt){ const dd=daysBetween(today(),o.appt);
-      if(dd===1&&(r=on('r_appt24'))) push(r,'kunde',r.ch,c.name,'Terminerinnerung',o.model+' · morgen',fmtDate(o.appt),o);
-      if(dd===0&&(r=on('r_dropoff'))) push(r,'kunde',r.ch,c.name,'Abgabe-Checkliste',o.model+' · heute',fmtDate(o.appt),o);
+      if(dd===1&&(r=on('r_appt24'))) push(r,'kunde',r.ch,c.name,'Terminerinnerung',o.model+' · morgen',fmtDate(o.appt)+(o.apptTime?' '+o.apptTime+' Uhr':''),o);
+      if(dd===0&&(r=on('r_dropoff'))) push(r,'kunde',r.ch,c.name,'Abgabe-Checkliste',o.model+' · heute',fmtDate(o.appt)+(o.apptTime?' '+o.apptTime+' Uhr':''),o);
     }
     if(o.status==='fertig'&&o.readyAt){ const age=daysBetween(o.readyAt,today());
       if(age>=3&&age<14&&(r=on('r_pickup3'))) push(r,'kunde',r.ch,c.name,'Abhol-Erinnerung',o.model+' · seit '+age+' Tagen fertig','in Kürze',o);
