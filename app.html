@@ -4056,11 +4056,22 @@ const ES_TABS=[['betrieb','🏢 Betrieb'],['belege','🧾 Aufträge & Belege'],[
 const ES_CATMAP={'Werkstatt-Account':'betrieb','Stammdaten':'betrieb','Benutzer':'betrieb','Systemeinstellungen':'belege','Automatisierungen':'belege','Garantie':'belege','Kasse anbinden':'kasse','TSE-Anbindung':'kasse','Buchhaltung':'kasse','Integrationen':'kasse','Kundenkommunikation':'komm','Benachrichtigungen':'komm','WhatsApp-Vorlagen':'komm','Website anbinden':'komm','Empfangskraft':'komm','Kalender-Synchronisierung':'komm','Etikettendruck':'hardware','Hardware':'hardware','Geräteversicher':'hardware'};
 function esApplyTab(){ document.querySelectorAll('#main .card').forEach(function(card){ if(card.parentElement&&card.parentElement.closest('.card'))return; const b=card.querySelector('b'); const title=(b?b.textContent:'').trim(); let cat=null; for(const k in ES_CATMAP){ if(title.indexOf(k)>=0){cat=ES_CATMAP[k];break;} } if(cat){ card.style.display=(cat===setTab)?'':'none'; } }); }
 function esTab(t){ setTab=t; try{localStorage.setItem('rep_settab',t);}catch(e){} document.querySelectorAll('#esTabs .estab').forEach(function(c){c.classList.toggle('on',c.dataset.t===t);}); esApplyTab(); window.scrollTo(0,0); }
+/* Sichtbare „✓ Gespeichert"-Rückmeldung, wenn in den Einstellungen ein Feld geändert wird (Felder speichern automatisch) */
+let _esSaveT=null;
+function esFlashSaved(){ let el=document.getElementById('esSavedPill');
+  if(!el){ el=document.createElement('div'); el.id='esSavedPill'; el.textContent='✓ Gespeichert';
+    el.style.cssText='position:fixed;top:14px;right:16px;z-index:200;background:#16a34a;color:#fff;padding:9px 15px;border-radius:22px;font-size:13px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.18);opacity:0;transition:opacity .2s ease,transform .2s ease;transform:translateY(-8px);pointer-events:none';
+    document.body.appendChild(el); }
+  el.style.opacity='1'; el.style.transform='translateY(0)';
+  clearTimeout(_esSaveT); _esSaveT=setTimeout(function(){ el.style.opacity='0'; el.style.transform='translateY(-8px)'; },1500);
+}
+(function(){ const mm=document.getElementById('main'); if(mm&&!mm.__esSaveHooked){ mm.__esSaveHooked=true; mm.addEventListener('change',function(e){ if(current!=='einstellungen')return; const t=e.target; if(t&&t.matches&&t.matches('input,select,textarea')) esFlashSaved(); }); } })();
 views.einstellungen=function(){
   const m=document.getElementById('main');
   const cashConn=S.cash.connected;
   m.innerHTML=`<div class="between"><div><h1 class="h1">Einstellungen</h1><p class="sub">In Kategorien unterteilt – oben umschalten</p></div></div>${billPanel()}
    <div class="row" id="esTabs" style="gap:8px;flex-wrap:wrap;margin:14px 0 2px">${ES_TABS.map(t=>`<button class="chip estab ${setTab===t[0]?'on':''}" data-t="${t[0]}" onclick="esTab('${t[0]}')">${t[1]}</button>`).join('')}</div>
+   <div class="muted" style="font-size:12px;margin:2px 0 0;display:flex;align-items:center;gap:6px">💾 Änderungen werden automatisch gespeichert – bei jeder Eingabe erscheint kurz „✓ Gespeichert".</div>
    ${(function(){const w=ensureWorkshop();const members=(S.users||[]).length;return `<div class="card" style="margin-top:16px;border:1px solid var(--green,#34a24a)">
      <div class="between" style="flex-wrap:wrap;gap:10px"><div><b>Werkstatt-Account</b> <span class="tag">${esc(PLAN_LBL[w.plan]||w.plan)}</span> <span class="pill ${w.status==='active'?'soft':'dash'}"><span class="d"></span>${w.status==='active'?'Aktiv':(w.status==='trial'?'Testphase':'Gesperrt')}</span>
        <div class="muted" style="font-size:12px;margin-top:2px">Werkstatt-ID <span class="mono">${esc(w.id)}</span> · Kürzel <span class="mono">${esc(w.slug)}</span> · ${members} Nutzer · seit ${fmtDate(w.createdAt)}</div></div>
