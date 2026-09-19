@@ -841,6 +841,8 @@ function setUserRole(id,role){const u=S.users.find(x=>x.id===id);if(!u)return;if
 function go(v){
   if(current==='neworder'&&NO&&v!=='neworder'){noCollect();if(!NO.editId&&NO.mode!=='angebot'&&noHasContent()){noSaveDraft();toast('Als Entwurf gespeichert');}NO=null;}
   if(!canView(v)){toast('Keine Berechtigung');v='dashboard';} current=v;
+  /* zuletzt geöffnete Seite merken (nicht den Auftrags-Assistenten – der hat keinen stabilen Zustand nach Reload) */
+  if(v!=='neworder'){try{localStorage.setItem('rep_lastview',v);}catch(e){}}
   document.querySelectorAll('#nav a').forEach(a=>a.classList.toggle('active',a.dataset.view===v));
   document.getElementById('side').classList.remove('show');
   window.scrollTo(0,0);
@@ -995,7 +997,6 @@ views.dashboard=function(){
   const m=document.getElementById('main');
   const src=visibleOrders();
   const warten=src.filter(o=>o.status==='warten').length;
-  const monthRev=src.filter(o=>(o.status==='abgeholt'||o.status==='fertig')&&isThisMonth(o.pickedAt||o.readyAt||o.created)).reduce((s,o)=>s+oTotal(o),0)+ S.sales.filter(x=>isThisMonth(x.t)).reduce((s,x)=>s+x.total,0);
   const offen=src.filter(o=>o.status!=='abgeholt').length;
   const fertig=src.filter(o=>o.status==='fertig').length;
   const heute=src.filter(o=>o.appt===today()).length;
@@ -1012,7 +1013,7 @@ views.dashboard=function(){
      <div style="margin-top:8px">${b.items.length?b.items.map(it=>`<div class="row" style="padding:7px 0;border-bottom:1px solid rgba(255,255,255,.18);cursor:pointer" onclick="${it.go}"><span style="flex:1">${it.lvl==='warn'?'⚠ ':'• '}${esc(it.txt)}</span><span style="opacity:.7">›</span></div>`).join(''):'<div style="opacity:.85">Alles im grünen Bereich – nichts Dringendes heute.</div>'}</div>
      <div style="margin-top:10px;opacity:.9;font-size:13px">Diese Woche: ${b.count} Reparaturen erledigt · Marge ${eur(b.margeW)}</div></div>`;})():''}
    <div class="grid g4" style="margin-top:16px">
-     ${curRole()==='inhaber'?`<div class="card kpi"><div class="n">${eur(monthRev)}</div><div class="l">Umsatz diesen Monat</div><div class="t">Reparaturen führen</div></div>`:`<div class="card kpi"><div class="n">${src.filter(o=>o.status==='abgeholt'&&isThisMonth(o.pickedAt||o.readyAt||o.created)).length}</div><div class="l">Erledigt diesen Monat</div><div class="t">Weiter so</div></div>`}
+     <div class="card kpi"${curRole()==='inhaber'?' onclick="go(\'statistik\')" style="cursor:pointer"':''}><div class="n">${src.filter(o=>o.status==='abgeholt'&&isThisMonth(o.pickedAt||o.readyAt||o.created)).length}</div><div class="l">Erledigt diesen Monat</div><div class="t">${curRole()==='inhaber'?'Umsatz in der Statistik':'Weiter so'}</div></div>
      <div class="card kpi" onclick="go('auftraege')" style="cursor:pointer"><div class="n">${offen}</div><div class="l">Offene Aufträge</div><div class="t">${fertig} abholbereit · ${warten} auf Ersatzteil</div></div>
      <div class="card kpi" onclick="go('kalender')" style="cursor:pointer"><div class="n">${heute}</div><div class="l">Termine heute</div><div class="t">Kalender ansehen</div></div>
      <div class="card kpi"><div class="n">${q.length}</div><div class="l">Geplante Erinnerungen</div><div class="t">Kunde &amp; Werkstatt</div></div>
@@ -3914,7 +3915,7 @@ function statBrandSection(){
 }
 views.statistik=function(){
   const m=document.getElementById('main');
-  const rep=S.ord.filter(o=>(o.status==='abgeholt'||o.status==='fertig')&&isThisMonth(o.pickedAt||o.readyAt||o.created)).reduce((s,o)=>s+(+o.price||0),0);
+  const rep=S.ord.filter(o=>(o.status==='abgeholt'||o.status==='fertig')&&isThisMonth(o.pickedAt||o.readyAt||o.created)).reduce((s,o)=>s+oTotal(o),0);
   const sale=S.sales.filter(x=>isThisMonth(x.t)).reduce((s,x)=>s+x.total,0);
   const total=rep+sale;
   const doneM=S.ord.filter(o=>(o.status==='abgeholt'||o.status==='fertig')&&isThisMonth(o.pickedAt||o.readyAt||o.created));
@@ -3924,7 +3925,7 @@ views.statistik=function(){
   const maxT=Math.max(1,...top.map(t=>t[1]));
   m.innerHTML=`<div class="between"><div><h1 class="h1">Statistik</h1><p class="sub">Aktueller Monat</p></div></div>${statBrandSection()}
    <div class="grid g4" style="margin-top:16px">
-     <div class="card kpi"><div class="n">${eur(total)}</div><div class="l">Gesamtumsatz</div></div>
+     <div class="card kpi"><div class="n">${eur(total)}</div><div class="l">Umsatz diesen Monat</div><div class="t">Reparaturen + Kasse</div></div>
      <div class="card kpi"><div class="n">${eur(rep)}</div><div class="l">Reparaturen</div></div>
      <div class="card kpi"><div class="n">${eur(sale)}</div><div class="l">Kasse / Verkauf</div></div>
      <div class="card kpi"><div class="n">${S.ord.filter(o=>o.status==='abgeholt').length}</div><div class="l">Abgeschlossen</div></div>
@@ -5054,7 +5055,7 @@ function demoDone(){ if(_demoStop)return; const el=document.getElementById('demo
 
 /* ============================ BOOT ============================ */
 paintIcons();
-function bootApp(){ensureWorkshop(); ensureMaster(); applyMaster(); ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); ensureInv(); ensureProc(); ensureTrade(); ensureShip(); ensureContracts(); ensureInsurers(); ensureIntegrations(); const n=pullBookings(); const nq=pullRequests(); pullFeedback(); pullWarranty(); go('dashboard'); applyNavRole(); if(!curUser())showLogin();
+function bootApp(){ensureWorkshop(); ensureMaster(); applyMaster(); ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); ensureInv(); ensureProc(); ensureTrade(); ensureShip(); ensureContracts(); ensureInsurers(); ensureIntegrations(); const n=pullBookings(); const nq=pullRequests(); pullFeedback(); pullWarranty(); let _lv='dashboard'; try{const _s=localStorage.getItem('rep_lastview'); if(_s&&views[_s]&&canView(_s))_lv=_s;}catch(e){} go(_lv); applyNavRole(); if(!curUser())showLogin();
   if(nq) setTimeout(()=>toast(nq+' neue Website-Anfrage'+(nq>1?'n':'')),900);
   if(n) setTimeout(()=>toast(n+' neue Online-Buchung'+(n>1?'en':'')+' übernommen'),500);
   if(DB.backend==='server'){ setTimeout(()=>intakeImport(false),1500); setTimeout(()=>portalPollReplies(),2200); setTimeout(()=>ensurePubKey(),1700); setTimeout(()=>voiceLoad(),1800); setTimeout(()=>mailcfgLoad(),1900); if(!window.__intakePoll)window.__intakePoll=setInterval(()=>intakeImport(false),90000); if(!window.__portalPoll)window.__portalPoll=setInterval(()=>portalPollReplies(),90000); }
