@@ -1059,7 +1059,7 @@ views.dashboard=function(){
 };
 
 /* ============================ AUFTRÄGE ============================ */
-let aufFilter='alle', aufSort='neu', aufView='aktiv', aufSel={}, aufLayout='list';
+let aufFilter='alle', aufSort='neu', aufView='aktiv', aufSel={}, aufLayout='board';
 let __kanDrag=null;
 function aufSelCount(){return Object.keys(aufSel).filter(k=>aufSel[k]).length;}
 function aufToggleSel(id){aufSel[id]=!aufSel[id];views.auftraege();paintIcons();}
