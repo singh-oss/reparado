@@ -1469,6 +1469,10 @@ function noSaveDraft(){ if(!NO||NO.editId||NO.mode==='angebot')return; if(!noHas
   const ex=S.drafts.find(x=>x.id===NO.draftId); if(ex)Object.assign(ex,rec); else S.drafts.unshift(rec); save(); }
 let _noT=null; function noSaveDraftDebounced(){clearTimeout(_noT);_noT=setTimeout(()=>{noCollect();noSaveDraft();},600);}
 function noAutosave(){noCollect();noSaveDraft();}
+function noTypChange(i){noCollect();const d=NO.devices[i];const typ=d.typ;const brands=catBrandsForType(typ);
+  if(d.brand&&brands.indexOf(d.brand)<0){d.brand='';d.model='';} /* Marke passt nicht mehr zum Typ */
+  else if(d.brand){const ms=catModelNamesForType(d.brand,typ);if(ms.length&&d.model&&ms.indexOf(d.model)<0)d.model='';} /* Modell passt nicht mehr zum Typ */
+  renderNewOrder();}
 function noBrandChange(i){noCollect();NO.devices[i].model='';renderNewOrder();}
 function noModelPick(i){noCollect();const d=NO.devices[i];if(d.brand&&d.model){const t=catModelType(d.brand,d.model);if(t)d.typ=t;}const p0=(d.positions&&d.positions[0]);if(p0&&d.brand&&p0.reparatur){const pr=priceFor(d.brand,d.model,p0.reparatur);if(pr!=='')p0.price=pr;}renderNewOrder();}
 function noPrice(i){noCollect();const d=NO.devices[i];if(d.brand&&d.reparatur){const p=priceFor(d.brand,d.model,d.reparatur);if(p!==''){const e=document.getElementById('dev'+i+'_price');if(e)e.value=p;d.price=p;}}noVat(i);noSaveDraft();}
@@ -1821,19 +1825,25 @@ function noBuildDevices(){ const built=[];
   return built; }
 function noMirror(devs){ const f=devs[0]||{}; return {devtyp:f.typ||'Smartphone',brand:f.brand||'',model:f.model||'',imei:f.imei||'',fach:f.fach||'',ref:f.ref||'',qual:f.qual||'Original',warranty:f.warranty||6,lock:normLock(f.lock),lockval:f.lockval||'',issue:devs.reduce((a,d)=>a.concat(devPositions(d).map(p=>p.reparatur)),[]).filter(Boolean).join(' · '),price:devs.reduce((s,d)=>s+devTotal(d),0)}; }
 function noGeraetFields(d,i){
-  const brands=catBrands();
-  const modelNames=catModelNames(d.brand);
+  const types=ensureCat().types;
+  const typ=d.typ||types[0]||'Smartphone';
+  const brands=catBrandsForType(typ).slice();
+  if(d.brand&&brands.indexOf(d.brand)<0)brands.push(d.brand); /* aktuelle Marke nie verschwinden lassen */
+  const modelNames=catModelNamesForType(d.brand,typ);
   const modelOpts=['<option value="">Modell wählen…</option>'].concat(modelNames.map(mm=>`<option ${d.model===mm?'selected':''}>${esc(mm)}</option>`));
   if(d.model&&modelNames.indexOf(d.model)<0)modelOpts.push(`<option selected>${esc(d.model)}</option>`);
   const brandOpts=['<option value="">Marke wählen…</option>'].concat(brands.map(b=>`<option ${d.brand===b?'selected':''}>${esc(b)}</option>`));
-  const types=ensureCat().types;
   const img=(d.brand&&d.model)?catModelImg(d.brand,d.model):'';
+  const freeModel=!!d.brand&&modelNames.length===0; /* Marke ohne hinterlegte Modelle für diesen Typ (z. B. E-Scooter) → frei eintippen */
+  const modelField=freeModel
+    ? `<input class="in" id="dev${i}_model" value="${esc(d.model||'')}" placeholder="Modell eintippen" onchange="noAutosave()">`
+    : `<select class="in" id="dev${i}_model" onchange="noModelPick(${i})">${modelOpts.join('')}</select>`;
   return `<label class="f" style="margin-top:10px">Geräte-Schnellsuche</label>
     <input class="in" id="dev${i}_search" list="allDevices" placeholder="z. B. „iph 15 p“ → Apple iPhone 15 Pro" onchange="noQuickPick(${i})">
     <div class="grid g2" style="margin-top:10px">
-      <div><label class="f">Gerätetyp *</label><select class="in" id="dev${i}_typ">${types.map(t=>`<option ${d.typ===t?'selected':''}>${t}</option>`).join('')}</select></div>
+      <div><label class="f">Gerätetyp *</label><select class="in" id="dev${i}_typ" onchange="noTypChange(${i})">${types.map(t=>`<option ${typ===t?'selected':''}>${t}</option>`).join('')}</select></div>
       <div><label class="f">Marke *</label><select class="in" id="dev${i}_brand" onchange="noBrandChange(${i})">${brandOpts.join('')}</select></div>
-      <div><label class="f">Modell *</label><select class="in" id="dev${i}_model" onchange="noModelPick(${i})">${modelOpts.join('')}</select></div>
+      <div><label class="f">Modell *</label>${modelField}</div>
       ${img?`<div><label class="f">Vorschau</label><img src="${img}" style="height:56px;max-width:100%;border:1px solid var(--line);border-radius:8px;background:#fff;object-fit:contain;padding:2px"></div>`:''}
       <div><label class="f">IMEI / Seriennummer</label><input class="in" id="dev${i}_imei" value="${esc(d.imei)}" placeholder="optional"></div>
       <div><label class="f">Reparaturfach-Nr.</label><input class="in" id="dev${i}_fach" value="${esc(d.fach)}" placeholder="z. B. Fach 42"></div>
@@ -3477,6 +3487,14 @@ function qa(s){return String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\
 function catBrands(){return ensureCat().brands;}
 function catModels(brand){return (ensureCat().models[brand]||[]);}
 function catModelNames(brand){return catModels(brand).map(m=>m.name);}
+/* Kaskade: nur Marken/Modelle zeigen, die zum gewählten Gerätetyp passen */
+function catBrandsForType(typ){ const c=ensureCat(); if(!typ)return c.brands.slice();
+  const list=c.brands.filter(b=>(c.models[b]||[]).some(m=>((m.type||'Smartphone')===typ)));
+  (c.brands||[]).forEach(b=>{ if(/sonst/i.test(b)&&list.indexOf(b)<0)list.push(b); }); /* Auffang-Marke immer anbieten */
+  return list; }
+function catModelNamesForType(brand,typ){ if(!brand)return []; const ms=catModels(brand);
+  if(!typ)return ms.map(m=>m.name);
+  return ms.filter(m=>((m.type||'Smartphone')===typ)).map(m=>m.name); }
 function catRepairs(){return ensureCat().repairs;}
 function catQuals(){return ensureCat().quals;}
 /* v6 #2/#3: Ersatzteilqualität nur bei ersatzteilbezogenen Reparaturen (nicht bei Dienstleistungen) */
