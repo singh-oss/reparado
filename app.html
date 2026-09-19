@@ -244,6 +244,7 @@
       <a data-view="ankauf"><span class="ic" data-ic="swap"></span> Ankauf / Verkauf</a>
       <a data-view="versand"><span class="ic" data-ic="truck"></span> Versand <span class="badge" id="bg-ship">0</span></a>
       <a data-view="preise"><span class="ic" data-ic="tag"></span> Modelle &amp; Preise</a>
+      <a data-view="teilekatalog"><span class="ic" data-ic="arch"></span> Ersatzteilkatalog</a>
       <div class="grouplbl">Verkauf</div>
       <a data-view="kasse"><span class="ic" data-ic="rcpt"></span> Kasse</a>
       <a data-view="vertraege"><span class="ic" data-ic="contract"></span> Verträge (B2B) <span class="badge" id="bg-vert">0</span></a>
@@ -1494,6 +1495,10 @@ function noPosBlock(i,j,p,n){
       ${repairHasPart(p.reparatur)?`<div><label class="f">Ersatzteilqualität</label><select class="in" id="dev${i}_pos${j}_qual">${catQuals().map(q=>`<option ${p.qual===q?'selected':''}>${esc(q)}</option>`).join('')}</select></div>`:''}
     </div>
     ${(p.reparatur&&!repairHasPart(p.reparatur))?`<div class="muted" style="font-size:11px;margin-top:6px">Reine Dienstleistung – keine Ersatzteilqualität nötig.</div>`:''}
+    ${repairHasPart(p.reparatur)?`<div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap;align-items:center">
+      <button type="button" class="btn sm" onclick="pcOpen(${i},${j})">🔎 PreisCheck (Ersatzteil)</button>
+      ${(p.ek!==undefined&&p.ek!=='')?`<span class="muted" style="font-size:12px">EK ${eur(p.ek)}${p.supplier?' · '+esc(p.supplier):''}${p.artnr?' · '+esc(p.artnr):''} · Marge <b style="color:${pcMargin(p)>=0?'#0e7a3c':'#c0392b'}">${pcMargin(p)}%</b></span>`:''}
+    </div>`:''}
     <div id="dev${i}_pos${j}_vathint" class="muted" style="font-size:12px;margin-top:6px">${vatHint(p.price)}</div>
   </div>`;
 }
@@ -1887,7 +1892,7 @@ function sendIntakePhotos(o){
 }
 function noBuildDevices(){ const built=[];
   NO.devices.forEach(d=>{ if(!(d.brand||d.model))return;
-    const ps=devPositions(d).filter(p=>p.reparatur).map(p=>({reparatur:p.reparatur,qual:(repairHasPart(p.reparatur)?(p.qual||'Original'):''),price:+p.price||0}));
+    const ps=devPositions(d).filter(p=>p.reparatur).map(p=>{const o={reparatur:p.reparatur,qual:(repairHasPart(p.reparatur)?(p.qual||'Original'):''),price:+p.price||0};if(p.ek!==undefined&&p.ek!=='')o.ek=+p.ek||0;if(p.supplier)o.supplier=p.supplier;if(p.artnr)o.artnr=p.artnr;return o;});
     if(!ps.length)return;
     ps.forEach(p=>catLearnRepair(p.reparatur));
     const p0=ps[0];
@@ -3137,6 +3142,156 @@ function partCompare(id){ensureInv();const p=S.parts.find(x=>x.id===id);if(!p)re
 function partChooseOffer(id,sup,price){const p=S.parts.find(x=>x.id===id);if(!p)return;p.hist=p.hist||[{date:today(),price:p.price,supplier:p.supplier||''}];if(p.price!==price||p.supplier!==sup)p.hist.push({date:today(),price:price,supplier:sup});p.price=price;p.supplier=sup;save();closeAll();views.lager();paintIcons();toast('EK übernommen: '+eur(price)+' · '+sup);}
 function partRefreshOffers(id){const p=S.parts.find(x=>x.id===id);if(!p)return;p.offers=genOffers(p).map(o=>Object.assign({},o,{price:Math.round(o.price*(0.95+Math.random()*0.12)*100)/100,date:today()}));save();partCompare(id);toast('Lieferantenpreise aktualisiert');}
 function partAddOffer(id){const p=S.parts.find(x=>x.id===id);const sup=(prompt('Lieferant:')||'').trim();if(!sup)return;const price=+((prompt('Preis (€):'))||0);p.offers=p.offers||[];p.offers.push({supplier:sup,price,date:today()});save();partCompare(id);}
+/* ============================ ERSATZTEILKATALOG + PREISCHECK (repairOS-Prinzip) ============================ */
+const PC_STARTER=[
+  ['iPhone 15 Pro','Display','Original',129,'',''],['iPhone 15 Pro','Display','Kopie',69,'',''],['iPhone 15 Pro','Akku','Original',29,'',''],
+  ['iPhone 14','Display','Original',89,'',''],['iPhone 14','Display','Kopie',45,'',''],['iPhone 14','Akku','Original',22,'',''],
+  ['iPhone 13','Display','Original',75,'',''],['iPhone 13','Display','Kopie',38,'',''],['iPhone 13','Akku','Original',18,'',''],
+  ['iPhone 12','Display','Original',62,'',''],['iPhone 12','Akku','Original',16,'',''],['iPhone 11','Display','Kopie',22,'',''],['iPhone 11','Akku','Original',12,'',''],
+  ['Galaxy S23','Display','Original',119,'',''],['Galaxy S23','Akku','Original',24,'',''],['Galaxy A54','Display','Original',49,'',''],['Galaxy A14','Display','Original',26,'','']
+];
+function ensureTeile(){ if(!Array.isArray(S.teilekatalog))S.teilekatalog=[]; if(!S.pcSettings)S.pcSettings={margin:55,round:'0.90',vat:true};
+  if(!S.__teileSeed){ S.__teileSeed=1; if(!S.teilekatalog.length){ PC_STARTER.forEach(r=>S.teilekatalog.push({id:uid('tk'),model:r[0],part:r[1],quality:r[2],ek:+r[3]||0,supplier:r[4]||'',artnr:r[5]||'',stock:'',updated:today()})); } }
+  return S.teilekatalog; }
+function pcSet(){ if(!S.pcSettings)S.pcSettings={margin:55,round:'0.90',vat:true}; return S.pcSettings; }
+function pcRoundVK(v){ v=+v||0; const r=pcSet().round; if(r==='none')return Math.round(v*100)/100; if(r==='1')return Math.ceil(v); if(r==='0.99')return Math.ceil(v-0.99)+0.99; return Math.ceil(v-0.90)+0.90; /* 0.90 */ }
+function pcCalcVK(ek,margin){ ek=+ek||0; let m=+margin; if(isNaN(m))m=pcSet().margin; m=Math.max(0,Math.min(94,m)); const net=ek/(1-m/100); const gross=pcSet().vat?net*1.19:net; return pcRoundVK(gross); }
+function pcMargin(p){ if(!p||p.ek===undefined||p.ek==='')return 0; const net=pcSet().vat?((+p.price||0)/1.19):(+p.price||0); if(net<=0)return 0; return Math.round(((net-(+p.ek||0))/net)*100); }
+/* --- PreisCheck-Modal (aus der Reparaturposition) --- */
+function pcOpen(i,j){ noCollect(); ensureTeile(); const d=NO.devices[i]||{}; const p=(d.positions||[])[j]||{};
+  window.__pc={i:i,j:j,model:[d.brand,d.model].filter(Boolean).join(' '),part:(p.reparatur||''),search:(d.model||[d.brand,d.model].filter(Boolean).join(' ')),margin:pcSet().margin};
+  pcRender(); }
+function pcPartToken(rep){ rep=(rep||'').toLowerCase(); const map={'display':'display','glas':'display','akku':'akku','batterie':'akku','lade':'lade','buchse':'lade','kamera':'kamera','back':'back','rück':'back','hörmuschel':'hörer','lautsprecher':'lautsprecher','mikro':'mikro'}; for(const k in map){ if(rep.indexOf(k)>=0)return map[k]; } return ''; }
+function pcMatches(){ const st=window.__pc; const q=(st.search||'').toLowerCase().trim(); const tok=pcPartToken(st.part);
+  return (S.teilekatalog||[]).filter(a=>{ const hay=((a.model||'')+' '+(a.part||'')+' '+(a.quality||'')+' '+(a.supplier||'')+' '+(a.artnr||'')).toLowerCase();
+    const okQ=!q||q.split(/\s+/).every(w=>hay.indexOf(w)>=0);
+    const okP=!tok||(a.part||'').toLowerCase().indexOf(tok)>=0||tok.indexOf((a.part||'').toLowerCase())>=0;
+    return okQ&&okP; }).slice(0,60); }
+function pcRender(){ const st=window.__pc; const list=pcMatches(); const s=pcSet();
+  const rows=list.length?list.map(a=>{const vk=pcCalcVK(a.ek,st.margin);return `<div class="listitem" style="align-items:center;gap:10px">
+      <div style="flex:1;min-width:0"><b>${esc(a.model)} · ${esc(a.part)}</b> ${a.quality?`<span class="tag">${esc(a.quality)}</span>`:''}
+        <div class="muted" style="font-size:12px">EK ${eur(a.ek)}${a.supplier?' · '+esc(a.supplier):''}${a.artnr?' · Art.-Nr. '+esc(a.artnr):''}${a.stock!==''&&a.stock!=null?' · Bestand '+esc(String(a.stock)):''}</div></div>
+      <div style="text-align:end;flex:none"><div style="font-weight:800;font-size:16px">${eur(vk)}</div><button class="btn sm pri" style="margin-top:4px" onclick="pcApply('${a.id}')">Übernehmen</button></div>
+    </div>`;}).join(''):`<div class="empty" style="padding:16px">Keine passenden Artikel im Katalog. Zielmarge unten setzen und EK manuell eingeben – oder Katalog importieren.</div>`;
+  openModal(`<div class="dhead"><b style="flex:1">🔎 PreisCheck${st.part?' · '+esc(st.part):''}</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+    <div class="dbody">
+      <div class="grid g2" style="gap:12px;align-items:end">
+        <div><label class="f">Zielmarge (%)</label><input class="in" id="pc_margin" type="number" step="1" value="${st.margin}" oninput="window.__pc.margin=+this.value||0;pcRenderList()"></div>
+        <div><label class="f">Rundung</label><select class="in" id="pc_round" onchange="pcSet().round=this.value;save();pcRenderList()">
+          ${[['0.90','auf ,90'],['0.99','auf ,99'],['1','auf volle €'],['none','exakt']].map(o=>`<option value="${o[0]}" ${s.round===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select></div>
+      </div>
+      <div class="muted" style="font-size:11px;margin-top:4px">Kundenpreis = EK ÷ (1 − Marge) ${s.vat?'× 19 % MwSt':''}, danach gerundet. Marge = (Netto-VK − EK) ÷ Netto-VK.</div>
+      <div class="search-x" style="position:relative;margin-top:12px"><input class="in" id="pc_search" placeholder="Modell / Teil suchen…" value="${esc(st.search||'')}" oninput="window.__pc.search=this.value;pcRenderList()"></div>
+      <div id="pc_list" style="margin-top:6px;max-height:46vh;overflow:auto">${rows}</div>
+      <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:12px">
+        <label class="f">Nicht im Katalog? EK manuell eingeben</label>
+        <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">
+          <input class="in" id="pc_manual_ek" type="number" step="0.01" placeholder="EK (€)" style="max-width:140px">
+          <span class="muted" style="font-size:13px">→ VK <b id="pc_manual_vk">–</b></span>
+          <button class="btn sm pri" onclick="pcApplyManual()">Übernehmen</button>
+          <button class="btn sm gho" onclick="closeAll();go('teilekatalog')">Katalog / Import öffnen</button>
+        </div>
+      </div>
+    </div>`);
+  const me=document.getElementById('pc_manual_ek'); if(me)me.addEventListener('input',function(){const vk=document.getElementById('pc_manual_vk');if(vk)vk.textContent=this.value?eur(pcCalcVK(this.value,window.__pc.margin)):'–';});
+}
+function pcRenderList(){ const st=window.__pc; const list=pcMatches(); const el=document.getElementById('pc_list'); if(!el)return;
+  el.innerHTML=list.length?list.map(a=>{const vk=pcCalcVK(a.ek,st.margin);return `<div class="listitem" style="align-items:center;gap:10px">
+      <div style="flex:1;min-width:0"><b>${esc(a.model)} · ${esc(a.part)}</b> ${a.quality?`<span class="tag">${esc(a.quality)}</span>`:''}
+        <div class="muted" style="font-size:12px">EK ${eur(a.ek)}${a.supplier?' · '+esc(a.supplier):''}${a.artnr?' · Art.-Nr. '+esc(a.artnr):''}${a.stock!==''&&a.stock!=null?' · Bestand '+esc(String(a.stock)):''}</div></div>
+      <div style="text-align:end;flex:none"><div style="font-weight:800;font-size:16px">${eur(vk)}</div><button class="btn sm pri" style="margin-top:4px" onclick="pcApply('${a.id}')">Übernehmen</button></div>
+    </div>`;}).join(''):`<div class="empty" style="padding:16px">Keine passenden Artikel. EK unten manuell eingeben oder Katalog importieren.</div>`;
+  const mv=document.getElementById('pc_manual_vk'),me=document.getElementById('pc_manual_ek'); if(mv&&me)mv.textContent=me.value?eur(pcCalcVK(me.value,st.margin)):'–';
+}
+function pcApply(id){ const st=window.__pc; const a=(S.teilekatalog||[]).find(x=>x.id===id); if(!a)return; const d=NO.devices[st.i]; const p=(d.positions||[])[st.j]; if(!p)return;
+  p.price=pcCalcVK(a.ek,st.margin); p.ek=+a.ek||0; p.supplier=a.supplier||''; p.artnr=a.artnr||''; if(a.quality)p.qual=a.quality;
+  pcSet().margin=st.margin; save(); closeAll(); renderNewOrder(); toast('Preis übernommen: '+eur(p.price)+' (Marge '+pcMargin(p)+'%)'); }
+function pcApplyManual(){ const st=window.__pc; const ek=+((document.getElementById('pc_manual_ek')||{}).value)||0; if(!ek){toast('Bitte EK eingeben');return;} const d=NO.devices[st.i]; const p=(d.positions||[])[st.j]; if(!p)return;
+  p.price=pcCalcVK(ek,st.margin); p.ek=ek; p.supplier=''; p.artnr=''; pcSet().margin=st.margin; save(); closeAll(); renderNewOrder(); toast('Preis übernommen: '+eur(p.price)+' (Marge '+pcMargin(p)+'%)'); }
+
+/* --- Ersatzteilkatalog-Verwaltung + Import --- */
+let tkSearch='';
+views.teilekatalog=function(){ const m=document.getElementById('main'); ensureTeile(); const s=pcSet();
+  const q=tkSearch.toLowerCase().trim();
+  const list=(S.teilekatalog||[]).filter(a=>!q||((a.model||'')+' '+(a.part||'')+' '+(a.quality||'')+' '+(a.supplier||'')+' '+(a.artnr||'')).toLowerCase().indexOf(q)>=0);
+  m.innerHTML=`<div class="between"><div><h1 class="h1">Ersatzteilkatalog</h1><p class="sub">Einkaufspreise pflegen · PreisCheck rechnet daraus im Auftrag automatisch den Kundenpreis</p></div>
+     <div class="row"><button class="btn" onclick="tkImportOpen()">📥 Preisliste importieren</button><button class="btn pri" onclick="tkAdd()">+ Artikel</button></div></div>
+   <div class="card" style="margin-top:16px"><div class="grid g3" style="align-items:end">
+     <div><label class="f">Standard-Zielmarge (%)</label><input class="in" type="number" value="${s.margin}" onchange="pcSet().margin=Math.max(0,Math.min(94,+this.value||0));save();toast('Marge gespeichert')"></div>
+     <div><label class="f">Preis-Rundung</label><select class="in" onchange="pcSet().round=this.value;save()">${[['0.90','auf ,90'],['0.99','auf ,99'],['1','auf volle €'],['none','exakt']].map(o=>`<option value="${o[0]}" ${s.round===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select></div>
+     <div class="integ" style="justify-content:space-between"><div><b>MwSt (19 %) aufschlagen</b><div class="muted" style="font-size:12px">Kundenpreis brutto</div></div><button class="switch ${s.vat?'on':''}" onclick="pcSet().vat=!pcSet().vat;save();views.teilekatalog();paintIcons()"><i></i></button></div>
+   </div></div>
+   <div class="row" style="margin:14px 0"><input class="in" placeholder="Suche: Modell, Teil, Qualität, Lieferant, Art.-Nr…" value="${esc(tkSearch)}" oninput="tkSearch=this.value;tkTable()"></div>
+   <div class="card" style="padding:0" id="tkCard">${tkTableHtml(list)}</div>
+   <div class="note" style="margin-top:12px">Beim Anlegen/Bearbeiten einer Reparaturposition im Auftrag auf <b>🔎 PreisCheck</b> tippen: passende Artikel erscheinen, Zielmarge setzen → Kundenpreis wird automatisch übernommen. Import unterstützt CSV/Excel-Preislisten (Spalten zuordnen).</div>`;
+  paintIcons();
+};
+function tkTableHtml(list){
+  if(!list.length)return `<div class="empty" style="padding:24px">Keine Artikel. „+ Artikel" anlegen oder eine <b>Preisliste importieren</b>.</div>`;
+  return `<table style="width:100%;border-collapse:collapse;font-size:14px"><thead><tr style="text-align:left;color:var(--ink2);font-size:12px">
+    <th style="padding:10px 12px">Modell</th><th style="padding:10px 8px">Teil</th><th style="padding:10px 8px">Qualität</th><th style="padding:10px 8px;text-align:right">EK</th><th style="padding:10px 8px">Lieferant</th><th style="padding:10px 8px">Art.-Nr.</th><th style="padding:10px 8px;text-align:right">Bestand</th><th></th></tr></thead>
+    <tbody>${list.map(a=>`<tr style="border-top:1px solid var(--line)">
+      <td style="padding:8px 12px"><b>${esc(a.model)}</b></td><td style="padding:8px">${esc(a.part)}</td><td style="padding:8px"><span class="tag">${esc(a.quality||'')}</span></td>
+      <td style="padding:8px;text-align:right;font-variant-numeric:tabular-nums">${eur(a.ek)}</td><td style="padding:8px">${esc(a.supplier||'')}</td><td style="padding:8px">${esc(a.artnr||'')}</td><td style="padding:8px;text-align:right">${esc(a.stock!==''&&a.stock!=null?String(a.stock):'')}</td>
+      <td style="padding:8px;text-align:right;white-space:nowrap"><button class="btn sm gho" onclick="tkEdit('${a.id}')">✎</button> <button class="btn sm gho" onclick="tkDel('${a.id}')">🗑</button></td></tr>`).join('')}</tbody></table>`;
+}
+function tkTable(){ const q=tkSearch.toLowerCase().trim(); const list=(S.teilekatalog||[]).filter(a=>!q||((a.model||'')+' '+(a.part||'')+' '+(a.quality||'')+' '+(a.supplier||'')+' '+(a.artnr||'')).toLowerCase().indexOf(q)>=0); const c=document.getElementById('tkCard'); if(c)c.innerHTML=tkTableHtml(list); }
+function tkArticleModal(a){ const isNew=!a; a=a||{id:uid('tk'),model:'',part:'',quality:'Original',ek:'',supplier:'',artnr:'',stock:''};
+  openModal(`<div class="dhead"><b style="flex:1">${isNew?'Neuer Artikel':'Artikel bearbeiten'}</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+   <div class="dbody"><div class="grid g2" style="gap:12px">
+     <div><label class="f">Modell *</label><input class="in" id="tk_model" list="allDevices" value="${esc(a.model)}" placeholder="z. B. iPhone 15 Pro"></div>
+     <div><label class="f">Teil *</label><input class="in" id="tk_part" list="allRepairs" value="${esc(a.part)}" placeholder="z. B. Display"></div>
+     <div><label class="f">Qualität</label><input class="in" id="tk_qual" value="${esc(a.quality||'')}" placeholder="Original / Kopie / Serviceware"></div>
+     <div><label class="f">EK (€) *</label><input class="in" id="tk_ek" type="number" step="0.01" value="${a.ek!==''?a.ek:''}" placeholder="0.00"></div>
+     <div><label class="f">Lieferant</label><input class="in" id="tk_sup" value="${esc(a.supplier||'')}"></div>
+     <div><label class="f">Artikel-Nr.</label><input class="in" id="tk_art" value="${esc(a.artnr||'')}"></div>
+     <div><label class="f">Bestand</label><input class="in" id="tk_stock" type="number" value="${a.stock!==''&&a.stock!=null?a.stock:''}"></div>
+   </div><div class="row" style="margin-top:14px;justify-content:flex-end;gap:8px"><button class="btn gho" onclick="closeAll()">Abbrechen</button><button class="btn pri" onclick="tkSave('${a.id}',${isNew})">Speichern</button></div></div>`);
+}
+function tkAdd(){ tkArticleModal(null); }
+function tkEdit(id){ const a=(S.teilekatalog||[]).find(x=>x.id===id); if(a)tkArticleModal(a); }
+function tkSave(id,isNew){ const g=x=>{const e=document.getElementById(x);return e?e.value.trim():'';};
+  const model=g('tk_model'),part=g('tk_part'); if(!model||!part){toast('Modell und Teil sind Pflicht');return;}
+  const rec={id:id,model:model,part:part,quality:g('tk_qual'),ek:+g('tk_ek')||0,supplier:g('tk_sup'),artnr:g('tk_art'),stock:(g('tk_stock')===''?'':(+g('tk_stock')||0)),updated:today()};
+  ensureTeile(); const ex=S.teilekatalog.find(x=>x.id===id); if(ex)Object.assign(ex,rec); else S.teilekatalog.unshift(rec);
+  save(); closeAll(); views.teilekatalog(); paintIcons(); toast('Artikel gespeichert'); }
+function tkDel(id){ if(!confirm('Artikel löschen?'))return; S.teilekatalog=(S.teilekatalog||[]).filter(x=>x.id!==id); save(); views.teilekatalog(); paintIcons(); toast('Gelöscht'); }
+/* --- Import Preisliste (CSV) --- */
+let TKI=null;
+function tkImportOpen(){ TKI=null;
+  openModal(`<div class="dhead"><b style="flex:1">📥 Preisliste importieren</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+   <div class="dbody"><p class="muted" style="font-size:13px">CSV/Excel-Datei deines Lieferanten hochladen (oder Inhalt einfügen). Danach ordnest du die Spalten zu. Trennzeichen <b>;</b> oder <b>,</b> werden erkannt.</p>
+     <div class="row" style="gap:8px;margin-top:10px;flex-wrap:wrap"><label class="btn" style="cursor:pointer">Datei wählen (.csv)<input type="file" accept=".csv,text/csv,text/plain" style="display:none" onchange="tkImportFile(this)"></label></div>
+     <label class="f" style="margin-top:12px">…oder Inhalt einfügen</label>
+     <textarea class="in" id="tki_paste" rows="5" placeholder="Modell;Teil;Qualität;EK;Lieferant;Artikelnr&#10;iPhone 15 Pro;Display;Original;129;MeinLieferant;A123"></textarea>
+     <div class="row" style="margin-top:10px"><button class="btn pri" onclick="tkImportParse()">Weiter → Spalten zuordnen</button></div>
+     <div id="tki_map"></div>
+   </div>`);
+}
+function tkImportFile(inp){ const f=inp.files&&inp.files[0]; if(!f)return; const rd=new FileReader(); rd.onload=function(){ const ta=document.getElementById('tki_paste'); if(ta)ta.value=rd.result; tkImportParse(); }; rd.readAsText(f); }
+function _csvParse(text){ text=(text||'').replace(/\r/g,''); const lines=text.split('\n').filter(l=>l.trim()!==''); if(!lines.length)return {head:[],rows:[]};
+  const delim=(lines[0].split(';').length>=lines[0].split(',').length)?';':',';
+  const split=function(line){ const out=[]; let cur='',q=false; for(let i=0;i<line.length;i++){ const c=line[i]; if(q){ if(c==='"'){ if(line[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=c; } else { if(c==='"')q=true; else if(c===delim){out.push(cur);cur='';} else cur+=c; } } out.push(cur); return out.map(s=>s.trim()); };
+  const head=split(lines[0]); const rows=lines.slice(1).map(split); return {head:head,rows:rows}; }
+function tkImportParse(){ const text=(document.getElementById('tki_paste')||{}).value||''; const pd=_csvParse(text); if(!pd.head.length){toast('Keine Daten erkannt');return;}
+  TKI=pd; const fields=[['model','Modell'],['part','Teil'],['quality','Qualität'],['ek','EK / Einkaufspreis'],['supplier','Lieferant'],['artnr','Artikel-Nr.'],['stock','Bestand'],['','— ignorieren —']];
+  const guess=function(h){ h=h.toLowerCase(); if(/modell|model|gerät|device/.test(h))return 'model'; if(/teil|part|komponente|repair|reparatur/.test(h))return 'part'; if(/qual/.test(h))return 'quality'; if(/ek|einkauf|preis|price|cost|netto/.test(h))return 'ek'; if(/liefer|supplier|händler|vendor/.test(h))return 'supplier'; if(/art.*nr|artikel|sku|nummer/.test(h))return 'artnr'; if(/bestand|stock|menge|lager|qty/.test(h))return 'stock'; return ''; };
+  const mapUI=pd.head.map((h,ix)=>`<div class="row" style="align-items:center;gap:10px;margin-top:6px"><span style="flex:1;min-width:0"><b>${esc(h||('Spalte '+(ix+1)))}</b> <span class="muted" style="font-size:12px">${esc((pd.rows[0]||[])[ix]||'')}</span></span>
+    <select class="in" id="tki_col${ix}" style="max-width:200px">${fields.map(f=>`<option value="${f[0]}" ${guess(h)===f[0]?'selected':''}>${f[1]}</option>`).join('')}</select></div>`).join('');
+  document.getElementById('tki_map').innerHTML=`<div style="border-top:1px solid var(--line);margin-top:14px;padding-top:12px"><b>Spalten zuordnen</b><div class="muted" style="font-size:12px;margin-bottom:4px">${pd.rows.length} Zeilen erkannt.</div>${mapUI}
+    <label class="chk" style="margin-top:10px;display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" id="tki_upd" checked> Bestehende Artikel (gleiches Modell+Teil+Qualität) aktualisieren statt doppeln</label>
+    <div class="row" style="margin-top:12px"><button class="btn pri" onclick="tkImportRun()">Import starten (${pd.rows.length} Zeilen)</button></div></div>`;
+}
+function tkImportRun(){ if(!TKI){return;} const map={}; TKI.head.forEach((h,ix)=>{const sel=document.getElementById('tki_col'+ix);if(sel&&sel.value)map[sel.value]=ix;});
+  if(map.model===undefined||map.part===undefined||map.ek===undefined){toast('Bitte mindestens Modell, Teil und EK zuordnen');return;}
+  const upd=!!(document.getElementById('tki_upd')||{}).checked; ensureTeile(); let added=0,updated=0;
+  const num=function(v){ v=(v||'').toString().replace(/[^0-9,.\-]/g,'').replace(/\.(?=\d{3}(\D|$))/g,'').replace(',','.'); return +v||0; };
+  TKI.rows.forEach(r=>{ const model=(r[map.model]||'').trim(), part=(r[map.part]||'').trim(); if(!model||!part)return;
+    const rec={model:model,part:part,quality:(map.quality!==undefined?(r[map.quality]||'').trim():'')||'Original',ek:num(r[map.ek]),supplier:(map.supplier!==undefined?(r[map.supplier]||'').trim():''),artnr:(map.artnr!==undefined?(r[map.artnr]||'').trim():''),stock:(map.stock!==undefined?num(r[map.stock]):''),updated:today()};
+    let ex=upd?S.teilekatalog.find(x=>x.model.toLowerCase()===model.toLowerCase()&&x.part.toLowerCase()===part.toLowerCase()&&(x.quality||'').toLowerCase()===(rec.quality||'').toLowerCase()):null;
+    if(ex){Object.assign(ex,rec);updated++;} else {S.teilekatalog.unshift(Object.assign({id:uid('tk')},rec));added++;} });
+  save(); closeAll(); if(current==='teilekatalog')views.teilekatalog(); paintIcons(); toast('Import fertig: '+added+' neu, '+updated+' aktualisiert'); }
+
 views.lager=function(){
   ensureInv(); const m=document.getElementById('main');
   const tabBtn=(k,l)=>`<button class="chip ${lagerTab===k?'on':''}" onclick="lagerTab='${k}';views.lager();paintIcons()">${l}</button>`;
@@ -4285,7 +4440,7 @@ views.einstellungen=function(){
          ${u.id===S.userId?'':`<button class="btn sm gho" onclick="removeUser('${u.id}')">Entfernen</button>`}</div>`).join('')}
        <button class="btn" style="margin-top:12px" onclick="addUser()">Mitarbeiter anlegen</button>
        <label class="f" style="margin-top:16px">Mitarbeiter-Zugriff – welche Bereiche dürfen Mitarbeiter sehen?</label>
-       <div class="row" style="flex-wrap:wrap;gap:8px">${[['statistik','Statistik'],['buchhaltung','Buchhaltung'],['ankauf','Ankauf/Verkauf'],['einstellungen','Einstellungen'],['angebote','Angebote'],['versicherung','Versicherung'],['preise','Modelle & Preise'],['bestellungen','Bestellungen'],['lager','Lager']].map(v=>{const hidden=maHidden().indexOf(v[0])>=0;return `<button class="chip ${hidden?'':'on'}" onclick="toggleMaView('${v[0]}')">${v[1]} ${hidden?'✕':'✓'}</button>`;}).join('')}</div>
+       <div class="row" style="flex-wrap:wrap;gap:8px">${[['statistik','Statistik'],['buchhaltung','Buchhaltung'],['ankauf','Ankauf/Verkauf'],['einstellungen','Einstellungen'],['angebote','Angebote'],['versicherung','Versicherung'],['preise','Modelle & Preise'],['teilekatalog','Ersatzteilkatalog'],['bestellungen','Bestellungen'],['lager','Lager']].map(v=>{const hidden=maHidden().indexOf(v[0])>=0;return `<button class="chip ${hidden?'':'on'}" onclick="toggleMaView('${v[0]}')">${v[1]} ${hidden?'✕':'✓'}</button>`;}).join('')}</div>
        <div class="muted" style="font-size:12px;margin-top:6px">Grün = für Mitarbeiter sichtbar. Umsätze/Marge bleiben unabhängig davon der Geschäftsführung vorbehalten.</div>
      </div>
    </div>`;
