@@ -1562,7 +1562,7 @@ function noAnnahmeBlock(d,i){
     <div class="ztiles">${ztiles}${keinTile}</div>
     <textarea class="in" id="dev${i}_zubnote" rows="1" placeholder="Sonstiges Zubehör / Hinweise…" style="margin-top:8px">${esc(d.zubehoerNote||'')}</textarea>
     <label class="f" style="margin-top:14px">📷 Fotos bei Annahme (optional)</label>
-    <div class="zfotos">${thumbs}<label class="zfadd">＋ Foto<input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="noAddFoto(${i},this)"></label></div>
+    <div class="zfotos">${thumbs}<label class="zfadd">＋ Foto<input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="noAddFoto(${i},this)"></label>${DB.backend==='server'?`<button type="button" class="zfadd" onclick="noFotoQR(${i})" title="Mit dem Smartphone fotografieren – Fotos landen direkt hier">📱 Handy-Foto (QR)</button>`:''}</div>
   </div>`;
 }
 function noZustandSecToggle(i,key){noCollect();ZOPEN[i+'_'+key]=!ZOPEN[i+'_'+key];renderNewOrder();}
@@ -1777,6 +1777,39 @@ function noSignPollStart(token){ noSignPollStop(); __signPoll=setInterval(functi
 },2500); }
 function noSignPollStop(){ if(__signPoll){clearInterval(__signPoll);__signPoll=null;} }
 function noQRDone(){ noCollect(); NO.sig=makeSigStamp('Digital signiert · QR-Fernunterschrift'); NO.sigVia='qr-demo'; noSaveDraft(); closeAll(); renderNewOrder(); toast('QR-Unterschrift eingegangen'); }
+/* Fotos per Handy: QR am PC -> Handy öffnet /foto.html -> Fotos landen live im aktuellen Gerät */
+let __fotoPoll=null, __fotoPulled=0, __fotoDev=-1;
+function noFotoQR(i){ noCollect();
+  if(DB.backend!=='server'){ toast('Handy-Foto-Upload braucht die Server-Anbindung'); return; }
+  __fotoDev=i; __fotoPulled=(NO.devices[i]&&NO.devices[i].fotos?NO.devices[i].fotos.length:0);
+  openModal(`<div class="dhead"><b style="flex:1">Fotos per Handy</b><button class="btn sm gho" onclick="noFotoQRStop();closeAll();renderNewOrder()">Schließen</button></div><div class="dbody" style="text-align:center"><p class="muted">QR-Code wird erstellt…</p></div>`);
+  fetch(API+'/api/photo/create',{method:'POST',headers:DB._hdr()}).then(r=>r.json()).then(res=>{
+    if(!res.token)throw new Error(res.error||'Fehler beim Erstellen');
+    const url=location.origin+'/foto.html?t='+res.token;
+    openModal(`<div class="dhead"><b style="flex:1">Fotos per Handy aufnehmen</b><button class="btn sm gho" onclick="noFotoQRStop();closeAll();renderNewOrder()">Schließen</button></div>
+      <div class="dbody" style="text-align:center">
+        <p class="muted" style="font-size:13px">Scanne den QR-Code mit deinem <b>Smartphone</b> und fotografiere das Gerät – die Bilder erscheinen <b>sofort hier</b> und werden dem Auftrag hinzugefügt.</p>
+        <div style="display:flex;justify-content:center;margin:12px 0">${RQR.svg(url,{cell:5,margin:4})}</div>
+        <div class="mono" style="font-size:12px;word-break:break-all;color:var(--ink2)">${esc(url)}</div>
+        <div id="fotoStatus" class="note" style="margin-top:12px">⏳ Warte auf Fotos vom Handy…</div>
+        <div id="fotoRecv" class="zfotos" style="justify-content:center;margin-top:10px"></div>
+        <div class="row" style="margin-top:12px;justify-content:center"><button class="btn pri" onclick="noFotoQRStop();closeAll();renderNewOrder()">Fertig</button></div>
+      </div>`);
+    noFotoQRPoll(res.token);
+  }).catch(e=>{ openModal(`<div class="dhead"><b style="flex:1">Fehler</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div><div class="dbody"><div class="note">Konnte den Foto-Link nicht erstellen: ${esc(e.message||'Fehler')}</div></div>`); });
+}
+function noFotoQRPoll(token){ noFotoQRStop(); __fotoPoll=setInterval(function(){
+  fetch(API+'/api/photo/get?t='+encodeURIComponent(token),{headers:DB._hdr()}).then(r=>r.json()).then(res=>{
+    if(!res||!res.photos)return; const d=NO.devices[__fotoDev]; if(!d)return; d.fotos=d.fotos||[];
+    if(res.photos.length>__fotoPulled){
+      for(let k=__fotoPulled;k<res.photos.length;k++){ d.fotos.push({src:res.photos[k].src,ts:res.photos[k].ts||new Date().toISOString()}); }
+      __fotoPulled=res.photos.length; noSaveDraft();
+      const st=document.getElementById('fotoStatus'); if(st)st.innerHTML='✓ '+__fotoPulled+' Foto'+(__fotoPulled>1?'s':'')+' empfangen';
+      const rc=document.getElementById('fotoRecv'); if(rc)rc.innerHTML=(d.fotos||[]).map(f=>`<div class="zfoto"><img src="${f.src}" alt=""></div>`).join('');
+    }
+  }).catch(()=>{});
+},2500); }
+function noFotoQRStop(){ if(__fotoPoll){clearInterval(__fotoPoll);__fotoPoll=null;} }
 function noSignKiosk(){ noCollect(); const nm=(NO.vorname+' '+NO.nachname).trim()||'Kunde'; const ov=document.createElement('div'); ov.id='kioskOv';
   ov.style.cssText='position:fixed;inset:0;z-index:300;background:#0f2318;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;gap:18px';
   ov.innerHTML=`<div style="color:#fff;text-align:center"><div style="font-size:24px;font-weight:800">Bitte hier unterschreiben</div><div style="opacity:.75;font-size:14px;margin-top:4px">${esc(SHOP.name)} · Reparaturauftrag für ${esc(nm)}</div><div style="opacity:.6;font-size:12px;margin-top:2px">Mit der Unterschrift bestätige ich die Auftragserteilung und den Hinweis zur Datensicherung.</div></div>
@@ -5183,7 +5216,16 @@ function startApp(){
   if(DB.backend==='server'){
     var rt=''; try{ rt=new URLSearchParams(location.search).get('reset')||''; }catch(e){}
     if(rt){ _sbResetToken=rt; _sbMode='reset'; serverLoginOverlay(); return; }
-    if(DB.restoreSession()){ DB.hydrate().then(had=>finishServerBoot(had)).catch(()=>serverLoginOverlay('Bitte erneut anmelden.')); }
+    if(DB.restoreSession()){
+      var _tries=0;
+      var _boot=function(){ DB.hydrate().then(had=>finishServerBoot(had)).catch(function(){
+        /* Netzfehler (z. B. kurzer Server-Neustart) → mehrfach neu versuchen, solange der Token gültig ist.
+           Nur bei echtem 401 (Token weg) oder nach mehreren Fehlversuchen zur Anmeldung. */
+        if(DB.token && _tries<5){ _tries++; setTimeout(_boot, 1500*_tries); }
+        else { serverLoginOverlay(DB.token?'Verbindung unterbrochen – bitte erneut versuchen oder anmelden.':'Bitte erneut anmelden.'); }
+      }); };
+      _boot();
+    }
     else { serverLoginOverlay(); }
   } else { bootApp(); }
 }

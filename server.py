@@ -182,6 +182,9 @@ def init_db():
           token TEXT PRIMARY KEY, workshop_id TEXT, data TEXT,
           signature TEXT, consents TEXT, signed INTEGER DEFAULT 0,
           created REAL, expires REAL);
+        CREATE TABLE IF NOT EXISTS photo_sessions(
+          token TEXT PRIMARY KEY, workshop_id TEXT, photos TEXT,
+          created REAL, expires REAL);
         CREATE TABLE IF NOT EXISTS intake_sessions(
           token TEXT PRIMARY KEY, workshop_id TEXT, herkunft TEXT,
           workshop_name TEXT, workshop_tel TEXT, data TEXT,
@@ -825,6 +828,23 @@ class H(BaseHTTPRequestHandler):
             return self._send(200, {"ok": True, "data": json.loads(row["data"]), "signed": bool(row["signed"]),
                                     "signature": row["signature"] or "",
                                     "consents": json.loads(row["consents"]) if row["consents"] else None})
+        if self.path.startswith("/api/photo/get"):
+            # Werkstatt (eingeloggt) pollt die vom Handy hochgeladenen Fotos ab.
+            p = self._auth()
+            if not p:
+                return self._send(401, {"error": "unauthorized"})
+            q = parse_qs(urlparse(self.path).query)
+            tok = (q.get("t") or [""])[0]
+            now = time.time()
+            with db() as c:
+                row = c.execute("SELECT workshop_id,photos,expires FROM photo_sessions WHERE token=?", (tok,)).fetchone()
+            if not row or (row["expires"] or 0) < now or row["workshop_id"] != p["wid"]:
+                return self._send(404, {"error": "Foto-Link ungueltig oder abgelaufen"})
+            try:
+                arr = json.loads(row["photos"] or "[]")
+            except Exception:
+                arr = []
+            return self._send(200, {"ok": True, "photos": arr, "count": len(arr)})
         if self.path.startswith("/api/intake/get"):
             # Öffentlich: Kunde öffnet Vorab-Auftragsformular per Token.
             q = parse_qs(urlparse(self.path).query)
@@ -1265,6 +1285,42 @@ class H(BaseHTTPRequestHandler):
                 c.execute("UPDATE sign_sessions SET signature=?,consents=?,signed=1 WHERE token=?",
                           (sig, json.dumps(consents), tok))
             return self._send(200, {"ok": True})
+
+        if self.path == "/api/photo/create":
+            # Werkstatt (eingeloggt) legt eine Foto-Session an -> Token für QR-Link ans Handy.
+            p = self._auth()
+            if not p:
+                return self._send(401, {"error": "unauthorized"})
+            tok = uid("f")
+            now = time.time(); exp = now + 60 * 60
+            with _lock, db() as c:
+                c.execute("DELETE FROM photo_sessions WHERE expires<?", (now,))
+                c.execute("INSERT INTO photo_sessions(token,workshop_id,photos,created,expires) VALUES(?,?,?,?,?)",
+                          (tok, p["wid"], json.dumps([]), now, exp))
+            return self._send(200, {"token": tok})
+
+        if self.path == "/api/photo/add":
+            # Öffentlich: Handy lädt ein Foto (Data-URL, JPEG) zum Token hoch.
+            tok = body.get("t") or ""
+            photo = body.get("photo") or ""
+            if not tok or not photo:
+                return self._send(400, {"error": "Token/Foto fehlt"})
+            if not photo.startswith("data:image/") or len(photo) > 8 * 1024 * 1024:
+                return self._send(413, {"error": "Foto ungueltig oder zu gross"})
+            now = time.time()
+            with _lock, db() as c:
+                row = c.execute("SELECT photos,expires FROM photo_sessions WHERE token=?", (tok,)).fetchone()
+                if not row or (row["expires"] or 0) < now:
+                    return self._send(404, {"error": "Foto-Link ungueltig oder abgelaufen"})
+                try:
+                    arr = json.loads(row["photos"] or "[]")
+                except Exception:
+                    arr = []
+                if len(arr) >= 30:
+                    return self._send(413, {"error": "Zu viele Fotos"})
+                arr.append({"src": photo, "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())})
+                c.execute("UPDATE photo_sessions SET photos=? WHERE token=?", (json.dumps(arr), tok))
+            return self._send(200, {"ok": True, "count": len(arr)})
 
         if self.path == "/api/intake/create":
             # Werkstatt erzeugt Vorab-Auftrags-Link (mit Herkunft Telefon/E-Mail/Online).
