@@ -860,7 +860,7 @@ function refreshBadges(){
   const bs=document.getElementById('bg-ship'); if(bs){const n=(S.shipments||[]).filter(s=>['transit_in','received','repair'].includes(s.status)).length; bs.textContent=n; bs.style.display=n?'':'none';}
   const bv=document.getElementById('bg-vert'); if(bv){const n=(S.contracts||[]).reduce((a,c)=>a+(c.bills||[]).filter(b=>b.status!=='bezahlt').length,0); bv.textContent=n; bv.style.display=n?'':'none';}
   const _pfu=(typeof pfUnread==='function')?pfUnread():0; const bp=document.getElementById('bg-postfach'); if(bp){bp.textContent=_pfu; bp.style.display=_pfu?'':'none';}
-  const bn=document.getElementById('bg-notif'); if(bn){const n=_pfu+((S.requests||[]).length)+((S.feedback||[]).length)+((S.warrantyClaims||[]).length)+(typeof uncollectedOrders==='function'?uncollectedOrders().length:0)+((S.drafts||[]).length); bn.textContent=n; bn.style.display=n?'':'none';}
+  const bn=document.getElementById('bg-notif'); if(bn){bn.textContent=_pfu; bn.style.display=_pfu?'':'none';}
 }
 
 /* ---- KI-Tagesbriefing / Chef-Cockpit (L16) ---- */
