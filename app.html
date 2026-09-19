@@ -1781,7 +1781,7 @@ function noQRDone(){ noCollect(); NO.sig=makeSigStamp('Digital signiert · QR-Fe
 let __fotoPoll=null, __fotoPulled=0, __fotoDev=-1;
 function noFotoQR(i){ noCollect();
   if(DB.backend!=='server'){ toast('Handy-Foto-Upload braucht die Server-Anbindung'); return; }
-  __fotoDev=i; __fotoPulled=(NO.devices[i]&&NO.devices[i].fotos?NO.devices[i].fotos.length:0);
+  __fotoDev=i; __fotoPulled=0; /* zählt Fotos aus der NEUEN Server-Session (startet leer), unabhängig von schon vorhandenen Geräte-Fotos */
   openModal(`<div class="dhead"><b style="flex:1">Fotos per Handy</b><button class="btn sm gho" onclick="noFotoQRStop();closeAll();renderNewOrder()">Schließen</button></div><div class="dbody" style="text-align:center"><p class="muted">QR-Code wird erstellt…</p></div>`);
   fetch(API+'/api/photo/create',{method:'POST',headers:DB._hdr()}).then(r=>r.json()).then(res=>{
     if(!res.token)throw new Error(res.error||'Fehler beim Erstellen');
@@ -1804,11 +1804,12 @@ function noFotoQRPoll(token){ noFotoQRStop(); __fotoPoll=setInterval(function(){
     if(res.photos.length>__fotoPulled){
       for(let k=__fotoPulled;k<res.photos.length;k++){ d.fotos.push({src:res.photos[k].src,ts:res.photos[k].ts||new Date().toISOString()}); }
       __fotoPulled=res.photos.length; noSaveDraft();
-      const st=document.getElementById('fotoStatus'); if(st)st.innerHTML='✓ '+__fotoPulled+' Foto'+(__fotoPulled>1?'s':'')+' empfangen';
+      const st=document.getElementById('fotoStatus'); if(st)st.innerHTML='✓ '+__fotoPulled+' Foto'+(__fotoPulled>1?'s':'')+' empfangen – im Auftrag gespeichert';
       const rc=document.getElementById('fotoRecv'); if(rc)rc.innerHTML=(d.fotos||[]).map(f=>`<div class="zfoto"><img src="${f.src}" alt=""></div>`).join('');
+      toast('📷 '+__fotoPulled+' Foto'+(__fotoPulled>1?'s':'')+' vom Handy erhalten');
     }
   }).catch(()=>{});
-},2500); }
+},1500); }
 function noFotoQRStop(){ if(__fotoPoll){clearInterval(__fotoPoll);__fotoPoll=null;} }
 function noSignKiosk(){ noCollect(); const nm=(NO.vorname+' '+NO.nachname).trim()||'Kunde'; const ov=document.createElement('div'); ov.id='kioskOv';
   ov.style.cssText='position:fixed;inset:0;z-index:300;background:#0f2318;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;gap:18px';

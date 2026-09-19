@@ -15,17 +15,17 @@ html,body{margin:0;background:#eef2ef;color:var(--ink);font-family:-apple-system
 .head h1{margin:0;font-size:19px}.head p{margin:4px 0 0;opacity:.9;font-size:13px}
 h2{font-size:15px;margin:0 0 8px}
 .muted{color:var(--ink2)}.sm{font-size:13px}.xs{font-size:12px}
-.btn{display:block;width:100%;border:0;border-radius:12px;padding:16px;font-size:17px;font-weight:700;cursor:pointer;text-align:center}
+.btn{display:block;width:100%;border:0;border-radius:12px;padding:16px;font-size:17px;font-weight:700;cursor:pointer;text-align:center;margin-top:12px}
 .btn.pri{background:var(--acc);color:#fff}.btn.pri:disabled{background:#a9c9b4;cursor:not-allowed}
+.btn.gho{background:transparent;border:1px solid var(--line);color:var(--ink);font-size:15px}
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
-.grid .th{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--soft)}
-.grid .th img{width:100%;height:100%;object-fit:cover;display:block}
-.grid .th .ok{position:absolute;right:4px;bottom:4px;background:var(--acc);color:#fff;border-radius:20px;font-size:11px;padding:1px 6px}
-.grid .th.up{opacity:.55}
+.th{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--soft)}
+.th img{width:100%;height:100%;object-fit:cover;display:block}
+.th .x{position:absolute;right:4px;top:4px;background:rgba(0,0,0,.6);color:#fff;border-radius:20px;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer}
 .err{background:#fdecea;color:#8a1c13;border:1px solid #f5c6c2;border-radius:10px;padding:12px;font-size:14px;margin-top:14px}
-.count{background:#e9f5ec;color:#0f7a37;border-radius:10px;padding:10px;font-size:14px;font-weight:700;text-align:center;margin-top:12px}
-.foot{text-align:center;color:var(--ink2);font-size:11px;margin-top:22px}
+.ok{text-align:center;padding:26px 10px}.ok .big{font-size:56px}
 .hint{background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:13px;color:#41504a;line-height:1.5;margin-top:12px}
+.foot{text-align:center;color:var(--ink2);font-size:11px;margin-top:22px}
 </style>
 </head>
 <body>
@@ -34,55 +34,72 @@ h2{font-size:15px;margin:0 0 8px}
 function $(id){return document.getElementById(id);}
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function token(){var m=location.search.match(/[?&]t=([^&]+)/);return m?decodeURIComponent(m[1]):'';}
-var T=token(), COUNT=0, THUMBS=[];
+var T=token(), STAGED=[], SENT=0, sending=false;
 
 function screenError(msg){ $('app').innerHTML='<div class="head"><h1>Fotos zur Annahme</h1></div><div class="card"><div class="err">'+esc(msg)+'</div><p class="muted sm" style="margin-top:12px">Bitte scannen Sie den QR-Code am PC erneut.</p></div>'; }
 
 function render(){
   $('app').innerHTML=
-   '<div class="head"><h1>Fotos zur Geräteannahme</h1><p>Mit diesem Handy fotografieren – die Bilder erscheinen sofort am PC.</p></div>'+
+   '<div class="head"><h1>Fotos zur Geräteannahme</h1><p>Fotografieren, prüfen und mit einem Tipp an den PC senden.</p></div>'+
    '<div class="card">'+
-     '<label class="btn pri" for="fileIn">📷 Foto aufnehmen / auswählen</label>'+
+     '<label class="btn pri" for="fileIn">📷 Foto aufnehmen</label>'+
      '<input id="fileIn" type="file" accept="image/*" capture="environment" multiple style="display:none">'+
-     '<div class="hint">Tipp: Du kannst mehrere Fotos nacheinander machen. Jedes Foto wird automatisch hochgeladen und erscheint direkt am PC im Auftrag.</div>'+
-     '<div id="count"></div>'+
+     (SENT?'<div class="hint">✓ Bereits '+SENT+' Foto'+(SENT>1?'s':'')+' gesendet. Du kannst weitere aufnehmen.</div>':'<div class="hint">Tipp: Mehrere Fotos nacheinander aufnehmen. Erst am Ende auf „Fotos senden" tippen – dann erscheinen sie sofort am PC.</div>')+
      '<div class="grid" id="grid"></div>'+
+     '<div id="errbox"></div>'+
+     '<button class="btn pri" id="sendBtn" style="display:none" onclick="sendAll()"></button>'+
    '</div>'+
-   '<div id="errbox"></div>'+
    '<div class="foot">Sichere Übertragung · Velqio</div>';
   $('fileIn').addEventListener('change',onPick);
-  updCount();
+  drawStaged();
 }
-function updCount(){ $('count').innerHTML = COUNT? '<div class="count">✓ '+COUNT+' Foto'+(COUNT>1?'s':'')+' hochgeladen</div>' : ''; }
-function drawGrid(){ $('grid').innerHTML=THUMBS.map(function(t){return '<div class="th'+(t.up?' up':'')+'"><img src="'+t.src+'">'+(t.up?'':'<span class="ok">✓</span>')+'</div>';}).join(''); }
+function drawStaged(){
+  var g=$('grid'); if(!g)return;
+  g.innerHTML=STAGED.map(function(src,i){return '<div class="th"><img src="'+src+'"><span class="x" onclick="delStaged('+i+')">✕</span></div>';}).join('');
+  var b=$('sendBtn'); if(b){ if(STAGED.length){ b.style.display='block'; b.disabled=sending; b.textContent=sending?'Wird gesendet…':('✓ '+STAGED.length+' Foto'+(STAGED.length>1?'s':'')+' senden'); } else { b.style.display='none'; } }
+}
+function delStaged(i){ if(sending)return; STAGED.splice(i,1); drawStaged(); }
 
 function toJpeg(file,cb){
   var rd=new FileReader();
   rd.onload=function(){ var im=new Image(); im.onload=function(){
-    var max=1400, w=im.width, h=im.height;
+    var max=1400, w=im.width||1024, h=im.height||1024;
     if(w>=h&&w>max){h=Math.round(h*max/w);w=max;} else if(h>w&&h>max){w=Math.round(w*max/h);h=max;}
     var cv=document.createElement('canvas'); cv.width=w; cv.height=h;
     var cx=cv.getContext('2d'); cx.fillStyle='#fff'; cx.fillRect(0,0,w,h); cx.drawImage(im,0,0,w,h);
-    cb(cv.toDataURL('image/jpeg',0.85));
+    try{ cb(cv.toDataURL('image/jpeg',0.85)); }catch(e){ cb(null); }
   }; im.onerror=function(){cb(null);}; im.src=rd.result; };
   rd.onerror=function(){cb(null);};
   rd.readAsDataURL(file);
 }
-
 function onPick(e){
-  var files=Array.prototype.slice.call(e.target.files||[]); if(!files.length)return;
-  e.target.value='';
-  files.forEach(function(f){
-    toJpeg(f,function(j){
-      if(!j){ return; }
-      var idx=THUMBS.length; THUMBS.push({src:j,up:true}); drawGrid();
-      fetch('/api/photo/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({t:T,photo:j})})
-        .then(function(r){return r.json();}).then(function(res){
-          if(res&&res.ok){ THUMBS[idx].up=false; COUNT=res.count||(COUNT+1); drawGrid(); updCount(); }
-          else { THUMBS.splice(idx,1); drawGrid(); $('errbox').innerHTML='<div class="err">'+esc((res&&res.error)||'Foto konnte nicht gesendet werden.')+'</div>'; }
-        }).catch(function(){ THUMBS[idx]&&(THUMBS.splice(idx,1)); drawGrid(); $('errbox').innerHTML='<div class="err">Verbindungsproblem – bitte erneut versuchen.</div>'; });
-    });
-  });
+  var files=Array.prototype.slice.call(e.target.files||[]); e.target.value=''; if(!files.length)return;
+  var pend=files.length;
+  files.forEach(function(f){ toJpeg(f,function(j){ if(j)STAGED.push(j); if(--pend===0)drawStaged(); }); });
+}
+
+function sendAll(){
+  if(sending||!STAGED.length)return;
+  sending=true; drawStaged(); $('errbox').innerHTML='';
+  var queue=STAGED.slice(), okCount=0;
+  var next=function(){
+    if(!queue.length){ SENT+=okCount; STAGED=[]; sending=false; return screenDone(okCount); }
+    var photo=queue.shift();
+    fetch('/api/photo/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({t:T,photo:photo})})
+      .then(function(r){return r.json();}).then(function(res){
+        if(res&&res.ok){ okCount++; next(); }
+        else { sending=false; drawStaged(); $('errbox').innerHTML='<div class="err">'+esc((res&&res.error)||'Foto konnte nicht gesendet werden.')+'</div>'; }
+      }).catch(function(){ sending=false; drawStaged(); $('errbox').innerHTML='<div class="err">Verbindungsproblem – bitte erneut auf „Fotos senden" tippen.</div>'; });
+  };
+  next();
+}
+
+function screenDone(n){
+  $('app').innerHTML='<div class="head"><h1>Fotos zur Geräteannahme</h1></div>'+
+   '<div class="card ok"><div class="big">✅</div><h2 style="font-size:19px">'+n+' Foto'+(n>1?'s':'')+' gesendet</h2>'+
+   '<p class="muted">Die Fotos erscheinen jetzt am PC direkt im Auftrag. Du kannst dieses Fenster schließen – oder weitere Fotos aufnehmen.</p>'+
+   '<button class="btn pri" onclick="render()">📷 Weitere Fotos</button></div>'+
+   '<div class="foot">Sichere Übertragung · Velqio</div>';
 }
 
 if(!T){ screenError('Kein gültiger Foto-Link. Bitte scannen Sie den QR-Code am PC.'); }
