@@ -2647,10 +2647,11 @@ function printKVA(id){const o=S.ord.find(x=>x.id===id);const c=cust(o.cid);
 /* Kalender-Sync (Repender-Punkt) – Google/Apple/Outlook 2-Wege simuliert; .ics-Export ist ECHT funktionsfähig. */
 const CAL_PROVIDERS=[['google','Google Kalender','G'],['apple','Apple Kalender','A'],['outlook','Outlook','O']];
 function ensureCalSync(){ if(!S.calSync){S.calSync={google:{connected:false,dir:'both'},apple:{connected:false,dir:'both'},outlook:{connected:false,dir:'both'},lastSync:''};save();} return S.calSync; }
-function calSyncConnect(p){const cs=ensureCalSync();cs[p].connected=true;cs.lastSync=today();save();views.kalender();paintIcons();toast(CAL_PROVIDERS.find(x=>x[0]===p)[1]+' verbunden – Termine werden abgeglichen');}
-function calSyncDisconnect(p){const cs=ensureCalSync();cs[p].connected=false;save();views.kalender();paintIcons();toast(CAL_PROVIDERS.find(x=>x[0]===p)[1]+' getrennt');}
-function calSyncDir(p,d){const cs=ensureCalSync();cs[p].dir=d;save();views.kalender();paintIcons();}
-function calSyncNow(){const cs=ensureCalSync();const conn=CAL_PROVIDERS.filter(x=>cs[x[0]].connected);if(!conn.length){toast('Kein Kalender verbunden');return;}cs.lastSync=today();const n=visibleOrders().filter(o=>o.appt).length;save();views.kalender();paintIcons();toast(n+' Termine synchronisiert ('+conn.map(x=>x[1]).join(', ')+')');}
+function _calRefresh(){(views[current]||views.kalender)();paintIcons();}
+function calSyncConnect(p){const cs=ensureCalSync();cs[p].connected=true;cs.lastSync=today();save();_calRefresh();toast(CAL_PROVIDERS.find(x=>x[0]===p)[1]+' verbunden – Termine werden abgeglichen');}
+function calSyncDisconnect(p){const cs=ensureCalSync();cs[p].connected=false;save();_calRefresh();toast(CAL_PROVIDERS.find(x=>x[0]===p)[1]+' getrennt');}
+function calSyncDir(p,d){const cs=ensureCalSync();cs[p].dir=d;save();_calRefresh();}
+function calSyncNow(){const cs=ensureCalSync();const conn=CAL_PROVIDERS.filter(x=>cs[x[0]].connected);if(!conn.length){toast('Kein Kalender verbunden');return;}cs.lastSync=today();const n=visibleOrders().filter(o=>o.appt).length;save();_calRefresh();toast(n+' Termine synchronisiert ('+conn.map(x=>x[1]).join(', ')+')');}
 function calICS(){ const pad=n=>String(n).padStart(2,'0'); const now=new Date();
   const stamp=now.getUTCFullYear()+pad(now.getUTCMonth()+1)+pad(now.getUTCDate())+'T'+pad(now.getUTCHours())+pad(now.getUTCMinutes())+pad(now.getUTCSeconds())+'Z';
   const ev=visibleOrders().filter(o=>o.appt).map(o=>{const c=cust(o.cid);let dtstart,dtend;
@@ -2810,7 +2811,7 @@ views.kalender=function(){
      <div class="grid" style="grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:8px">${['Mo','Di','Mi','Do','Fr','Sa','So'].map(d=>`<div class="muted" style="font-size:12px;font-weight:700;text-align:center">${d}</div>`).join('')}</div>
      <div class="grid" style="grid-template-columns:repeat(7,1fr);gap:6px">${cells}</div>
    </div>
-   ${calSyncCard()}`;
+   <div class="note" style="margin-top:12px">📅 Kalender mit Google, Apple &amp; Outlook verbinden bzw. exportieren: <a onclick="go('einstellungen');setTimeout(function(){esTab('komm');},30)" style="color:var(--green,#34a24a);cursor:pointer;font-weight:700">Einstellungen → Kommunikation → Kalender-Synchronisierung</a>.</div>`;
 };
 
 /* ============================ KUNDEN ============================ */
@@ -4059,7 +4060,7 @@ views.statistik=function(){
 let setTab=(function(){try{return localStorage.getItem('rep_settab')||'betrieb';}catch(e){return 'betrieb';}})();
 const ES_TABS=[['betrieb','🏢 Betrieb'],['belege','🧾 Aufträge & Belege'],['komm','✉️ Kommunikation'],['kasse','💳 Kasse & Buchhaltung'],['hardware','🖨️ Geräte & Hardware']];
 /* Karten den Reitern zuordnen (Titel enthält Schlüssel → Kategorie) */
-const ES_CATMAP={'Werkstatt-Account':'betrieb','Stammdaten':'betrieb','Benutzer':'betrieb','Systemeinstellungen':'belege','Automatisierungen':'belege','Garantie':'belege','Kasse anbinden':'kasse','TSE-Anbindung':'kasse','Buchhaltung':'kasse','Integrationen':'kasse','Kundenkommunikation':'komm','Benachrichtigungen':'komm','WhatsApp-Vorlagen':'komm','Website anbinden':'komm','Empfangskraft':'komm','Etikettendruck':'hardware','Hardware':'hardware','Geräteversicher':'hardware'};
+const ES_CATMAP={'Werkstatt-Account':'betrieb','Stammdaten':'betrieb','Benutzer':'betrieb','Systemeinstellungen':'belege','Automatisierungen':'belege','Garantie':'belege','Kasse anbinden':'kasse','TSE-Anbindung':'kasse','Buchhaltung':'kasse','Integrationen':'kasse','Kundenkommunikation':'komm','Benachrichtigungen':'komm','WhatsApp-Vorlagen':'komm','Website anbinden':'komm','Empfangskraft':'komm','Kalender-Synchronisierung':'komm','Etikettendruck':'hardware','Hardware':'hardware','Geräteversicher':'hardware'};
 function esApplyTab(){ document.querySelectorAll('#main .card').forEach(function(card){ if(card.parentElement&&card.parentElement.closest('.card'))return; const b=card.querySelector('b'); const title=(b?b.textContent:'').trim(); let cat=null; for(const k in ES_CATMAP){ if(title.indexOf(k)>=0){cat=ES_CATMAP[k];break;} } if(cat){ card.style.display=(cat===setTab)?'':'none'; } }); }
 function esTab(t){ setTab=t; try{localStorage.setItem('rep_settab',t);}catch(e){} document.querySelectorAll('#esTabs .estab').forEach(function(c){c.classList.toggle('on',c.dataset.t===t);}); esApplyTab(); window.scrollTo(0,0); }
 views.einstellungen=function(){
@@ -4143,6 +4144,7 @@ views.einstellungen=function(){
        <div style="border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--soft)"><iframe src="${esc(linkFull)}&embed=1" style="width:100%;height:560px;border:0" title="Vorschau"></iframe></div>
        <div class="note" style="margin-top:12px">Eingehende Anfragen erscheinen unter <b>Angebote</b> („Anfragen von der Website") und im Benachrichtigungs-Zähler oben – 1 Klick macht daraus ein Angebot oder einen Auftrag.</div>`)}
      </div>`;})()}
+     ${calSyncCard()}
      ${(function(){ if(DB.backend!=='server'){ return `<div class="card"><b>📞 KI-Telefon-Empfangskraft</b><p class="muted" style="font-size:13px;margin-top:6px">Nur im Online-Betrieb verfügbar. Der Bot nimmt Anrufe entgegen, beantwortet Fragen (Öffnungszeiten, Adresse, Reparatur-Status) und nimmt Rückrufbitten auf.</p></div>`; }
        const vc=voiceCfg(); if(!vc){ voiceLoad(); return `<div class="card"><b>📞 KI-Telefon-Empfangskraft</b><p class="muted" style="font-size:13px;margin-top:6px">Wird geladen…</p></div>`; }
        const p=vc.profile||{}; const on=!!p.enabled;
