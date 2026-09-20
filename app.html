@@ -3295,12 +3295,18 @@ function tkImportRun(){ if(!TKI){return;} const map={}; TKI.head.forEach((h,ix)=
 
 /* --- Lieferanten-Anbindung (PreisCheck-Kataloge – wie repairOS: ASWO/Faro/Foneday/MobileSentrix/Smartpart4u/Utopya) --- */
 const PARTS_SUPPLIERS=[
- {id:'foneday',name:'Foneday',tags:['Mobile Parts','Werkzeuge'],site:'https://foneday.shop',desc:'Europäischer One-Stop-Parts-Supplier für Smartphone-/Tablet-Teile (echte API).'},
- {id:'aswo',name:'ASWO',tags:['Originalteile','IT & Smartphone'],site:'https://www.aswo.com',desc:'Herstellerübergreifender B2B-Katalog für Original- und Zubehörteile.'},
- {id:'faro',name:'Faro',tags:['Mobilfunk','Reparaturbedarf'],site:'',desc:'360°-Distribution für Mobilfunk, Zubehör und Reparaturprodukte.'},
- {id:'mobilesentrix',name:'MobileSentrix',tags:['Displays & Akkus','Genuine Parts'],site:'https://www.mobilesentrix.eu',desc:'Displays, Akkus, Kleinteile, Werkzeug und Zubehör.'},
- {id:'smartpart4u',name:'Smartpart4u',tags:['Smartphone & MacBook','Werkstattbedarf'],site:'https://www.smartpart4u.de',desc:'Smartphone-/MacBook-Ersatzteile, Werkstatt- und Refurbishing-Bedarf.'},
- {id:'utopya',name:'Utopya',tags:['Qualitätsvarianten','Großhandel'],site:'https://www.utopya.de',desc:'Europäischer Großhandel für mobile Ersatzteile.'}
+ {id:'foneday',name:'Foneday',tags:['Mobile Parts','Werkzeuge'],site:'https://foneday.shop',desc:'Europäischer One-Stop-Parts-Supplier für Smartphone-/Tablet-Teile (echte API).',
+  guide:['Bei Foneday im Händlerkonto einloggen (Website ↗).','API-Zugang anfordern – Foneday bietet eine Produkt-API (Konto-Einstellungen oder Support/Account-Manager).','Den erhaltenen API-Key unten einfügen und „Speichern".']},
+ {id:'aswo',name:'ASWO',tags:['Originalteile','IT & Smartphone'],site:'https://www.aswo.com',desc:'Herstellerübergreifender B2B-Katalog für Original- und Zubehörteile.',
+  guide:['Bei ASWO im B2B-Konto einloggen.','Webservice-/API-Zugang beim ASWO-Ansprechpartner anfragen.','API-Zugangsschlüssel unten einfügen und „Speichern".']},
+ {id:'faro',name:'Faro',tags:['Mobilfunk','Reparaturbedarf'],site:'',desc:'360°-Distribution für Mobilfunk, Zubehör und Reparaturprodukte.',
+  guide:['Bei Faro im Händlerkonto einloggen.','API-/Datenschnittstelle über deinen Faro-Ansprechpartner anfordern.','Zugangsschlüssel unten einfügen und „Speichern".']},
+ {id:'mobilesentrix',name:'MobileSentrix',tags:['Displays & Akkus','Genuine Parts'],site:'https://www.mobilesentrix.eu',desc:'Displays, Akkus, Kleinteile, Werkzeug und Zubehör.',
+  guide:['Bei MobileSentrix (EU) im Konto einloggen.','API-Zugang über Account/Support anfragen.','API-Key unten einfügen und „Speichern".']},
+ {id:'smartpart4u',name:'Smartpart4u',tags:['Smartphone & MacBook','Werkstattbedarf'],site:'https://www.smartpart4u.de',desc:'Smartphone-/MacBook-Ersatzteile, Werkstatt- und Refurbishing-Bedarf.',
+  guide:['Bei Smartpart4u im Händlerkonto einloggen.','API-/Exportzugang über den Support anfragen.','Zugangsschlüssel unten einfügen und „Speichern".']},
+ {id:'utopya',name:'Utopya',tags:['Qualitätsvarianten','Großhandel'],site:'https://www.utopya.de',desc:'Europäischer Großhandel für mobile Ersatzteile.',
+  guide:['Bei Utopya im B2B-Konto einloggen.','API-/Schnittstellenzugang beim Utopya-Account-Manager anfragen.','API-Key unten einfügen und „Speichern".']}
 ];
 let __partsConn={};
 function partsSupLoad(){ if(DB.backend!=='server')return; fetch(API+'/api/parts/suppliers',{headers:DB._hdr()}).then(r=>r.json()).then(res=>{ if(res&&res.connected){ __partsConn=res.connected; if(current==='teilekatalog'){const el=document.getElementById('tkSupCard'); if(el)el.innerHTML=tkSupHtml();} } }).catch(()=>{}); }
@@ -3318,11 +3324,18 @@ function tkSupHtml(){ const server=DB.backend==='server';
       </div></div>`;}).join('')}</div>
     <div class="note" style="margin-top:10px">Foneday hat eine echte API (EK/Bestand je Modell). Bei den anderen greift – solange keine API hinterlegt ist – der <b>CSV-Preislisten-Import</b>. Preise/Bestände hängen vom jeweiligen Händlerkonto ab.</div>`;
 }
-function partsConnect(sid,name){ openModal(`<div class="dhead"><b style="flex:1">${esc(name)} verbinden</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
-   <div class="dbody"><p class="muted" style="font-size:13px">API-Key aus deinem ${esc(name)}-Händlerkonto eingeben. Der Schlüssel wird <b>nur auf dem Server</b> gespeichert und nie angezeigt.</p>
-     <label class="f" style="margin-top:8px">API-Key</label><input class="in" id="ps_key" type="password" placeholder="••••••••••••" autocomplete="off">
+function partsConnect(sid,name){ const s=PARTS_SUPPLIERS.find(x=>x.id===sid)||{name:name,guide:[],site:''};
+  const steps=(s.guide||[]).map((g,ix)=>`<div class="row" style="align-items:flex-start;gap:10px;margin-top:8px"><span style="flex:none;width:22px;height:22px;border-radius:50%;background:var(--green,#0e7a3c);color:#fff;display:grid;place-items:center;font-size:12px;font-weight:800">${ix+1}</span><span style="flex:1;font-size:13px;line-height:1.5">${esc(g)}</span></div>`).join('');
+  openModal(`<div class="dhead"><b style="flex:1">${esc(s.name)} verbinden</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+   <div class="dbody">
+     <div style="background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:12px 14px">
+       <b style="font-size:13px">So bekommst du deinen API-Zugang</b>${steps}
+       ${s.site?`<div style="margin-top:10px"><a class="btn sm" href="${s.site}" target="_blank" rel="noopener">${esc(s.name)}-Konto öffnen ↗</a></div>`:''}
+     </div>
+     <label class="f" style="margin-top:14px">API-Key</label><input class="in" id="ps_key" type="password" placeholder="••••••••••••" autocomplete="off">
+     <div class="muted" style="font-size:11px;margin-top:6px">Der Schlüssel wird <b>nur auf dem Server</b> gespeichert und nie angezeigt.</div>
      <div class="row" style="margin-top:14px;justify-content:flex-end;gap:8px"><button class="btn gho" onclick="closeAll()">Abbrechen</button><button class="btn pri" onclick="partsSaveKey('${sid}')">Speichern</button></div>
-     <div class="note" style="margin-top:10px">Noch keinen API-Zugang? Fordere ihn bei ${esc(name)} an (Händlerkonto → API/Schnittstelle). Bis dahin Preisliste als CSV importieren.</div></div>`); }
+     <div class="note" style="margin-top:10px">Kein API-Zugang möglich? <b>Preisliste als CSV importieren</b> – funktioniert immer.</div></div>`); }
 function partsSaveKey(sid){ const k=((document.getElementById('ps_key')||{}).value||'').trim(); if(!k){toast('Bitte API-Key eingeben');return;}
   fetch(API+'/api/parts/supplier',{method:'POST',headers:DB._hdr(),body:JSON.stringify({supplier:sid,apiKey:k})}).then(r=>r.json()).then(res=>{ if(res&&res.ok){ __partsConn[sid]=true; closeAll(); if(current==='teilekatalog')views.teilekatalog(); paintIcons(); toast('Verbunden – Schlüssel gespeichert'); } else toast('Speichern fehlgeschlagen'); }).catch(()=>toast('Keine Verbindung')); }
 function partsDisconnect(sid){ if(!confirm('Verbindung trennen und Schlüssel entfernen?'))return; fetch(API+'/api/parts/supplier',{method:'POST',headers:DB._hdr(),body:JSON.stringify({supplier:sid,clear:true})}).then(r=>r.json()).then(()=>{ delete __partsConn[sid]; if(current==='teilekatalog')views.teilekatalog(); paintIcons(); toast('Getrennt'); }).catch(()=>{}); }
