@@ -3221,10 +3221,11 @@ views.teilekatalog=function(){ const m=document.getElementById('main'); ensureTe
      <div><label class="f">Preis-Rundung</label><select class="in" onchange="pcSet().round=this.value;save()">${[['0.90','auf ,90'],['0.99','auf ,99'],['1','auf volle €'],['none','exakt']].map(o=>`<option value="${o[0]}" ${s.round===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select></div>
      <div class="integ" style="justify-content:space-between"><div><b>MwSt (19 %) aufschlagen</b><div class="muted" style="font-size:12px">Kundenpreis brutto</div></div><button class="switch ${s.vat?'on':''}" onclick="pcSet().vat=!pcSet().vat;save();views.teilekatalog();paintIcons()"><i></i></button></div>
    </div></div>
+   <div class="card" style="margin-top:16px" id="tkSupCard">${tkSupHtml()}</div>
    <div class="row" style="margin:14px 0"><input class="in" placeholder="Suche: Modell, Teil, Qualität, Lieferant, Art.-Nr…" value="${esc(tkSearch)}" oninput="tkSearch=this.value;tkTable()"></div>
    <div class="card" style="padding:0" id="tkCard">${tkTableHtml(list)}</div>
    <div class="note" style="margin-top:12px">Beim Anlegen/Bearbeiten einer Reparaturposition im Auftrag auf <b>🔎 PreisCheck</b> tippen: passende Artikel erscheinen, Zielmarge setzen → Kundenpreis wird automatisch übernommen. Import unterstützt CSV/Excel-Preislisten (Spalten zuordnen).</div>`;
-  paintIcons();
+  paintIcons(); partsSupLoad();
 };
 function tkTableHtml(list){
   if(!list.length)return `<div class="empty" style="padding:24px">Keine Artikel. „+ Artikel" anlegen oder eine <b>Preisliste importieren</b>.</div>`;
@@ -3291,6 +3292,45 @@ function tkImportRun(){ if(!TKI){return;} const map={}; TKI.head.forEach((h,ix)=
     let ex=upd?S.teilekatalog.find(x=>x.model.toLowerCase()===model.toLowerCase()&&x.part.toLowerCase()===part.toLowerCase()&&(x.quality||'').toLowerCase()===(rec.quality||'').toLowerCase()):null;
     if(ex){Object.assign(ex,rec);updated++;} else {S.teilekatalog.unshift(Object.assign({id:uid('tk')},rec));added++;} });
   save(); closeAll(); if(current==='teilekatalog')views.teilekatalog(); paintIcons(); toast('Import fertig: '+added+' neu, '+updated+' aktualisiert'); }
+
+/* --- Lieferanten-Anbindung (PreisCheck-Kataloge – wie repairOS: ASWO/Faro/Foneday/MobileSentrix/Smartpart4u/Utopya) --- */
+const PARTS_SUPPLIERS=[
+ {id:'foneday',name:'Foneday',tags:['Mobile Parts','Werkzeuge'],site:'https://foneday.shop',desc:'Europäischer One-Stop-Parts-Supplier für Smartphone-/Tablet-Teile (echte API).'},
+ {id:'aswo',name:'ASWO',tags:['Originalteile','IT & Smartphone'],site:'https://www.aswo.com',desc:'Herstellerübergreifender B2B-Katalog für Original- und Zubehörteile.'},
+ {id:'faro',name:'Faro',tags:['Mobilfunk','Reparaturbedarf'],site:'',desc:'360°-Distribution für Mobilfunk, Zubehör und Reparaturprodukte.'},
+ {id:'mobilesentrix',name:'MobileSentrix',tags:['Displays & Akkus','Genuine Parts'],site:'https://www.mobilesentrix.eu',desc:'Displays, Akkus, Kleinteile, Werkzeug und Zubehör.'},
+ {id:'smartpart4u',name:'Smartpart4u',tags:['Smartphone & MacBook','Werkstattbedarf'],site:'https://www.smartpart4u.de',desc:'Smartphone-/MacBook-Ersatzteile, Werkstatt- und Refurbishing-Bedarf.'},
+ {id:'utopya',name:'Utopya',tags:['Qualitätsvarianten','Großhandel'],site:'https://www.utopya.de',desc:'Europäischer Großhandel für mobile Ersatzteile.'}
+];
+let __partsConn={};
+function partsSupLoad(){ if(DB.backend!=='server')return; fetch(API+'/api/parts/suppliers',{headers:DB._hdr()}).then(r=>r.json()).then(res=>{ if(res&&res.connected){ __partsConn=res.connected; if(current==='teilekatalog'){const el=document.getElementById('tkSupCard'); if(el)el.innerHTML=tkSupHtml();} } }).catch(()=>{}); }
+function tkSupHtml(){ const server=DB.backend==='server';
+  return `<div class="between"><b>🔌 PreisCheck-Kataloge (Lieferanten-Anbindung)</b>${server?'':'<span class="muted" style="font-size:12px">nur im Online-Betrieb</span>'}</div>
+    <p class="muted" style="font-size:13px;margin:4px 0 12px">Ersatzteil-Großhändler verbinden – Einkaufspreise &amp; Bestände fließen direkt in den PreisCheck. Die Artikelauswahl bleibt bei dir; es wird nichts automatisch bestellt.</p>
+    <div class="grid g2" style="gap:10px">${PARTS_SUPPLIERS.map(s=>{const on=!!__partsConn[s.id];return `<div class="card" style="margin:0;border:1px solid ${on?'var(--green,#34a24a)':'var(--line)'}">
+      <div class="between"><b>${esc(s.name)}</b><span class="pill ${on?'soft':'dash'}"><span class="d"></span>${on?'verbunden':'nicht verbunden'}</span></div>
+      <div class="muted" style="font-size:12px;margin:4px 0 6px">${esc(s.desc)}</div>
+      <div class="row" style="gap:5px;flex-wrap:wrap;margin-bottom:8px">${s.tags.map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>
+      <div class="row" style="gap:6px;flex-wrap:wrap">
+        ${server?(on?`<button class="btn sm pri" onclick="partsSync('${s.id}')">Synchronisieren</button><button class="btn sm gho" onclick="partsDisconnect('${s.id}')">Trennen</button>`:`<button class="btn sm pri" onclick="partsConnect('${s.id}','${qa(s.name)}')">Verbinden (API-Key)</button>`):''}
+        <button class="btn sm gho" onclick="tkImportOpen()">Preisliste (CSV)</button>
+        ${s.site?`<a class="btn sm gho" href="${s.site}" target="_blank" rel="noopener">Website ↗</a>`:''}
+      </div></div>`;}).join('')}</div>
+    <div class="note" style="margin-top:10px">Foneday hat eine echte API (EK/Bestand je Modell). Bei den anderen greift – solange keine API hinterlegt ist – der <b>CSV-Preislisten-Import</b>. Preise/Bestände hängen vom jeweiligen Händlerkonto ab.</div>`;
+}
+function partsConnect(sid,name){ openModal(`<div class="dhead"><b style="flex:1">${esc(name)} verbinden</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+   <div class="dbody"><p class="muted" style="font-size:13px">API-Key aus deinem ${esc(name)}-Händlerkonto eingeben. Der Schlüssel wird <b>nur auf dem Server</b> gespeichert und nie angezeigt.</p>
+     <label class="f" style="margin-top:8px">API-Key</label><input class="in" id="ps_key" type="password" placeholder="••••••••••••" autocomplete="off">
+     <div class="row" style="margin-top:14px;justify-content:flex-end;gap:8px"><button class="btn gho" onclick="closeAll()">Abbrechen</button><button class="btn pri" onclick="partsSaveKey('${sid}')">Speichern</button></div>
+     <div class="note" style="margin-top:10px">Noch keinen API-Zugang? Fordere ihn bei ${esc(name)} an (Händlerkonto → API/Schnittstelle). Bis dahin Preisliste als CSV importieren.</div></div>`); }
+function partsSaveKey(sid){ const k=((document.getElementById('ps_key')||{}).value||'').trim(); if(!k){toast('Bitte API-Key eingeben');return;}
+  fetch(API+'/api/parts/supplier',{method:'POST',headers:DB._hdr(),body:JSON.stringify({supplier:sid,apiKey:k})}).then(r=>r.json()).then(res=>{ if(res&&res.ok){ __partsConn[sid]=true; closeAll(); if(current==='teilekatalog')views.teilekatalog(); paintIcons(); toast('Verbunden – Schlüssel gespeichert'); } else toast('Speichern fehlgeschlagen'); }).catch(()=>toast('Keine Verbindung')); }
+function partsDisconnect(sid){ if(!confirm('Verbindung trennen und Schlüssel entfernen?'))return; fetch(API+'/api/parts/supplier',{method:'POST',headers:DB._hdr(),body:JSON.stringify({supplier:sid,clear:true})}).then(r=>r.json()).then(()=>{ delete __partsConn[sid]; if(current==='teilekatalog')views.teilekatalog(); paintIcons(); toast('Getrennt'); }).catch(()=>{}); }
+function partsSync(sid){ toast('Synchronisiere…'); fetch(API+'/api/parts/sync',{method:'POST',headers:DB._hdr(),body:JSON.stringify({supplier:sid})}).then(r=>r.json()).then(res=>{
+    if(res&&res.ok&&Array.isArray(res.articles)){ ensureTeile(); let a=0,u=0; res.articles.forEach(art=>{ const ex=S.teilekatalog.find(x=>(x.model||'').toLowerCase()===(art.model||'').toLowerCase()&&(x.part||'').toLowerCase()===(art.part||'').toLowerCase()&&(x.quality||'').toLowerCase()===(art.quality||'').toLowerCase()); const rec={model:art.model||'',part:art.part||'',quality:art.quality||'Original',ek:+art.ek||0,supplier:art.supplier||sid,artnr:art.artnr||'',stock:(art.stock!==undefined?art.stock:''),updated:today()}; if(ex){Object.assign(ex,rec);u++;}else{S.teilekatalog.unshift(Object.assign({id:uid('tk')},rec));a++;} }); save(); views.teilekatalog(); paintIcons(); toast('Sync fertig: '+a+' neu, '+u+' aktualisiert'); }
+    else if(res&&res.pending){ toast('✓ API-Zugang gespeichert. Live-Sync folgt, sobald der Endpoint hinterlegt ist.'); }
+    else { toast((res&&res.error)||'Sync nicht möglich'); }
+  }).catch(()=>toast('Keine Verbindung')); }
 
 views.lager=function(){
   ensureInv(); const m=document.getElementById('main');

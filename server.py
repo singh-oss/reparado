@@ -294,6 +294,23 @@ def _ws_mailcfg(wid):
     try: return json.loads(r["value"])
     except Exception: return {}
 
+# ---------- Ersatzteil-Lieferanten (PreisCheck-Kataloge) ----------
+def _parts_suppliers(wid):
+    with db() as c:
+        r = c.execute("SELECT value FROM app_data WHERE workshop_id=? AND key='parts_suppliers'", (wid,)).fetchone()
+    if not r:
+        return {}
+    try: return json.loads(r["value"]) or {}
+    except Exception: return {}
+def _parts_suppliers_save(wid, d):
+    with _lock, db() as c:
+        c.execute("INSERT INTO app_data(workshop_id,key,value,updated_at) VALUES(?,?,?,?) ON CONFLICT(workshop_id,key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at",
+                  (wid, "parts_suppliers", json.dumps(d), _iso()))
+# Connector-Registry: {supplier_id: fn(api_key)->(ok, articles|error)}.
+# Artikel: {"model","part","quality","ek","supplier","artnr","stock"}.
+# Wird pro Händler aktiviert, sobald API-Endpoint/Zugangsdaten vorliegen (z. B. Foneday).
+_PARTS_CONN = {}
+
 def send_mail(workshop_id, to, subject, body, html=None, from_name=None, reply_to=None, attachments=None):
     """White-Label: Kunden-Mails (mit from_name) erscheinen unter dem Namen des Betriebs;
     wenn der Betrieb ein eigenes SMTP-Konto hinterlegt hat, wird darüber versendet (echte
@@ -828,6 +845,13 @@ class H(BaseHTTPRequestHandler):
             return self._send(200, {"ok": True, "data": json.loads(row["data"]), "signed": bool(row["signed"]),
                                     "signature": row["signature"] or "",
                                     "consents": json.loads(row["consents"]) if row["consents"] else None})
+        if self.path == "/api/parts/suppliers":
+            # Status der Ersatzteil-Lieferanten (welche haben einen API-Key hinterlegt) – ohne Keys zurueckzugeben.
+            p = self._auth()
+            if not p:
+                return self._send(401, {"error": "unauthorized"})
+            d = _parts_suppliers(p["wid"])
+            return self._send(200, {"ok": True, "connected": {k: True for k, v in d.items() if v}})
         if self.path.startswith("/api/photo/get"):
             # Werkstatt (eingeloggt) pollt die vom Handy hochgeladenen Fotos ab.
             p = self._auth()
@@ -1487,6 +1511,44 @@ class H(BaseHTTPRequestHandler):
                              "filename": str(a.get("filename") or "anhang.jpg")[:120]})
             ok, note = send_mail(p["wid"], to, subj, text, body.get("html"), body.get("fromName"), body.get("replyTo"), atts)
             return self._send(200, {"sent": ok, "note": note})
+
+        if self.path == "/api/parts/supplier":
+            # API-Key eines Ersatzteil-Lieferanten hinterlegen/entfernen (Secret bleibt auf dem Server).
+            p = self._auth()
+            if not p:
+                return self._send(401, {"error": "unauthorized"})
+            sid = (body.get("supplier") or "").strip()[:40]
+            if not sid:
+                return self._send(400, {"error": "supplier fehlt"})
+            d = _parts_suppliers(p["wid"])
+            if body.get("clear"):
+                d.pop(sid, None)
+            elif body.get("apiKey"):
+                d[sid] = str(body.get("apiKey"))[:400]
+            else:
+                return self._send(400, {"error": "apiKey fehlt"})
+            _parts_suppliers_save(p["wid"], d)
+            return self._send(200, {"ok": True, "connected": sid in d})
+
+        if self.path == "/api/parts/sync":
+            # Live-Synchronisierung eines Lieferantenkatalogs (sobald der Connector aktiv ist).
+            p = self._auth()
+            if not p:
+                return self._send(401, {"error": "unauthorized"})
+            sid = (body.get("supplier") or "").strip()[:40]
+            key = _parts_suppliers(p["wid"]).get(sid)
+            if not key:
+                return self._send(200, {"ok": False, "error": "Nicht verbunden – bitte zuerst den API-Key hinterlegen."})
+            fn = _PARTS_CONN.get(sid)
+            if not fn:
+                return self._send(200, {"ok": False, "pending": True, "note": "API-Zugang gespeichert. Die Live-Synchronisierung wird aktiviert, sobald der Endpoint/das Antwortformat des Haendlers hinterlegt ist."})
+            try:
+                ok, res = fn(key)
+                if not ok:
+                    return self._send(200, {"ok": False, "error": res if isinstance(res, str) else "Sync fehlgeschlagen"})
+                return self._send(200, {"ok": True, "articles": res})
+            except Exception as e:
+                return self._send(200, {"ok": False, "error": str(e)[:200]})
 
         if self.path == "/api/mail/config":
             p = self._auth()
