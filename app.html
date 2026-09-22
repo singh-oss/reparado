@@ -4261,7 +4261,7 @@ views.statistik=function(){
 let setTab=(function(){try{return localStorage.getItem('rep_settab')||'betrieb';}catch(e){return 'betrieb';}})();
 const ES_TABS=[['betrieb','🏢 Betrieb'],['belege','🧾 Aufträge & Belege'],['komm','✉️ Kommunikation'],['kasse','💳 Kasse & Buchhaltung'],['hardware','🖨️ Geräte & Hardware']];
 /* Karten den Reitern zuordnen (Titel enthält Schlüssel → Kategorie) */
-const ES_CATMAP={'Werkstatt-Account':'betrieb','Stammdaten':'betrieb','Benutzer':'betrieb','Systemeinstellungen':'belege','Automatisierungen':'belege','Garantie':'belege','Kasse anbinden':'kasse','TSE-Anbindung':'kasse','Buchhaltung':'kasse','Integrationen':'kasse','Kundenkommunikation':'komm','Benachrichtigungen':'komm','WhatsApp-Vorlagen':'komm','Website anbinden':'komm','Empfangskraft':'komm','Kalender-Synchronisierung':'komm','Etikettendruck':'hardware','Hardware':'hardware','Geräteversicher':'hardware'};
+const ES_CATMAP={'Einrichtung':'betrieb','Werkstatt-Account':'betrieb','Stammdaten':'betrieb','Benutzer':'betrieb','Systemeinstellungen':'belege','Automatisierungen':'belege','Garantie':'belege','Kasse anbinden':'kasse','TSE-Anbindung':'kasse','Buchhaltung':'kasse','Integrationen':'kasse','Kundenkommunikation':'komm','Benachrichtigungen':'komm','WhatsApp-Vorlagen':'komm','Website anbinden':'komm','Empfangskraft':'komm','Kalender-Synchronisierung':'komm','Etikettendruck':'hardware','Hardware':'hardware','Geräteversicher':'hardware'};
 function esApplyTab(){ document.querySelectorAll('#main .card').forEach(function(card){ if(card.parentElement&&card.parentElement.closest('.card'))return; const b=card.querySelector('b'); const title=(b?b.textContent:'').trim(); let cat=null; for(const k in ES_CATMAP){ if(title.indexOf(k)>=0){cat=ES_CATMAP[k];break;} } if(cat){ card.style.display=(cat===setTab)?'':'none'; } }); }
 function esTab(t){ setTab=t; try{localStorage.setItem('rep_settab',t);}catch(e){} document.querySelectorAll('#esTabs .estab').forEach(function(c){c.classList.toggle('on',c.dataset.t===t);}); esApplyTab(); window.scrollTo(0,0); }
 /* Sichtbare „✓ Gespeichert"-Rückmeldung, wenn in den Einstellungen ein Feld geändert wird (Felder speichern automatisch) */
@@ -4293,6 +4293,9 @@ views.einstellungen=function(){
        <div><label class="f">BIC</label><input class="in" value="${esc(w.bic||'')}" placeholder="XXXXDEXXXXX" onchange="wsSet('bic',this.value)"></div></div>
      <div class="note" style="margin-top:10px">Diese Angaben (inkl. Bankverbindung) erscheinen im Fußbereich des Kundenbelegs. Dieser Account trennt Ihre Daten von anderen Werkstätten (Mandantentrennung). Aktuell lokal auf diesem Gerät – beim Live-Schalten wird daraus ein echter Online-Login, ohne dass sich für Sie etwas ändert.</div>
    </div>`;})()}
+   <div class="card" style="margin-top:16px;border:1px solid var(--green,#34a24a)"><div class="between"><b>🚀 Einrichtung &amp; Import (Alt-System)</b></div>
+     <p class="muted" style="font-size:13px;margin:4px 0 12px">Umstiegs-Assistent: Kunden &amp; Aufträge aus deiner alten Software importieren und die wichtigsten Bereiche kennenlernen. Öffnet sich beim ersten Login automatisch – hier jederzeit erneut aufrufbar.</p>
+     <button class="btn pri" onclick="setupOpen(true)">Assistent öffnen</button></div>
    <div class="grid g2" style="margin-top:16px">
      <div class="card"><b>Stammdaten</b><p class="muted" style="font-size:13px;margin:4px 0 10px">Diese Angaben erscheinen auf Belegen, Angeboten, Etiketten &amp; im Status-Portal. Trage die Daten deiner Werkstatt ein – sie werden automatisch gespeichert.</p>
        ${(function(){const m=ensureMaster();return `<div class="grid g2" style="margin-top:4px">
@@ -5357,7 +5360,103 @@ function demoDone(){ if(_demoStop)return; const el=document.getElementById('demo
 
 /* ============================ BOOT ============================ */
 paintIcons();
+/* ============================ EINRICHTUNGS-/IMPORT-ASSISTENT (Umstieg vom Alt-System) ============================ */
+let SETUP={step:1,kind:'kunden',csv:null};
+const SETUP_STEPS=['Willkommen','Stammdaten','Import','Führung','Fertig'];
+const SETUP_FIELDS={
+ kunden:[['name','Name (voll)'],['vorname','Vorname'],['nachname','Nachname'],['firma','Firma'],['tel','Telefon'],['mail','E-Mail'],['strasse','Straße & Nr.'],['plz','PLZ'],['ort','Ort'],['','— ignorieren —']],
+ auftraege:[['nr','Auftragsnr.'],['kunde','Kundenname'],['tel','Telefon'],['marke','Marke'],['modell','Modell'],['fehler','Fehler/Reparatur'],['status','Status'],['preis','Preis'],['datum','Datum'],['','— ignorieren —']]
+};
+function setupOpen(force){ SETUP={step:1,kind:'kunden',csv:null}; let ov=document.getElementById('setupOv'); if(!ov){ov=document.createElement('div');ov.id='setupOv';ov.style.cssText='position:fixed;inset:0;z-index:250;background:rgba(15,35,24,.5);display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:24px 14px';document.body.appendChild(ov);} setupRender(); }
+function setupClose(){const ov=document.getElementById('setupOv');if(ov)ov.remove();}
+function setupSeen(){ try{localStorage.setItem('velqio_setup_v1','1');}catch(e){} }
+function setupGo(n){ SETUP.step=Math.max(1,Math.min(5,n)); setupRender(); const ov=document.getElementById('setupOv'); if(ov)ov.scrollTop=0; }
+function setupFinish(){ setupSeen(); setupClose(); toast('Einrichtung abgeschlossen ✅'); }
+function setupToView(v){ setupSeen(); setupClose(); go(v); }
+function setupBar(){ return `<div class="row" style="gap:6px;margin-bottom:14px;flex-wrap:wrap">${SETUP_STEPS.map((l,ix)=>{const n=ix+1,on=n===SETUP.step,dn=n<SETUP.step;return `<div style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:${on?'var(--ink)':'var(--ink2)'}"><span style="width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:${on?'#0e7a3c':(dn?'#dbeee2':'var(--soft)')};color:${on?'#fff':(dn?'#0e7a3c':'var(--ink2)')}">${dn?'✓':n}</span>${l}</div>`;}).join('<span style="color:var(--line)">·</span>')}</div>`; }
+function setupBox(inner){ return `<div style="background:#fff;border-radius:18px;max-width:660px;width:100%;margin:auto;box-shadow:0 24px 70px rgba(0,0,0,.25);overflow:hidden">
+  <div style="background:linear-gradient(135deg,#0e7a3c,#12a24c);color:#fff;padding:15px 20px;display:flex;align-items:center;gap:12px"><b style="flex:1;font-size:16px">Einrichtungs-Assistent</b><button class="btn sm" style="background:rgba(255,255,255,.16);color:#fff;border:0" onclick="setupSeen();setupClose()">Schließen</button></div>
+  <div style="padding:20px 22px 22px">${setupBar()}${inner}</div></div>`; }
+function setupRender(){ const ov=document.getElementById('setupOv'); if(!ov)return; let inner='';
+  if(SETUP.step===1){ inner=`<h2 style="font-size:22px;margin:0 0 6px">Willkommen bei Velqio 👋</h2>
+     <p class="muted" style="margin:0 0 14px">In wenigen Schritten startklar: Werkstattdaten prüfen, <b>Kunden &amp; Aufträge aus deiner alten Software importieren</b> und die wichtigsten Bereiche kennenlernen.</p>
+     <div class="note">Kein Schritt ist Pflicht – du kannst den Assistenten jederzeit in den Einstellungen erneut öffnen.</div>
+     <div class="row" style="margin-top:18px;justify-content:flex-end;gap:8px"><button class="btn gho" onclick="setupSeen();setupClose()">Später</button><button class="btn pri" onclick="setupGo(2)">Los geht's →</button></div>`; }
+  else if(SETUP.step===2){ const m=ensureMaster(); const ok=!!(m.name&&m.street&&m.city); inner=`<h2 style="font-size:20px;margin:0 0 6px">1 · Werkstattdaten</h2>
+     <p class="muted" style="margin:0 0 12px">Diese erscheinen auf Belegen, Angeboten und im Kundenportal.</p>
+     <div class="card" style="background:var(--soft);border:0"><div class="between"><div style="min-width:0"><b>${esc(m.name||'—')}</b><div class="muted" style="font-size:13px">${esc([m.street,((m.zip||'')+' '+(m.city||'')).trim()].filter(Boolean).join(' · ')||'Adresse fehlt')}</div></div><span class="pill ${ok?'soft':'dash'}"><span class="d"></span>${ok?'vollständig':'unvollständig'}</span></div></div>
+     <button class="btn" style="margin-top:12px" onclick="setupToView('einstellungen')">Stammdaten öffnen / bearbeiten</button>
+     <div class="row" style="margin-top:18px;justify-content:space-between"><button class="btn gho" onclick="setupGo(1)">← Zurück</button><button class="btn pri" onclick="setupGo(3)">Weiter →</button></div>`; }
+  else if(SETUP.step===3){ inner=setupImportInner(); }
+  else if(SETUP.step===4){ inner=`<h2 style="font-size:20px;margin:0 0 6px">3 · Kurze Führung</h2>
+     <p class="muted" style="margin:0 0 12px">Die wichtigsten Bereiche – jeweils direkt öffnen:</p>
+     <div class="grid g2" style="gap:8px">${[['auftraege','📋 Aufträge','Annehmen, Board &amp; Status'],['kunden','👤 Kunden','Kundendaten &amp; Historie'],['teilekatalog','🔧 Ersatzteilkatalog','EK-Preise &amp; PreisCheck'],['angebote','📝 Angebote','Kostenvoranschläge'],['kalender','📅 Kalender','Termine'],['einstellungen','⚙️ Einstellungen','Alles anpassen']].map(x=>`<button class="btn gho" style="text-align:left;height:auto;padding:12px;display:block" onclick="setupToView('${x[0]}')"><b>${x[1]}</b><div class="muted" style="font-size:12px;font-weight:500">${x[2]}</div></button>`).join('')}</div>
+     <button class="btn" style="margin-top:12px" onclick="setupSeen();setupClose();startDemo()">▶ Geführte Demo-Tour starten</button>
+     <div class="row" style="margin-top:18px;justify-content:space-between"><button class="btn gho" onclick="setupGo(3)">← Zurück</button><button class="btn pri" onclick="setupGo(5)">Weiter →</button></div>`; }
+  else { inner=`<div style="text-align:center;padding:14px 0"><div style="width:64px;height:64px;border-radius:50%;background:#0e7a3c;color:#fff;display:grid;place-items:center;margin:0 auto 14px;font-size:30px">✓</div>
+     <h2 style="font-size:22px;margin:0 0 6px">Fertig – viel Erfolg!</h2>
+     <p class="muted">Erneut öffnen unter <b>Einstellungen → Betrieb → Einrichtung &amp; Import</b>.</p>
+     <button class="btn pri" style="margin-top:18px" onclick="setupFinish()">Loslegen</button></div>`; }
+  ov.innerHTML=setupBox(inner);
+}
+function setupImportInner(){ const k=SETUP.kind;
+  const kindBtns=`<div class="row" style="gap:8px;margin-bottom:12px">${[['kunden','👤 Kunden'],['auftraege','📋 Aufträge']].map(x=>`<button class="chip ${k===x[0]?'on':''}" onclick="SETUP.kind='${x[0]}';SETUP.csv=null;setupRender()">${x[1]}</button>`).join('')}</div>`;
+  let body;
+  if(!SETUP.csv){ body=`<label class="f">CSV/Excel-Datei aus dem Alt-System</label>
+     <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:4px"><label class="btn" style="cursor:pointer">Datei wählen (.csv)<input type="file" accept=".csv,text/csv,text/plain" style="display:none" onchange="setupImportFile(this)"></label></div>
+     <label class="f" style="margin-top:12px">…oder Inhalt einfügen</label>
+     <textarea class="in" id="setup_paste" rows="5" placeholder="${k==='kunden'?'Name;Telefon;E-Mail;Straße;PLZ;Ort':'Auftragsnr;Kunde;Marke;Modell;Fehler;Status;Preis;Datum'}"></textarea>
+     <button class="btn pri" style="margin-top:10px" onclick="setupImportParse()">Weiter → Spalten zuordnen</button>`;
+  } else { const pd=SETUP.csv; const fields=SETUP_FIELDS[k];
+    body=`<div class="muted" style="font-size:12px;margin-bottom:6px">${pd.rows.length} Zeilen erkannt. Ordne die Spalten zu:</div>
+     ${pd.head.map((h,ix)=>`<div class="row" style="align-items:center;gap:10px;margin-top:6px"><span style="flex:1;min-width:0"><b>${esc(h||('Spalte '+(ix+1)))}</b> <span class="muted" style="font-size:12px">${esc((pd.rows[0]||[])[ix]||'')}</span></span>
+       <select class="in" id="setup_col${ix}" style="max-width:190px">${fields.map(f=>`<option value="${f[0]}" ${setupGuess(k,h)===f[0]?'selected':''}>${f[1]}</option>`).join('')}</select></div>`).join('')}
+     <div class="row" style="margin-top:12px;gap:8px"><button class="btn gho" onclick="SETUP.csv=null;setupRender()">← Andere Datei</button><button class="btn pri" onclick="setupImportRun()">${pd.rows.length} ${k==='kunden'?'Kunden':'Aufträge'} importieren</button></div>`;
+  }
+  return `<h2 style="font-size:20px;margin:0 0 6px">2 · Daten aus dem Alt-System importieren</h2>
+     <p class="muted" style="margin:0 0 12px">In der alten Software eine CSV/Excel-Liste exportieren und hier hochladen. Dubletten (gleiche Telefonnummer) werden zusammengeführt.</p>
+     ${kindBtns}${body}
+     <div class="row" style="margin-top:18px;justify-content:space-between"><button class="btn gho" onclick="setupGo(2)">← Zurück</button><button class="btn pri" onclick="setupGo(4)">Überspringen / Weiter →</button></div>`;
+}
+function setupGuess(kind,h){ h=(h||'').toLowerCase();
+  if(kind==='kunden'){ if(/vorname|first/.test(h))return 'vorname'; if(/nachname|last|familien/.test(h))return 'nachname'; if(/firma|company|betrieb/.test(h))return 'firma'; if(/name|kunde|customer/.test(h))return 'name'; if(/tel|phone|mobil|handy/.test(h))return 'tel'; if(/mail|email/.test(h))return 'mail'; if(/stra|adress|addr|street/.test(h))return 'strasse'; if(/plz|zip|postal/.test(h))return 'plz'; if(/ort|stadt|city/.test(h))return 'ort'; return ''; }
+  if(/auftrag|nummer|^nr|order|beleg/.test(h))return 'nr'; if(/kunde|name|customer/.test(h))return 'kunde'; if(/tel|phone|mobil/.test(h))return 'tel'; if(/marke|hersteller|brand|make/.test(h))return 'marke'; if(/modell|model|gerät|device/.test(h))return 'modell'; if(/fehler|reparatur|problem|issue|repair|schaden/.test(h))return 'fehler'; if(/status|zustand|state/.test(h))return 'status'; if(/preis|price|betrag|summe|total/.test(h))return 'preis'; if(/datum|date|angelegt|erstellt/.test(h))return 'datum'; return '';
+}
+function setupImportFile(inp){ const f=inp.files&&inp.files[0]; if(!f)return; const rd=new FileReader(); rd.onload=function(){ const ta=document.getElementById('setup_paste'); if(ta)ta.value=rd.result; setupImportParse(); }; rd.readAsText(f); }
+function setupImportParse(){ const t=(document.getElementById('setup_paste')||{}).value||''; const pd=_csvParse(t); if(!pd.head.length){toast('Keine Daten erkannt');return;} SETUP.csv=pd; setupRender(); }
+function setupMapStatus(s){ s=(s||'').toLowerCase(); const keys=statusFlow(); const has=k=>keys.indexOf(k)>=0;
+  if(/abgehol|abgeschlossen|erledigt|closed|ausgeliefert|abgerechnet/.test(s)&&has('abgeholt'))return 'abgeholt';
+  if(/fertig|bereit|ready|repariert|abholbereit/.test(s)&&has('fertig'))return 'fertig';
+  if(/wart|teil|bestell|ersatzteil/.test(s)&&has('warten'))return 'warten';
+  return has('offen')?'offen':(keys[0]||'offen'); }
+function setupParseDate(s){ s=(s||'').trim(); if(!s)return ''; let m=s.match(/(\d{4})[-.\/](\d{1,2})[-.\/](\d{1,2})/); if(m)return m[1]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[3]).slice(-2); m=s.match(/(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2,4})/); if(m){let y=m[3];if(y.length===2)y='20'+y;return y+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[1]).slice(-2);} return ''; }
+function setupImportRun(){ const pd=SETUP.csv; if(!pd)return; const map={}; pd.head.forEach((h,ix)=>{const s=document.getElementById('setup_col'+ix);if(s&&s.value)map[s.value]=ix;});
+  const get=(r,key)=> (map[key]!==undefined?((r[map[key]]||'').toString().trim()):'');
+  let added=0,merged=0;
+  if(SETUP.kind==='kunden'){
+    pd.rows.forEach(r=>{ let name=get(r,'name'); const vn=get(r,'vorname'),nn=get(r,'nachname'),firma=get(r,'firma'); if(!name)name=[vn,nn].filter(Boolean).join(' ')||firma; if(!name)return;
+      const tel=get(r,'tel'),mail=get(r,'mail'); const digits=tel.replace(/\D/g,'');
+      let c=digits.length>5?S.cust.find(x=>x.tel&&x.tel.replace(/\D/g,'')===digits):null; if(!c&&mail)c=S.cust.find(x=>x.mail&&x.mail.toLowerCase()===mail.toLowerCase());
+      const rec={name:name,tel:tel,mail:mail,adr:get(r,'strasse'),plz:get(r,'plz'),stadt:get(r,'ort'),firma:firma,typ:firma?'Firma':'Privat'};
+      if(c){Object.keys(rec).forEach(k=>{if(rec[k]&&!c[k])c[k]=rec[k];});merged++;} else {S.cust.push(Object.assign({id:uid('c')},rec));added++;} });
+    save(); toast('Import: '+added+' Kunden neu, '+merged+' zusammengeführt');
+  } else {
+    pd.rows.forEach(r=>{ const kunde=get(r,'kunde'),tel=get(r,'tel'); if(!kunde&&!tel)return;
+      const digits=tel.replace(/\D/g,''); let c=digits.length>5?S.cust.find(x=>x.tel&&x.tel.replace(/\D/g,'')===digits):null; if(!c&&kunde)c=S.cust.find(x=>(x.name||'').toLowerCase()===kunde.toLowerCase());
+      if(!c){c={id:uid('c'),name:kunde||'Kunde',tel:tel,mail:'',adr:''};S.cust.push(c);}
+      const price=parseFloat((get(r,'preis')||'').replace(/[^0-9,.\-]/g,'').replace(',','.'))||0;
+      const issue=get(r,'fehler')||'Reparatur'; const brand=get(r,'marke'),model=get(r,'modell');
+      const devs=[{typ:'Smartphone',brand:brand,model:model,imei:'',fach:'',ref:'',reparatur:issue,qual:'Original',price:price,warranty:6,lock:'Kein',lockval:'',positions:[{reparatur:issue,qual:'Original',price:price}]}];
+      const st=setupMapStatus(get(r,'status')); const dt=setupParseDate(get(r,'datum'))||today();
+      const nr=get(r,'nr')||nextOrderNr();
+      const o=Object.assign({id:uid('o'),nr:nr,cid:c.id,devices:devs,lock:'Keine',lockval:'',status:st,prio:'Standard',created:dt,due:dt,appt:'',notes:'Import aus Alt-System',readyAt:(st==='abgeholt'||st==='fertig')?dt:'',pickedAt:(st==='abgeholt'?dt:''),sig:'',source:'import'},noMirror(devs));
+      S.ord.unshift(o); added++; });
+    save(); if(typeof refreshBadges==='function')refreshBadges(); toast('Import: '+added+' Aufträge angelegt');
+  }
+  SETUP.csv=null; setupGo(4);
+}
 function bootApp(){ensureWorkshop(); ensureMaster(); applyMaster(); ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); ensureInv(); ensureProc(); ensureTrade(); ensureShip(); ensureContracts(); ensureInsurers(); ensureIntegrations(); const n=pullBookings(); const nq=pullRequests(); pullFeedback(); pullWarranty(); let _lv='dashboard'; try{const _s=localStorage.getItem('rep_lastview'); if(_s&&views[_s]&&canView(_s))_lv=_s;}catch(e){} go(_lv); applyNavRole(); if(!curUser())showLogin();
+  try{ if(curUser() && !localStorage.getItem('velqio_setup_v1') && (S.cust||[]).length===0 && (S.ord||[]).length===0){ setTimeout(function(){ if(!document.getElementById('setupOv'))setupOpen(); }, 700); } }catch(e){}
   if(nq) setTimeout(()=>toast(nq+' neue Website-Anfrage'+(nq>1?'n':'')),900);
   if(n) setTimeout(()=>toast(n+' neue Online-Buchung'+(n>1?'en':'')+' übernommen'),500);
   if(DB.backend==='server'){ setTimeout(()=>intakeImport(false),1500); setTimeout(()=>portalPollReplies(),2200); setTimeout(()=>ensurePubKey(),1700); setTimeout(()=>voiceLoad(),1800); setTimeout(()=>mailcfgLoad(),1900); if(!window.__intakePoll)window.__intakePoll=setInterval(()=>intakeImport(false),90000); if(!window.__portalPoll)window.__portalPoll=setInterval(()=>portalPollReplies(),90000); }
