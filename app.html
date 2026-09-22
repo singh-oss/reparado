@@ -1230,7 +1230,7 @@ function openOrder(id){
   const o=S.ord.find(x=>x.id===id); if(!o)return; const c=cust(o.cid);
   if(!Array.isArray(o.statusHistory)||!o.statusHistory.length){o.statusHistory=[{status:o.status,at:o.created||new Date().toISOString()}];}
   if(DB.backend==='server')portalSync(o); /* Portal aktuell halten + Token sichern */
-  const track='reparado.de/status/'+o.nr;
+  const track=orderPortalUrl(o);
   const warrUntil=o.pickedAt?addMonths(o.pickedAt,o.warranty):(o.readyAt?addMonths(o.readyAt,o.warranty):'');
   const dr=document.getElementById('drawer');
   dr.innerHTML=`
@@ -2658,7 +2658,7 @@ function calICS(){ const pad=n=>String(n).padStart(2,'0'); const now=new Date();
     return ['BEGIN:VEVENT','UID:'+o.id+'@reparado','DTSTAMP:'+stamp,dtstart,dtend,'SUMMARY:Termin: '+(c.name||'Kunde')+' · '+oDevLabel(o),'DESCRIPTION:Auftrag '+o.nr+' · '+oIssueLabel(o),'END:VEVENT'].join('\r\n');});
   return ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Velqio//Werkstatt//DE','CALSCALE:GREGORIAN','X-WR-CALNAME:'+ensureWorkshop().name+' Termine',...ev,'END:VCALENDAR'].join('\r\n');
 }
-function downloadICS(){const ics=calICS();const blob=new Blob([ics],{type:'text/calendar'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='reparado-termine.ics';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},100);toast('Kalender exportiert (.ics) – in jeden Kalender importierbar');}
+function downloadICS(){const ics=calICS();const blob=new Blob([ics],{type:'text/calendar'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='velqio-termine.ics';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},100);toast('Kalender exportiert (.ics) – in jeden Kalender importierbar');}
 function calSubscribeUrl(){return widgetBase()+'/kalender/'+ensureWorkshop().slug+'.ics';}
 function calSyncCard(){const cs=ensureCalSync();const anyConn=CAL_PROVIDERS.some(x=>cs[x[0]].connected);
   return `<div class="card" style="margin-top:16px"><div class="between"><b>Kalender-Synchronisierung</b>${anyConn?`<span class="pill soft"><span class="d"></span>zuletzt ${fmtDate(cs.lastSync)}</span>`:''}</div>
@@ -2926,7 +2926,7 @@ function renderTemplate(r,o){
     '{adresse}':SHOP.street+', '+SHOP.zip+' '+SHOP.city,'{oeffnung}':SHOP.hours,
     '{google}':(typeof googleReviewLink==='function'?googleReviewLink():SHOP.google),'{geraet}':o?(o.brand+' '+o.model):'Ihr Gerät','{leistung}':o?o.issue:'',
     '{auftrag}':o?o.nr:'','{preis}':o?eur(o.price):'','{termin}':o&&o.appt?fmtDate(o.appt):'nach Absprache',
-    '{tracking}':o?('reparado.de/status/'+o.nr):'','{teil}':o?o.issue:'','{lieferant}':'Foneday','{eta}':'',
+    '{tracking}':o?orderPortalUrl(o):'','{teil}':o?o.issue:'','{lieferant}':'Foneday','{eta}':'',
     '{telefon_kunde}':c.tel||'','{stock}':'','{min}':'',
     '{n_termine}':stats.n_termine,'{n_fertig}':stats.n_fertig,'{n_warten}':stats.n_warten,'{n_ueberfaellig}':stats.n_ueberfaellig,
   };
@@ -4344,7 +4344,7 @@ views.einstellungen=function(){
            <label class="f">2 · Auf der Website einbetten</label>
            <textarea class="in" rows="4" readonly style="font-family:ui-monospace,monospace;font-size:12px" onclick="this.select()">${esc(siteEmbedCode())}</textarea>
            <div class="row" style="margin-top:8px"><button class="btn sm" onclick="copyStr(siteEmbedCode())">Einbett-Code kopieren</button><button class="btn sm" onclick="downloadWpPlugin()">WordPress-Plugin</button></div>
-           <div class="muted" style="font-size:12px;margin-top:6px">Funktioniert auf jeder Website (WordPress, Wix, Jimdo, eigenes HTML). WordPress: Plugin hochladen, dann Shortcode <span class="mono">[reparado typ="anfrage"]</span>.</div>
+           <div class="muted" style="font-size:12px;margin-top:6px">Funktioniert auf jeder Website (WordPress, Wix, Jimdo, eigenes HTML). WordPress: Plugin hochladen, dann Shortcode <span class="mono">[velqio typ="anfrage"]</span>.</div>
          </div>
          <div>
            <label class="f">3 · QR-Code <span class="muted">(Theke, Flyer, Schaufenster, Instagram-Bio)</span></label>
@@ -5101,7 +5101,7 @@ function downloadWpPlugin(){
   const php='<?php\n'
    +'/*\n'
    +'Plugin Name: Velqio Buchung & Anfrage\n'
-   +'Description: Bindet das Velqio Buchungs- und Anfrage-Widget per Shortcode ein. Nutzung: [reparado] oder [reparado typ="anfrage"].\n'
+   +'Description: Bindet das Velqio Buchungs- und Anfrage-Widget per Shortcode ein. Nutzung: [velqio] oder [velqio typ="anfrage"].\n'
    +'Version: 1.0.0\n'
    +'Author: '+SHOP.name+'\n'
    +'*/\n'
@@ -5115,9 +5115,10 @@ function downloadWpPlugin(){
    +"  $out.='<scr'+'ipt>window.addEventListener(\"message\",function(e){if(e.data&&e.data.reparadoHeight){var f=document.getElementById(\"'.$id.'\");if(f)f.style.height=e.data.reparadoHeight+\"px\";}});<\\/scr'+'ipt>';\n"
    +"  return $out;\n"
    +"}\n"
+   +"add_shortcode('velqio','reparado_widget');\n"
    +"add_shortcode('reparado','reparado_widget');\n";
   const blob=new Blob([php],{type:'application/x-php'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='reparado-widget.php'; document.body.appendChild(a); a.click();
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='velqio-widget.php'; document.body.appendChild(a); a.click();
   setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},100);
   toast('WordPress-Plugin heruntergeladen');
 }
