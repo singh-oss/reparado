@@ -336,9 +336,11 @@ const DB = {
   tenant: null,          // Werkstatt-ID (aus Login), nur zur Anzeige
   token: null,           // Login-Token (Server-Modus)
   name: null, role: null, _pt: null,
-  _dirty:false, _lastVal:null,
-  read(){ try{ return JSON.parse(localStorage.getItem(this.key)); }catch(e){ return null; } },
-  write(x){ try{ localStorage.setItem(this.key, JSON.stringify(x)); }catch(e){}
+  _dirty:false, _lastVal:null, _mem:null,
+  /* In-Memory-Cache: im Server-Betrieb ist der Server die Wahrheit. Wenn der (durch Fotos große)
+     Status-Blob das localStorage-Limit sprengt, läuft die App trotzdem aus dem Speicher weiter. */
+  read(){ if(this._mem!=null) return this._mem; try{ return JSON.parse(localStorage.getItem(this.key)); }catch(e){ return null; } },
+  write(x){ this._mem=x; try{ localStorage.setItem(this.key, JSON.stringify(x)); }catch(e){}
     if(this.backend==='server' && this.token){ this._dirty=true; this._lastVal=x; this._pushDebounced(x); } },
   _hdr(){ return {'Authorization':'Bearer '+this.token,'Content-Type':'application/json'}; },
   _pushDebounced(x){ clearTimeout(this._pt); const self=this; this._pt=setTimeout(function(){ self._push(x); }, 800); },
@@ -351,7 +353,7 @@ const DB = {
   hydrate(){ const self=this; if(!this.token) return Promise.resolve(false);
     return fetch(API+'/api/state', {headers:this._hdr()})
       .then(function(r){ if(r.status===401){ self.logoutServer(); throw new Error('Sitzung abgelaufen'); } return r.ok? r.json() : {}; })
-      .then(function(d){ if(d && d.value){ let v=d.value; try{ if(typeof SYNC_COLLS!=='undefined'){ const loc=JSON.parse(localStorage.getItem(self.key)||'null')||{}; SYNC_COLLS.forEach(function(k){ if(v[k]===undefined && loc[k]!==undefined) v[k]=loc[k]; }); } }catch(e){} localStorage.setItem(self.key, JSON.stringify(v)); return true; } return false; }); },
+      .then(function(d){ if(d && d.value){ let v=d.value; try{ if(typeof SYNC_COLLS!=='undefined'){ const loc=(self._mem||JSON.parse(localStorage.getItem(self.key)||'null'))||{}; SYNC_COLLS.forEach(function(k){ if(v[k]===undefined && loc[k]!==undefined) v[k]=loc[k]; }); } }catch(e){} self._mem=v; try{ localStorage.setItem(self.key, JSON.stringify(v)); }catch(e){} return true; } return false; }); },
   _setSession(d){ this.token=d.token; this.tenant=d.workshopId; this.name=d.name; this.role=d.role; if(d.billing)window.__billing=d.billing; try{localStorage.setItem('reparado_token', d.token);}catch(e){} },
   login(email,pw){ const self=this; if(!CFG) return Promise.reject(new Error('Keine Server-Config'));
     return fetch(API+'/api/auth/login', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email:email,password:pw})})
