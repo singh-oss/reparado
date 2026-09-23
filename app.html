@@ -5456,7 +5456,7 @@ function setupImportRun(){ const pd=SETUP.csv; if(!pd)return; const map={}; pd.h
   SETUP.csv=null; setupGo(4);
 }
 function bootApp(){ensureWorkshop(); ensureMaster(); applyMaster(); ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); ensureInv(); ensureProc(); ensureTrade(); ensureShip(); ensureContracts(); ensureInsurers(); ensureIntegrations(); const n=pullBookings(); const nq=pullRequests(); pullFeedback(); pullWarranty(); let _lv='dashboard'; try{const _s=localStorage.getItem('rep_lastview'); if(_s&&views[_s]&&canView(_s))_lv=_s;}catch(e){} go(_lv); applyNavRole(); if(!curUser())showLogin();
-  try{ if(curUser() && !localStorage.getItem('velqio_setup_v1') && (S.cust||[]).length===0 && (S.ord||[]).length===0){ setTimeout(function(){ if(!document.getElementById('setupOv'))setupOpen(); }, 700); } }catch(e){}
+  try{ if(curUser() && !localStorage.getItem('velqio_setup_v1') && (S.cust||[]).length===0 && (S.ord||[]).length===0){ try{localStorage.setItem('velqio_setup_v1','1');}catch(e){} setTimeout(function(){ if(!document.getElementById('setupOv'))setupOpen(); }, 800); } }catch(e){}
   if(nq) setTimeout(()=>toast(nq+' neue Website-Anfrage'+(nq>1?'n':'')),900);
   if(n) setTimeout(()=>toast(n+' neue Online-Buchung'+(n>1?'en':'')+' übernommen'),500);
   if(DB.backend==='server'){ setTimeout(()=>intakeImport(false),1500); setTimeout(()=>portalPollReplies(),2200); setTimeout(()=>ensurePubKey(),1700); setTimeout(()=>voiceLoad(),1800); setTimeout(()=>mailcfgLoad(),1900); if(!window.__intakePoll)window.__intakePoll=setInterval(()=>intakeImport(false),90000); if(!window.__portalPoll)window.__portalPoll=setInterval(()=>portalPollReplies(),90000); }
