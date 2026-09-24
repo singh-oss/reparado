@@ -185,6 +185,10 @@ def init_db():
         CREATE TABLE IF NOT EXISTS photo_sessions(
           token TEXT PRIMARY KEY, workshop_id TEXT, photos TEXT,
           created REAL, expires REAL);
+        CREATE TABLE IF NOT EXISTS photos(
+          pid TEXT PRIMARY KEY, workshop_id TEXT, order_id TEXT,
+          ctype TEXT, data TEXT, created REAL);
+        CREATE INDEX IF NOT EXISTS ix_photos_ws ON photos(workshop_id);
         CREATE TABLE IF NOT EXISTS intake_sessions(
           token TEXT PRIMARY KEY, workshop_id TEXT, herkunft TEXT,
           workshop_name TEXT, workshop_tel TEXT, data TEXT,
@@ -845,6 +849,27 @@ class H(BaseHTTPRequestHandler):
             return self._send(200, {"ok": True, "data": json.loads(row["data"]), "signed": bool(row["signed"]),
                                     "signature": row["signature"] or "",
                                     "consents": json.loads(row["consents"]) if row["consents"] else None})
+        if self.path.startswith("/api/photos/get"):
+            # Foto ausliefern (per unratbarer pid, wie sign/foto-Tokens) – ausgelagert aus dem State-Blob.
+            q = parse_qs(urlparse(self.path).query); pid = (q.get("pid") or [""])[0]
+            row = None
+            if pid:
+                with db() as c:
+                    row = c.execute("SELECT ctype,data FROM photos WHERE pid=?", (pid,)).fetchone()
+            if not row:
+                return self._send(404, {"error": "not found"})
+            try:
+                raw = base64.b64decode(row["data"] or "")
+            except Exception:
+                raw = b""
+            self.send_response(200)
+            self.send_header("Content-Type", row["ctype"] or "image/jpeg")
+            self.send_header("Content-Length", str(len(raw)))
+            self.send_header("Cache-Control", "private, max-age=31536000")
+            self.end_headers()
+            try: self.wfile.write(raw)
+            except Exception: pass
+            return
         if self.path == "/api/parts/suppliers":
             # Status der Ersatzteil-Lieferanten (welche haben einen API-Key hinterlegt) – ohne Keys zurueckzugeben.
             p = self._auth()
@@ -1511,6 +1536,24 @@ class H(BaseHTTPRequestHandler):
                              "filename": str(a.get("filename") or "anhang.jpg")[:120]})
             ok, note = send_mail(p["wid"], to, subj, text, body.get("html"), body.get("fromName"), body.get("replyTo"), atts)
             return self._send(200, {"sent": ok, "note": note})
+
+        if self.path == "/api/photos/put":
+            # Foto (Data-URL) in den Foto-Speicher legen -> pid; im State-Blob bleibt nur die Referenz.
+            p = self._auth()
+            if not p:
+                return self._send(401, {"error": "unauthorized"})
+            du = body.get("data") or ""
+            if not du.startswith("data:") or ";base64," not in du:
+                return self._send(400, {"error": "data ungueltig"})
+            head, b64 = du.split(";base64,", 1)
+            ctype = head[5:] or "image/jpeg"
+            if len(b64) > 14 * 1024 * 1024:
+                return self._send(413, {"error": "Foto zu gross"})
+            pid = uid("ph")
+            with _lock, db() as c:
+                c.execute("INSERT INTO photos(pid,workshop_id,order_id,ctype,data,created) VALUES(?,?,?,?,?,?)",
+                          (pid, p["wid"], str(body.get("orderId") or "")[:40], ctype, b64, time.time()))
+            return self._send(200, {"ok": True, "pid": pid})
 
         if self.path == "/api/parts/supplier":
             # API-Key eines Ersatzteil-Lieferanten hinterlegen/entfernen (Secret bleibt auf dem Server).
