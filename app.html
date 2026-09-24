@@ -357,9 +357,13 @@ const DB = {
   _setSession(d){ this.token=d.token; this.tenant=d.workshopId; this.name=d.name; this.role=d.role; if(d.billing)window.__billing=d.billing; try{localStorage.setItem('reparado_token', d.token);}catch(e){} },
   login(email,pw){ const self=this; if(!CFG) return Promise.reject(new Error('Keine Server-Config'));
     return fetch(API+'/api/auth/login', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email:email,password:pw})})
-      .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, d:d}; }); })
+      .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(d){ return {ok:r.ok, status:r.status, d:d}; }); },
+        function(){ const e=new Error('Server nicht erreichbar – bitte Internetverbindung prüfen.'); e.kind='network'; throw e; })
       .then(function(res){ if(res.ok && (res.d.token||res.d.twofa)){ if(res.d.token) self._setSession(res.d); return res.d; }
-        throw new Error((res.d && res.d.error) || 'Anmeldung fehlgeschlagen'); }); },
+        let msg,kind; if(res.status===401||res.status===403){ msg=(res.d&&res.d.error)||'E-Mail oder Passwort ist nicht korrekt.'; kind='credentials'; }
+        else if(res.status>=500){ msg='Server-Problem – bitte in einem Moment erneut versuchen.'; kind='server'; }
+        else { msg=(res.d&&res.d.error)||'Anmeldung fehlgeschlagen.'; kind='other'; }
+        const e=new Error(msg); e.kind=kind; throw e; }); },
   signup(workshopName,email,pw){ const self=this; if(!CFG) return Promise.reject(new Error('Keine Server-Config'));
     return fetch(API+'/api/auth/signup', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({workshopName:workshopName,email:email,password:pw})})
       .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, d:d}; }); })
@@ -683,6 +687,8 @@ function devPositions(d){ if(d&&Array.isArray(d.positions)&&d.positions.length) 
 function devTotal(d){ return devPositions(d).reduce((s,p)=>s+(+p.price||0),0); }
 function oTotal(o){ return oDevices(o).reduce((s,d)=>s+devTotal(d),0); }
 function oDevLabel(o){ return oDevices(o).map(d=>[d.brand,d.model].filter(Boolean).join(' ')).filter(Boolean).join(' + ')||'—'; }
+function orderKind(o){ return (o&&o.kind)||((o&&o.ins&&o.ins.on)?'Versicherung':'Privat'); }
+function kindBadge(o){ return orderKind(o)==='Versicherung'?'<span class="tag" style="background:#eef2ff;color:#4338ca">🛡 Versicherung</span>':'<span class="tag" style="background:#f3f4f6;color:#4b5563">Privat</span>'; }
 function oIssueLabel(o){ return oDevices(o).reduce((a,d)=>a.concat(devPositions(d).map(p=>p.reparatur)),[]).filter(Boolean).join(' · '); }
 function posRows(o){ return oDevices(o).map(d=>devPositions(d).map(p=>`<tr><td>${esc(d.brand)} ${esc(d.model)} — ${esc(p.reparatur)}${posQual(p)?' ('+esc(posQual(p))+')':''}${(+p.price>0)?`<div style="font-size:11px;color:#666">darin ${MWST_RATE} % MwSt: ${eur(vatOf(p.price))}</div>`:''}</td><td style="text-align:right" class="mono">${eur(p.price)}</td></tr>`).join('')).join(''); }
 function totVatLine(o){const b=oTotal(o);if(!(b>0))return '';return `<div class="between" style="font-size:13px;color:#555;margin-top:3px"><span>Netto</span><span class="mono">${eur(netOf(b))}</span></div><div class="between" style="font-size:13px;color:#555"><span>darin enthaltene MwSt. (${MWST_RATE} %)</span><span class="mono">${eur(vatOf(b))}</span></div>`;}
@@ -796,9 +802,26 @@ function applyNavRole(){
   renderSideUser();
 }
 function renderSideUser(){const el=document.getElementById('sideUser');if(!el)return;const u=curUser();
-  el.innerHTML=`<div class="row" style="min-width:0;gap:10px"><div class="avatar">${initials(u?u.name:'—')}</div><div style="min-width:0"><div style="font-weight:700;font-size:13px">${esc(u?u.name:'—')}</div><div class="muted" style="font-size:12px">${u?ROLE_LABEL[u.role]:''}</div></div></div><button class="btn sm gho" title="Abmelden / Benutzer wechseln" onclick="logout()"><span style="width:16px;height:16px">${ic('logout',16)}</span></button>`;
+  const multi=(S.users||[]).length>1;
+  el.innerHTML=`<div class="row" style="min-width:0;gap:10px"><div class="avatar">${initials(u?u.name:'—')}</div><div style="min-width:0"><div style="font-weight:700;font-size:13px">${esc(u?u.name:'—')}</div><div class="muted" style="font-size:12px">${u?ROLE_LABEL[u.role]:''}</div></div></div>
+    <div style="display:flex;gap:4px">${multi?`<button class="btn sm gho" title="Benutzer wechseln" onclick="switchUser()"><span style="width:16px;height:16px">${ic('swap',16)}</span></button>`:''}<button class="btn sm gho" title="${DB.backend==='server'?'Abmelden (vom Konto)':'Abmelden'}" onclick="logout()"><span style="width:16px;height:16px">${ic('logout',16)}</span></button></div>`;
 }
-function logout(){S.userId=null;try{localStorage.removeItem('rep_user_dev');}catch(e){}save();showLogin();}
+/* Nur den Mitarbeiter wechseln – Konto-Sitzung bleibt bestehen (Server-Token unangetastet). */
+function switchUser(){S.userId=null;try{localStorage.removeItem('rep_user_dev');}catch(e){}save();showLogin();}
+/* Vollständig abmelden. Im Server-Modus MUSS das Token weg, sonst meldet der Reload automatisch wieder an (Doc #9). */
+function logout(){
+  if(DB.backend==='server'){
+    if(!confirm('Vom Konto abmelden? Danach ist eine erneute Anmeldung mit E-Mail und Passwort nötig.'))return;
+    try{ if(typeof DB.flush==='function')DB.flush(true); }catch(e){}
+    S.userId=null; try{localStorage.removeItem('rep_user_dev');}catch(e){}
+    try{ if(typeof Sync!=='undefined'&&Sync._lpStop!==undefined)Sync._lpStop=true; }catch(e){}
+    try{DB.logoutServer();}catch(e){}
+    try{DB._mem=null;}catch(e){}
+    location.replace('/app.html');
+    return;
+  }
+  S.userId=null;try{localStorage.removeItem('rep_user_dev');}catch(e){}save();showLogin();
+}
 /* ===== Abo / Stripe (Doc: Sofort-Zahlung + harte Sperre nach Testphase) ===== */
 const BILL_PRICE={basic:'49,90',pro:'84,90',ai:'99,90'}; const BILL_NAME={basic:'Basic',pro:'Pro',ai:'AI'};
 function billHdr(){return {'Content-Type':'application/json','Authorization':'Bearer '+DB.token};}
@@ -1064,7 +1087,7 @@ views.dashboard=function(){
 };
 
 /* ============================ AUFTRÄGE ============================ */
-let aufFilter='alle', aufSort='neu', aufView='aktiv', aufSel={}, aufLayout='board';
+let aufFilter='alle', aufSort='neu', aufView='aktiv', aufSel={}, aufLayout='board', aufKind='alle';
 let __kanDrag=null;
 function aufSelCount(){return Object.keys(aufSel).filter(k=>aufSel[k]).length;}
 function aufToggleSel(id){aufSel[id]=!aufSel[id];views.auftraege();paintIcons();}
@@ -1113,13 +1136,13 @@ function _aufBulkStatusApply(ids,s){ids.forEach(id=>{const o=S.ord.find(x=>x.id=
 function kanCard(o){const c=cust(o.cid);const prioTag=(o.prio&&o.prio!=='Standard')?` <span class="tag">${esc(o.prio)}</span>`:'';const tech=o.technikerId?(S.users.find(u=>u.id===o.technikerId)||{}).name:'';
   return `<div class="kancard" draggable="true" ondragstart="__kanDrag='${o.id}';this.style.opacity=.5" ondragend="this.style.opacity=1" onclick="openOrder('${o.id}')" style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.06)">
     <div class="between"><b style="font-size:13px">${o.nr}</b><span class="mono" style="font-size:12px">${eur(oTotal(o))}</span></div>
-    <div style="font-size:13px;margin-top:2px">${esc(oDevLabel(o))}${oDevices(o).length>1?` <span class="tag">${oDevices(o).length}</span>`:''}</div>
-    <div class="muted" style="font-size:12px">${esc(c.name)}${prioTag}${o.source==='online'?' <span class="tag">Online</span>':''}${o.source==='versand'?' <span class="tag">Versand</span>':''}</div>
+    <div style="font-size:13px;margin-top:2px;display:flex;align-items:center;gap:7px">${modelThumb((oDevices(o)[0]||{}).brand,(oDevices(o)[0]||{}).model,26,(oDevices(o)[0]||{}).typ)}<span>${esc(oDevLabel(o))}${oDevices(o).length>1?` <span class="tag">${oDevices(o).length}</span>`:''}</span></div>
+    <div class="muted" style="font-size:12px">${esc(c.name)}${prioTag}${orderKind(o)==='Versicherung'?' <span class="tag" style="background:#eef2ff;color:#4338ca">🛡</span>':''}${o.source==='online'?' <span class="tag">Online</span>':''}${o.source==='versand'?' <span class="tag">Versand</span>':''}</div>
     <div class="between" style="margin-top:5px"><span class="muted" style="font-size:11px">Fällig ${fmtDate(o.due)}</span>${tech?`<span class="muted" style="font-size:11px">${esc(tech)}</span>`:''}</div>
     ${repResultBadge(o)?`<div style="margin-top:6px">${repResultBadge(o)}</div>`:''}
   </div>`;}
 function kanBoard(){
-  const src=visibleOrders(); const cols=statusFlow(); const byS={}; cols.forEach(s=>byS[s]=[]);
+  let src=visibleOrders(); if(aufKind!=='alle')src=src.filter(o=>orderKind(o)===aufKind); const cols=statusFlow(); const byS={}; cols.forEach(s=>byS[s]=[]);
   src.forEach(o=>{(byS[o.status]||(byS[o.status]=[])).push(o);});
   const CAP=15;
   const colHtml=cols.map(s=>{const c=statusColor(s);const all=sortOrders(byS[s]||[]);const sum=all.reduce((a,o)=>a+oTotal(o),0);const items=all.slice(0,CAP);const rest=all.length-items.length;
@@ -1137,7 +1160,7 @@ views.auftraege=function(){
   let list, counts={};
   if(aufView==='archiv'){list=arch;}
   else if(aufView==='papierkorb'){list=trash;}
-  else{const src=visibleOrders();statusFlow().forEach(s=>counts[s]=src.filter(o=>o.status===s).length);counts.__all=src.length;list=src.filter(o=>aufFilter==='alle'?true:o.status===aufFilter);}
+  else{let src=visibleOrders();if(aufKind!=='alle')src=src.filter(o=>orderKind(o)===aufKind);statusFlow().forEach(s=>counts[s]=src.filter(o=>o.status===s).length);counts.__all=src.length;counts.__priv=visibleOrders().filter(o=>orderKind(o)==='Privat').length;counts.__ins=visibleOrders().filter(o=>orderKind(o)==='Versicherung').length;list=src.filter(o=>aufFilter==='alle'?true:o.status===aufFilter);}
   list=sortOrders(list);
   const selN=aufSelCount(); const allIds=list.map(o=>o.id); const allSel=allIds.length&&allIds.every(id=>aufSel[id]);
   const idsArr='['+allIds.map(id=>`'${id}'`).join(',')+']';
@@ -1151,6 +1174,7 @@ views.auftraege=function(){
      <label class="muted" style="font-size:13px">Sortieren</label>
      <select class="in" style="width:auto;padding:6px 10px" onchange="aufSort=this.value;views.auftraege();paintIcons()">${[['neu','Neueste zuerst'],['alt','Älteste zuerst'],['preis','Preis: hoch → niedrig'],['faellig','Fällig zuerst']].map(o=>`<option value="${o[0]}" ${aufSort===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select>
    </div>
+   ${aufView==='aktiv'?`<div class="row" style="margin-bottom:12px;flex-wrap:wrap;gap:8px;align-items:center"><span class="muted" style="font-size:12px">Auftragsart</span>${[['alle','Alle',counts.__all],['Privat','Privat',counts.__priv],['Versicherung','🛡 Versicherung',counts.__ins]].map(k=>`<button class="chip ${aufKind===k[0]?'on':''}" onclick="aufKind='${k[0]}';aufFilter='alle';views.auftraege();paintIcons()">${k[1]}${k[2]!=null?' · '+k[2]:''}</button>`).join('')}</div>`:''}
    ${(aufView==='aktiv'&&aufLayout==='list')?`<div class="row" style="margin-bottom:14px;flex-wrap:wrap;gap:8px">${['alle',...statusFlow()].map(s=>`<button class="chip ${aufFilter===s?'on':''}" onclick="aufFilter='${s}';views.auftraege();paintIcons()">${s==='alle'?'Alle':esc(statusLabel(s))} · ${s==='alle'?(counts.__all||0):(counts[s]||0)}</button>`).join('')}</div>`:''}
    ${(aufView==='aktiv'&&S.drafts&&S.drafts.length)?`<div class="card" style="margin-bottom:14px;border:1px dashed var(--green);background:var(--green-tint,#e9f5ec)"><div class="between"><b>Entwürfe (${S.drafts.length})</b><span class="muted" style="font-size:12px">Nicht abgeschlossene Aufträge – jederzeit fortsetzen</span></div>
      <div style="margin-top:8px">${S.drafts.map(d=>`<div class="listitem"><div class="lg">${ic('clip')}</div><div style="flex:1;min-width:0"><b>${esc(d.title||'Entwurf')}</b><div class="muted" style="font-size:12px">Zuletzt bearbeitet ${fmtDateTime(d.updatedAt)}</div></div>
@@ -1164,7 +1188,7 @@ views.auftraege=function(){
     <table><thead><tr><th style="width:34px"><input type="checkbox" ${allSel?'checked':''} onclick="aufSelAll(${idsArr},this.checked)"></th><th>Nr.</th><th>Kunde</th><th>Gerät</th><th>Fehler</th><th>Preis</th><th>Status</th><th>Fällig</th><th></th></tr></thead>
     <tbody>${list.length?list.map(o=>`<tr style="box-shadow:inset 4px 0 0 ${statusColor(o.status)}">
       <td onclick="event.stopPropagation()"><input type="checkbox" ${aufSel[o.id]?'checked':''} onclick="aufToggleSel('${o.id}')"></td>
-      <td onclick="openOrder('${o.id}')" style="cursor:pointer"><b>${o.nr}</b>${o.source==='online'?' <span class="tag">Online</span>':''}${o.source==='wertgarantie'?' <span class="tag">WG</span>':''}</td>
+      <td onclick="openOrder('${o.id}')" style="cursor:pointer"><b>${o.nr}</b> ${kindBadge(o)}${o.source==='online'?' <span class="tag">Online</span>':''}${o.source==='wertgarantie'?' <span class="tag">WG</span>':''}</td>
       <td onclick="openOrder('${o.id}')" style="cursor:pointer">${esc(cust(o.cid).name)}</td>
       <td onclick="openOrder('${o.id}')" style="cursor:pointer"><div style="display:flex;align-items:center;gap:8px">${modelThumb((oDevices(o)[0]||{}).brand,(oDevices(o)[0]||{}).model,34,(oDevices(o)[0]||{}).typ)}<span>${esc(oDevLabel(o))}${oDevices(o).length>1?` <span class="tag">${oDevices(o).length}</span>`:''}</span></div></td>
       <td onclick="openOrder('${o.id}')" style="cursor:pointer">${esc(oIssueLabel(o))}</td>
@@ -1264,7 +1288,8 @@ function openOrder(id){
        <div><label class="f">Priorität</label><div style="font-weight:700">${esc(o.prio)}</div></div>
        <div><label class="f">Termin / Fällig</label><div style="font-weight:700">${o.appt?'Termin '+fmtDate(o.appt)+(o.apptTime?' · '+o.apptTime+' Uhr':'')+' · ':''}Fällig ${fmtDate(o.due)}</div></div>
        <div><label class="f">Garantie</label><div style="font-weight:700">${o.warranty} Monate${warrUntil?' · bis '+fmtDate(warrUntil):' (ab Abholung)'}</div></div>
-       <div><label class="f">Annahme</label><div style="font-weight:700">${o.sig?'Unterschrieben':'Keine Unterschrift'}</div>${o.sig?`<img src="${o.sig}" alt="Unterschrift" style="height:40px;margin-top:4px;border:1px solid var(--line);border-radius:6px;background:#fff">`:''}</div>
+       <div><label class="f">Annahme-Unterschrift</label><div style="font-weight:700">${o.sig?'Unterschrieben':'Keine Unterschrift'}</div>${o.sig?`<img src="${o.sig}" alt="Annahme-Unterschrift" style="height:40px;margin-top:4px;border:1px solid var(--line);border-radius:6px;background:#fff">`:''}</div>
+       <div><label class="f">Übergabe / Abholung</label><div style="font-weight:700">${o.pickupSig?('Übergeben'+(o.pickupBy==='andere'?' an '+esc(o.pickupName||'andere Person'):' an Kunde')):'Noch nicht übergeben'}</div>${o.pickupSig?`<div class="muted" style="font-size:11px;margin-top:2px">${fmtDateTime(o.pickupAt||'')}${o.pickupEmp?' · '+esc(o.pickupEmp):''}</div><img src="${o.pickupSig}" alt="Abhol-Unterschrift" style="height:40px;margin-top:4px;border:1px solid var(--line);border-radius:6px;background:#fff">`:''}</div>
      </div>
      ${terminBoxOrder(o)}
      ${activityBox(o)}
@@ -1299,7 +1324,8 @@ function openOrder(id){
        <button class="btn" onclick="printWarranty('${o.id}')">Garantie-Beleg</button>
        <button class="btn" onclick="go('kasse');closeAll();addToCart('${o.id}')">In die Kasse</button>
        <button class="btn" onclick="orderPartFor('${o.id}')">Ersatzteil bestellen</button>
-       <button class="btn" onclick="signOrder('${o.id}')">Unterschrift erfassen</button>
+       <button class="btn" onclick="signOrder('${o.id}')">Annahme-Unterschrift</button>
+       ${o.status!=='abgeholt'?`<button class="btn pri" onclick="handoverDialog('${o.id}')">📦 Gerät übergeben</button>`:`<button class="btn" onclick="printHandover('${o.id}')">Übergabebeleg</button><button class="btn gho" onclick="handoverDialog('${o.id}')">Übergabe erneut erfassen</button>`}
      </div>
 
      <div class="divider"></div>
@@ -1410,6 +1436,82 @@ function saveSig(id){const c=document.getElementById('sig');const o=S.ord.find(x
   if(!window.__sigDirty){toast('Bitte zuerst unterschreiben');return;}
   o.sig=c.toDataURL('image/png');save();closeAll();toast('Unterschrift gespeichert');openOrder(id);}
 
+/* ============================ GERÄTEÜBERGABE / ABHOL-UNTERSCHRIFT (Doc #11) ============================
+   Eigene, von der Annahme-Unterschrift (o.sig) klar getrennte Übergabe-Unterschrift (o.pickupSig).
+   Die Annahme-Unterschrift wird NIE automatisch zur Abhol-Unterschrift. */
+function handoverText(){ return (ensureSettings().handoverText||'Ich bestätige den Erhalt des oben genannten Geräts in ordnungsgemäßem, geprüftem Zustand. Etwaige Mängel wurden bei der Übergabe angezeigt.'); }
+function handoverDialog(id){ const o=S.ord.find(x=>x.id===id); if(!o)return; const c=cust(o.cid);
+  openModal(`<div class="dhead"><b style="flex:1">Gerät übergeben – Abhol-Unterschrift</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+   <div class="dbody">
+     <p class="muted" style="font-size:13px;margin-top:0">Auftrag ${esc(o.nr)} · ${esc(oDevLabel(o))}. Dies ist die <b>Abhol-Unterschrift bei der Übergabe</b> – getrennt von der Unterschrift bei der Annahme.</p>
+     <label class="f">Abgeholt von</label>
+     <div class="row" style="gap:14px;flex-wrap:wrap;margin:2px 0 4px">
+       <label style="display:flex;align-items:center;gap:6px"><input type="radio" name="ho_who" value="kunde" checked onchange="handoverToggle()"> Kunde selbst${c&&c.name?' ('+esc(c.name)+')':''}</label>
+       <label style="display:flex;align-items:center;gap:6px"><input type="radio" name="ho_who" value="andere" onchange="handoverToggle()"> Andere Person</label>
+     </div>
+     <input class="in" id="ho_name" placeholder="Name der abholenden Person" style="display:none">
+     <label class="f" style="margin-top:10px">Bestätigungstext</label>
+     <textarea class="in" id="ho_text" rows="3">${esc(handoverText())}</textarea>
+     <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px" class="muted"><input type="checkbox" id="ho_savetext"> Diesen Text als Standard speichern</label>
+     <label class="f" style="margin-top:12px">Unterschrift bei Übergabe</label>
+     <div class="sigwrap"><canvas id="psig" width="520" height="150"></canvas></div>
+     <div class="muted" style="font-size:12px;margin-top:6px">Datum, Uhrzeit und der übergebende Mitarbeiter (${esc(curUserName())}) werden automatisch protokolliert.</div>
+     <div class="row" style="margin-top:12px;justify-content:space-between">
+       <button class="btn gho" onclick="clearPSig()">Löschen</button>
+       <button class="btn pri" onclick="handoverDo('${id}')">Gerät übergeben &amp; abschließen</button>
+     </div>
+   </div>`);
+  setTimeout(initPSig,30);
+}
+function handoverToggle(){ const r=document.querySelector('input[name=ho_who]:checked'); const n=document.getElementById('ho_name'); if(n)n.style.display=(r&&r.value==='andere')?'block':'none'; if(r&&r.value==='andere'&&n)n.focus(); }
+function initPSig(){ const c=document.getElementById('psig'); if(!c)return; const ctx=c.getContext('2d');
+  ctx.lineWidth=2.4;ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle='#0e7a3c';
+  let drawing=false,last=null; window.__psigDirty=false;
+  const pos=e=>{const r=c.getBoundingClientRect();const t=e.touches?e.touches[0]:e;return {x:(t.clientX-r.left)*(c.width/r.width),y:(t.clientY-r.top)*(c.height/r.height)};};
+  const start=e=>{drawing=true;last=pos(e);e.preventDefault();};
+  const move=e=>{if(!drawing)return;const p=pos(e);ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(p.x,p.y);ctx.stroke();last=p;window.__psigDirty=true;e.preventDefault();};
+  const end=()=>{drawing=false;};
+  c.addEventListener('mousedown',start);c.addEventListener('mousemove',move);window.addEventListener('mouseup',end);
+  c.addEventListener('touchstart',start,{passive:false});c.addEventListener('touchmove',move,{passive:false});c.addEventListener('touchend',end);
+}
+function clearPSig(){const c=document.getElementById('psig');if(c){c.getContext('2d').clearRect(0,0,c.width,c.height);window.__psigDirty=false;}}
+function handoverDo(id){ const o=S.ord.find(x=>x.id===id); if(!o)return; const c=document.getElementById('psig');
+  if(!window.__psigDirty){toast('Bitte den Erhalt unterschreiben lassen');return;}
+  const who=(document.querySelector('input[name=ho_who]:checked')||{}).value||'kunde';
+  const nm=who==='andere'?((document.getElementById('ho_name')||{}).value||'').trim():'';
+  if(who==='andere'&&!nm){toast('Bitte den Namen der abholenden Person angeben');return;}
+  const txt=((document.getElementById('ho_text')||{}).value||'').trim()||handoverText();
+  if((document.getElementById('ho_savetext')||{}).checked){ ensureSettings().handoverText=txt; }
+  o.pickupSig=c.toDataURL('image/png');
+  o.pickupBy=who; o.pickupName=who==='andere'?nm:((cust(o.cid)||{}).name||'');
+  o.pickupText=txt; o.pickupAt=new Date().toISOString(); o.pickupEmp=curUserName(); o.pickupEmpId=(S.userId||'');
+  if(!o.pickedAt)o.pickedAt=today();
+  const wasStatus=o.status; o.status='abgeholt';
+  (o.statusHistory=o.statusHistory||[]).push({status:'abgeholt',at:new Date().toISOString()});
+  logActivity(o,'status','Gerät übergeben an '+(who==='andere'?('andere Person: '+nm):'Kunde')+' · Abhol-Unterschrift erfasst');
+  save(); if(DB.backend==='server')portalSync(o); closeAll(); toast('Gerät übergeben · Abhol-Unterschrift gespeichert');
+  if(current==='auftraege')views.auftraege(); paintIcons(); refreshBadges();
+  setTimeout(function(){ if(confirm('Übergabe-/Abholbeleg jetzt drucken?'))printHandover(id); else openOrder(id); },150);
+}
+function printHandover(id){ const o=S.ord.find(x=>x.id===id); if(!o)return; const c=cust(o.cid);
+  const recv=o.pickupBy==='andere'?('Andere Person: '+esc(o.pickupName||'—')):('Kunde: '+esc((c&&c.name)||o.pickupName||'—'));
+  printHTML('Übergabebeleg '+o.nr, shopHead()+`<h2>Übergabe-/Abholbeleg</h2>
+    <div class="muted">${esc(SHOP.name)} · ${fmtDateTime(o.pickupAt||new Date().toISOString())}</div>
+    <table><tbody>
+     <tr><th>Auftrag</th><td>${esc(o.nr)}</td></tr>
+     <tr><th>Kunde</th><td>${esc((c&&c.name)||'—')}</td></tr>
+     <tr><th>Gerät</th><td>${esc(oDevLabel(o))}${o.imei?' · IMEI '+esc(o.imei):''}</td></tr>
+     <tr><th>Reparatur</th><td>${esc(oIssueLabel(o))}</td></tr>
+     <tr><th>Abgeholt von</th><td>${recv}</td></tr>
+     <tr><th>Übergeben durch</th><td>${esc(o.pickupEmp||'—')}</td></tr>
+     <tr><th>Datum / Uhrzeit</th><td>${fmtDateTime(o.pickupAt||new Date().toISOString())}</td></tr>
+    </tbody></table>
+    <p style="font-size:13px;margin:14px 0 8px">${esc(o.pickupText||handoverText())}</p>
+    ${o.pickupSig?`<div style="margin-top:10px"><div style="font-size:12px;color:#667">Unterschrift bei Übergabe</div><img src="${o.pickupSig}" style="height:70px;border:1px solid #ddd;border-radius:6px;background:#fff;margin-top:4px"></div>`:''}
+    <div class="foot">${esc(SHOP.name)} · ${esc(SHOP.street||'')} · ${esc((SHOP.zip||'')+' '+(SHOP.city||''))}</div>`);
+  setTimeout(function(){openOrder(id);},50);
+}
+
 /* ============================ NEUER / EDIT AUFTRAG (Reparatur-Eingang, mit Entwurf) ============================ */
 function priceFor(brand,model,repair){const c=ensureCat();const k=brand+'|'+model+'|'+repair;if(c.prices[k]!==undefined&&c.prices[k]!=='')return +c.prices[k];const base=c.base[repair];if(base===undefined)return '';const names=catModelNames(brand);const i=names.indexOf(model);const f=i>=0?1+((i%3)*0.06):1;const bf=(c.brandMul&&c.brandMul[brand])||(brand==='Sonstige'||!brand?1:1.05);return Math.round(base*bf*f);}
 /* v2 Doc #3/#4: Zustand-Sektionen + Zubehör-Optionen (zentral) */
@@ -1428,7 +1530,7 @@ function blankDevice(){return {typ:'Smartphone',brand:'',model:'',imei:'',fach:'
 function normLock(s){s=s||'';if(/PIN|Passwort/i.test(s))return 'PIN';if(/Muster|Pattern/i.test(s))return 'Muster';return 'Kein';}
 function lockLabel(d){const l=normLock(d&&d.lock);if(l==='PIN')return 'PIN'+((d&&d.lockval)?' · '+d.lockval:'');if(l==='Muster')return 'Muster'+((d&&d.lockval)?' · '+d.lockval:'');return '';}
 function techName(id){const u=(typeof S!=='undefined'&&S.users||[]).find(x=>x.id===id);return u?u.name:'';}
-function blankForm(){return {mode:'auftrag',draftId:'',editId:'',quoteEditId:'',fromRequest:'',cid:'',typ:'Privat',anrede:'Herr',firma:'',vorname:'',nachname:'',tel:'+49 ',mail:'',plz:'',stadt:'',adr:'',lock:'Keine',lockval:'',devices:[blankDevice()],prio:'Standard',technikerId:'',notes:'',terminMode:'kein',appt:'',apptTime:'',due:today(),sig:''};}
+function blankForm(){return {mode:'auftrag',draftId:'',editId:'',quoteEditId:'',fromRequest:'',cid:'',typ:'Privat',anrede:'Herr',firma:'',vorname:'',nachname:'',tel:'+49 ',mail:'',plz:'',stadt:'',adr:'',lock:'Keine',lockval:'',devices:[blankDevice()],prio:'Standard',technikerId:'',notes:'',terminMode:'kein',appt:'',apptTime:'',due:today(),sig:'',orderKind:'Privat',insProvider:'',insSchaden:'',insVertrag:'',insSchadendatum:'',insKvaReq:'ja',insSelbst:'',insFreigabeNr:'',insFreigabeBetrag:'',insNote:''};}
 function dPlus(n){const x=new Date();x.setDate(x.getDate()+(+n||0));return x.toISOString().slice(0,10);}
 function newQuote(pref){ closeAll(); NO=blankForm(); NO.mode='angebot'; NO.draftId=uid('dr'); NO.due=dPlus(14); if(pref)Object.assign(NO,pref); current='neworder'; renderNewOrder(); window.scrollTo(0,0); }
 function editQuote(id){ closeAll(); const q=(S.quotes||[]).find(x=>x.id===id); if(!q)return; NO=quoteToForm(q); NO.mode='angebot'; NO.quoteEditId=id; NO.draftId=uid('dr'); current='neworder'; renderNewOrder(); window.scrollTo(0,0); }
@@ -1451,13 +1553,17 @@ let NO=null;
 function newOrder(){ closeAll(); NO=blankForm(); NO.draftId=uid('dr'); current='neworder'; renderNewOrder(); window.scrollTo(0,0); }
 function editOrder(id){ closeAll(); const o=S.ord.find(x=>x.id===id); if(!o)return; NO=orderToForm(o); NO.editId=id; current='neworder'; renderNewOrder(); window.scrollTo(0,0); }
 function resumeDraft(did){ closeAll(); const d=(S.drafts||[]).find(x=>x.id===did); if(!d)return; NO=Object.assign(blankForm(),JSON.parse(JSON.stringify(d.data))); NO.draftId=did; NO.editId=''; current='neworder'; renderNewOrder(); window.scrollTo(0,0); }
-function orderToForm(o){const c=cust(o.cid);const nm=(c.name||'').split(' ');const f=blankForm();f.cid=o.cid;f.typ=c.typ||'Privat';f.firma=c.firma||'';f.anrede=c.anrede||'Herr';f.vorname=nm.slice(0,-1).join(' ')||nm[0]||'';f.nachname=nm.length>1?nm[nm.length-1]:'';f.tel=c.tel||'+49 ';f.mail=c.mail||'';f.plz=c.plz||'';f.stadt=c.stadt||'';f.adr=c.adr||'';f.lock=o.lock||'Keine';f.lockval=o.lockval||'';f.prio=o.prio||'Standard';f.technikerId=o.technikerId||'';f.notes=o.notes||'';f.due=o.due||today();f.appt=o.appt||'';f.apptTime=o.apptTime||'';f.terminMode=o.appt?'termin':'kein';f.sig=o.sig||'';f.devices=oDevices(o).map((d,idx)=>({typ:d.typ||'Smartphone',brand:d.brand||'',model:d.model||'',imei:d.imei||'',fach:d.fach||'',ref:d.ref||'',fehler:d.fehler||'',reparatur:d.reparatur||'',price:(d.price!==undefined&&d.price!==0?d.price:(d.price===0?0:'')),qual:d.qual||'Original',warranty:d.warranty||6,lock:normLock(d.lock!==undefined?d.lock:(idx===0?o.lock:'')),lockval:(d.lockval!==undefined?d.lockval:(idx===0?(o.lockval||''):'')),technikerId:d.technikerId||'',zustand:(d.zustand?JSON.parse(JSON.stringify(d.zustand)):blankZustand()),zsonst:(d.zsonst?JSON.parse(JSON.stringify(d.zsonst)):{}),zubehoer:((d.zubehoer||[]).slice()),zubehoerNote:(d.zubehoerNote||''),fotos:((d.fotos||[]).slice()),lockSet:(d.lockSet!==undefined?d.lockSet:(normLock(d.lock)!=='Kein')),positions:(Array.isArray(d.positions)&&d.positions.length?d.positions.map(p=>({reparatur:p.reparatur||'',qual:p.qual||'Original',price:(p.price!==undefined&&p.price!==''?p.price:'')})):[{reparatur:d.reparatur||'',qual:d.qual||'Original',price:(d.price!==undefined&&d.price!==0?d.price:(d.price===0?0:''))}])}));return f;}
+function orderToForm(o){const c=cust(o.cid);const nm=(c.name||'').split(' ');const f=blankForm();f.cid=o.cid;f.typ=c.typ||'Privat';f.firma=c.firma||'';f.anrede=c.anrede||'Herr';f.vorname=nm.slice(0,-1).join(' ')||nm[0]||'';f.nachname=nm.length>1?nm[nm.length-1]:'';f.tel=c.tel||'+49 ';f.mail=c.mail||'';f.plz=c.plz||'';f.stadt=c.stadt||'';f.adr=c.adr||'';f.lock=o.lock||'Keine';f.lockval=o.lockval||'';f.prio=o.prio||'Standard';f.technikerId=o.technikerId||'';f.notes=o.notes||'';f.due=o.due||today();f.appt=o.appt||'';f.apptTime=o.apptTime||'';f.terminMode=o.appt?'termin':'kein';f.sig=o.sig||'';
+  f.orderKind=o.kind||((o.ins&&o.ins.on)?'Versicherung':'Privat');const _in=o.ins||{};f.insProvider=_in.provider||'';f.insSchaden=_in.claimNr||'';f.insVertrag=_in.vertrag||'';f.insSchadendatum=_in.schadendatum||'';f.insKvaReq=_in.kvaReq||'ja';f.insSelbst=(_in.selbst!==undefined&&_in.selbst!==0?_in.selbst:'');f.insFreigabeNr=_in.freigabeNr||'';f.insFreigabeBetrag=(_in.freigabeBetrag||'');f.insNote=_in.note||'';
+  f.devices=oDevices(o).map((d,idx)=>({typ:d.typ||'Smartphone',brand:d.brand||'',model:d.model||'',imei:d.imei||'',fach:d.fach||'',ref:d.ref||'',fehler:d.fehler||'',reparatur:d.reparatur||'',price:(d.price!==undefined&&d.price!==0?d.price:(d.price===0?0:'')),qual:d.qual||'Original',warranty:d.warranty||6,lock:normLock(d.lock!==undefined?d.lock:(idx===0?o.lock:'')),lockval:(d.lockval!==undefined?d.lockval:(idx===0?(o.lockval||''):'')),technikerId:d.technikerId||'',zustand:(d.zustand?JSON.parse(JSON.stringify(d.zustand)):blankZustand()),zsonst:(d.zsonst?JSON.parse(JSON.stringify(d.zsonst)):{}),zubehoer:((d.zubehoer||[]).slice()),zubehoerNote:(d.zubehoerNote||''),fotos:((d.fotos||[]).slice()),lockSet:(d.lockSet!==undefined?d.lockSet:(normLock(d.lock)!=='Kein')),positions:(Array.isArray(d.positions)&&d.positions.length?d.positions.map(p=>({reparatur:p.reparatur||'',qual:p.qual||'Original',price:(p.price!==undefined&&p.price!==''?p.price:'')})):[{reparatur:d.reparatur||'',qual:d.qual||'Original',price:(d.price!==undefined&&d.price!==0?d.price:(d.price===0?0:''))}])}));return f;}
 function noHasContent(){ if(!NO)return false; const d=NO.devices[0]||{}; return !!(NO.vorname||NO.nachname||(NO.tel||'').replace(/\D/g,'').length>3||NO.firma||NO.mail||d.brand||d.model||d.reparatur||(d.positions&&d.positions.some(p=>p.reparatur))||NO.notes); }
 function noTitleOf(){const nm=((NO.vorname+' '+NO.nachname).trim())||NO.firma||'Unbenannter Kunde';const d=NO.devices[0]||{};const dev=[d.brand,d.model].filter(Boolean).join(' ');return nm+(dev?' · '+dev:'');}
 function noCollect(){ if(!NO)return; const g=id=>{const e=document.getElementById(id);return e?e.value:null;}; let v;
   /* step-sicher: nur überschreiben, wenn das Feld gerade sichtbar/gerendert ist */
   v=g('no_typ');if(v!=null)NO.typ=v; v=g('no_anrede');if(v!=null)NO.anrede=v; v=g('no_firma');if(v!=null)NO.firma=v; v=g('no_vorname');if(v!=null)NO.vorname=v; v=g('no_nachname');if(v!=null)NO.nachname=v; v=g('no_tel');if(v!=null)NO.tel=v; v=g('no_mail');if(v!=null)NO.mail=v; v=g('no_plz');if(v!=null)NO.plz=v; v=g('no_stadt');if(v!=null)NO.stadt=v; v=g('no_adr');if(v!=null)NO.adr=v;
   v=g('no_prio');if(v!=null)NO.prio=v; v=g('no_tech');if(v!=null)NO.technikerId=v; v=g('no_notes');if(v!=null)NO.notes=v; v=g('no_due');if(v!=null)NO.due=v; v=g('no_appt');if(v!=null)NO.appt=v; v=g('no_appttime');if(v!=null)NO.apptTime=v;
+  {const rk=document.querySelector('input[name=no_kind]:checked');if(rk)NO.orderKind=rk.value;}
+  v=g('no_insprov');if(v!=null)NO.insProvider=v; v=g('no_insschaden');if(v!=null)NO.insSchaden=v; v=g('no_insvertrag');if(v!=null)NO.insVertrag=v; v=g('no_insschadendatum');if(v!=null)NO.insSchadendatum=v; v=g('no_inskva');if(v!=null)NO.insKvaReq=v; v=g('no_insselbst');if(v!=null)NO.insSelbst=v; v=g('no_insfreigabenr');if(v!=null)NO.insFreigabeNr=v; v=g('no_insfreigabebetrag');if(v!=null)NO.insFreigabeBetrag=v; v=g('no_insnote');if(v!=null)NO.insNote=v;
   const tm=document.querySelector('input[name=no_termin]:checked');if(tm)NO.terminMode=tm.value;
   NO.devices.forEach((d,i)=>{ let w;
     w=g('dev'+i+'_typ');if(w!=null)d.typ=w; w=g('dev'+i+'_brand');if(w!=null)d.brand=w; w=g('dev'+i+'_model');if(w!=null)d.model=w; w=g('dev'+i+'_imei');if(w!=null)d.imei=w; w=g('dev'+i+'_fach');if(w!=null)d.fach=w; w=g('dev'+i+'_ref');if(w!=null)d.ref=w; w=g('dev'+i+'_fehler');if(w!=null)d.fehler=w; w=g('dev'+i+'_warranty');if(w!=null&&w!=='')d.warranty=w;
@@ -1601,6 +1707,9 @@ function noRemoveDevice(i){noCollect();NO.devices.splice(i,1);renderNewOrder();}
 function noTyp(){noCollect();renderNewOrder();}
 function noLock(){noCollect();renderNewOrder();}
 function noTermin(){noCollect();renderNewOrder();}
+function noKind(){noCollect();const r=document.querySelector('input[name=no_kind]:checked');if(r)NO.orderKind=r.value;renderNewOrder();}
+/* baut aus dem Formular das Versicherungs-Objekt (oder null bei Privat) */
+function noInsFromForm(existing){ if(NO.orderKind!=='Versicherung')return null; const prev=existing||{}; return {on:true,provider:NO.insProvider||prev.provider||'',vertrag:NO.insVertrag||'',claimNr:NO.insSchaden||'',schadendatum:NO.insSchadendatum||'',kvaReq:NO.insKvaReq||'ja',selbst:+NO.insSelbst||0,freigabeNr:NO.insFreigabeNr||'',freigabeBetrag:+NO.insFreigabeBetrag||0,note:NO.insNote||'',status:prev.status||'kva_erstellen',submittedAt:prev.submittedAt||'',approvedAt:prev.approvedAt||''}; }
 function noPickCustomer(){const el=document.getElementById('no_search');const v=(el&&el.value||'').trim();if(!v)return;const tel=v.split('·').pop().trim();let c=S.cust.find(x=>(x.name+' · '+x.tel)===v)||S.cust.find(x=>x.tel===tel)||S.cust.find(x=>x.name&&v.toLowerCase().includes(x.name.toLowerCase()));if(!c)return;noCollect();NO.cid=c.id;const nm=(c.name||'').split(' ');NO.vorname=nm.slice(0,-1).join(' ')||nm[0]||'';NO.nachname=nm.length>1?nm[nm.length-1]:'';NO.tel=c.tel||NO.tel;NO.mail=c.mail||'';NO.adr=c.adr||'';NO.plz=c.plz||'';NO.stadt=c.stadt||'';NO.typ=c.typ||'Privat';NO.firma=c.firma||'';NO.anrede=c.anrede||'Herr';renderNewOrder();toast('Kunde übernommen: '+c.name);}
 function noSign(){ openModal(`<div class="dhead"><b style="flex:1">Unterschrift des Kunden</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
   <div class="dbody"><div class="note" style="margin-bottom:12px">Der Kunde bestätigt die Auftragserteilung und die Kenntnisnahme des Hinweises zur Datensicherung. Für Datenverlust wird keine Haftung übernommen.</div>
@@ -1848,9 +1957,9 @@ function noFinalize(){ noCollect();
   if(req.imei&&NO.devices.some(d=>(d.brand||d.model)&&!(d.imei||'').trim())){toast('Pflichtfeld: IMEI/Seriennummer je Gerät angeben');return;}
   if(req.sig&&!NO.sig){toast('Pflichtfeld: Unterschrift des Kunden erfassen');return;}
   const devs=noBuildDevices();
-  if(NO.editId){const o=S.ord.find(x=>x.id===NO.editId);if(o){const _oT=o.technikerId||'';const _oTot=oTotal(o);Object.assign(o,{cid:c.id,devices:devs},noMirror(devs),{lock:NO.lock,lockval:NO.lockval,prio:NO.prio,appt:NO.terminMode==='termin'?NO.appt:'',apptTime:NO.terminMode==='termin'?(NO.apptTime||''):'',due:NO.due,notes:NO.notes,technikerId:NO.technikerId,sig:NO.sig||o.sig,sigConsents:NO.sigConsents||o.sigConsents||null,sigVia:NO.sigVia||o.sigVia||''});const _p=[];if(oTotal(o)!==_oTot)_p.push('Preis');if((o.technikerId||'')!==_oT)logActivity(o,'assign',o.technikerId?('an '+techName(o.technikerId)):'Zuweisung entfernt');logActivity(o,'edit',_p.length?_p.join(', '):'Auftragsdaten aktualisiert');noSyncTermin(o);}save();toast('Auftrag gespeichert');NO=null;go('auftraege');return;}
+  if(NO.editId){const o=S.ord.find(x=>x.id===NO.editId);if(o){const _oT=o.technikerId||'';const _oTot=oTotal(o);Object.assign(o,{cid:c.id,devices:devs},noMirror(devs),{lock:NO.lock,lockval:NO.lockval,prio:NO.prio,appt:NO.terminMode==='termin'?NO.appt:'',apptTime:NO.terminMode==='termin'?(NO.apptTime||''):'',due:NO.due,notes:NO.notes,technikerId:NO.technikerId,sig:NO.sig||o.sig,sigConsents:NO.sigConsents||o.sigConsents||null,sigVia:NO.sigVia||o.sigVia||'',kind:NO.orderKind||'Privat',ins:noInsFromForm(o.ins)});const _p=[];if(oTotal(o)!==_oTot)_p.push('Preis');if((o.technikerId||'')!==_oT)logActivity(o,'assign',o.technikerId?('an '+techName(o.technikerId)):'Zuweisung entfernt');logActivity(o,'edit',_p.length?_p.join(', '):'Auftragsdaten aktualisiert');noSyncTermin(o);}save();toast('Auftrag gespeichert');NO=null;go('auftraege');return;}
   const nr=nextOrderNr();
-  const o=Object.assign({id:uid('o'),nr,cid:c.id,devices:devs,lock:NO.lock,lockval:NO.lockval,status:'offen',prio:NO.prio,created:today(),due:NO.due,appt:NO.terminMode==='termin'?NO.appt:'',apptTime:NO.terminMode==='termin'?(NO.apptTime||''):'',notes:NO.notes,readyAt:'',sig:NO.sig||'',sigConsents:NO.sigConsents||null,sigVia:NO.sigVia||'',source:(NO.herkunft?'vorab':''),herkunft:NO.herkunft||'',via:NO.reqVia||'',technikerId:NO.technikerId},noMirror(devs));
+  const o=Object.assign({id:uid('o'),nr,cid:c.id,devices:devs,lock:NO.lock,lockval:NO.lockval,status:'offen',prio:NO.prio,created:today(),due:NO.due,appt:NO.terminMode==='termin'?NO.appt:'',apptTime:NO.terminMode==='termin'?(NO.apptTime||''):'',notes:NO.notes,readyAt:'',sig:NO.sig||'',sigConsents:NO.sigConsents||null,sigVia:NO.sigVia||'',source:(NO.herkunft?'vorab':''),herkunft:NO.herkunft||'',via:NO.reqVia||'',technikerId:NO.technikerId,kind:NO.orderKind||'Privat',ins:noInsFromForm(null)},noMirror(devs));
   if(NO.diagPhoto)o.photos=[NO.diagPhoto];
   stampOrderCreate(o); /* Welle 2 #6: Ersteller/Filiale + Protokoll */
   S.ord.unshift(o); sendOrderConfirmation(o,{silent:false}); /* V4-2: automatische Auftragsbestätigung */
@@ -2012,6 +2121,21 @@ function noAuftragContent(){ const techs=S.users||[];
        <div><label class="f">Termin</label><div class="row">${[['kein','Kein Termin'],['termin','Termin vereinbaren']].map(t=>`<label class="chip ${NO.terminMode===t[0]?'on':''}" style="cursor:pointer"><input type="radio" name="no_termin" value="${t[0]}" ${NO.terminMode===t[0]?'checked':''} onchange="noTermin()" style="display:none">${t[1]}</label>`).join('')}</div></div>
        <div id="no_apptwrap" style="${NO.terminMode==='termin'?'':'display:none'}"><label class="f">Termin (Datum &amp; Uhrzeit)</label><div class="grid g2"><input class="in" id="no_appt" type="date" value="${NO.appt}"><input class="in" id="no_appttime" type="time" value="${esc(NO.apptTime||'')}"></div><div class="muted" style="font-size:11px;margin-top:4px">Mit Uhrzeit erscheint der Termin im Kalender.</div></div>
      </div>
+     <label class="f" style="margin-top:14px">Auftragsart *</label>
+     <div class="row" style="gap:8px">${[['Privat','Privat'],['Versicherung','🛡 Versicherung']].map(k=>`<label class="chip ${NO.orderKind===k[0]?'on':''}" style="cursor:pointer"><input type="radio" name="no_kind" value="${k[0]}" ${NO.orderKind===k[0]?'checked':''} onchange="noKind()" style="display:none">${k[1]}</label>`).join('')}</div>
+     ${NO.orderKind==='Versicherung'?`<div class="card" style="background:var(--soft);border:0;margin-top:10px"><b style="font-size:13px">🛡 Versicherungsdaten</b>
+       <div class="grid g2" style="margin-top:8px">
+         <div><label class="f">Versicherungsgesellschaft *</label><select class="in" id="no_insprov">${[''].concat(Object.keys(INSURERS)).map(p=>`<option value="${esc(p)}" ${NO.insProvider===p?'selected':''}>${p?esc(insProvDef(p).lbl):'— wählen —'}</option>`).join('')}</select></div>
+         <div><label class="f">Schaden-/Fallnummer</label><input class="in" id="no_insschaden" value="${esc(NO.insSchaden)}" placeholder="falls vorhanden"></div>
+         <div><label class="f">Vertrags-/Versicherungsnr.</label><input class="in" id="no_insvertrag" value="${esc(NO.insVertrag)}"></div>
+         <div><label class="f">Schadendatum</label><input class="in" id="no_insschadendatum" type="date" value="${esc(NO.insSchadendatum)}"></div>
+         <div><label class="f">Kostenvoranschlag erforderlich</label><select class="in" id="no_inskva">${[['ja','Ja'],['nein','Nein']].map(x=>`<option value="${x[0]}" ${NO.insKvaReq===x[0]?'selected':''}>${x[1]}</option>`).join('')}</select></div>
+         <div><label class="f">Selbstbeteiligung (€)</label><input class="in" id="no_insselbst" type="number" step="0.01" value="${esc(NO.insSelbst)}" placeholder="0.00"></div>
+         <div><label class="f">Freigabenummer</label><input class="in" id="no_insfreigabenr" value="${esc(NO.insFreigabeNr)}" placeholder="optional"></div>
+         <div><label class="f">Freigabebetrag (€)</label><input class="in" id="no_insfreigabebetrag" type="number" step="0.01" value="${esc(NO.insFreigabeBetrag)}" placeholder="optional"></div>
+       </div>
+       <label class="f" style="margin-top:8px">Interne Notiz zum Versicherungsfall</label>
+       <textarea class="in" id="no_insnote" rows="2">${esc(NO.insNote)}</textarea></div>`:''}
      <label class="f" style="margin-top:14px">Detaillierte Informationen &amp; Notizen</label>
      <textarea class="in" id="no_notes" rows="3" placeholder="z. B. Daten sichern, Schutzfolie aufbringen, Kundenhinweise…">${esc(NO.notes)}</textarea>
      <div class="divider"></div>
@@ -2325,8 +2449,48 @@ function mailBrandHtml(o,opts){ opts=opts||{}; const ACC='#0e7a3c';
     <div style="padding:22px 24px;color:#1a2b22">${opts.title?`<div style="font-size:18px;font-weight:800;margin-bottom:10px;color:#1a2b22">${esc(opts.title)}</div>`:''}${opts.greeting?`<div style="font-size:14px;margin-bottom:10px;color:#1a2b22">${esc(opts.greeting)}</div>`:''}<div style="font-size:14px;line-height:1.55;white-space:pre-wrap;color:#33403a">${esc(opts.bodyText||'')}</div>${info}${cta}</div>
     <div style="padding:16px 24px;background:#f6f9f7;color:#667;font-size:12px;line-height:1.5"><b style="color:#1a2b22">${esc(SHOP.name)}</b>${addr?' · '+esc(addr):''}${foot?'<br>'+foot:''}</div>
   </div></div>`; }
-function sendCustomerMail(o,to,subject,text,opts){ const id=mailIdentity();
-  return fetch(API+'/api/mail/send',{method:'POST',headers:DB._hdr(),body:JSON.stringify({to:to,subject:subject,body:text,html:mailBrandHtml(o,Object.assign({bodyText:text},opts||{})),fromName:id.fromName,replyTo:id.replyTo})}).then(r=>r.json()); }
+function sendCustomerMail(o,to,subject,text,opts){ const id=mailIdentity(); opts=opts||{};
+  const payload={to:to,subject:subject,body:text,html:mailBrandHtml(o,Object.assign({bodyText:text},opts)),fromName:id.fromName,replyTo:id.replyTo};
+  if(opts.attachments&&opts.attachments.length)payload.attachments=opts.attachments;
+  return fetch(API+'/api/mail/send',{method:'POST',headers:DB._hdr(),body:JSON.stringify(payload)}).then(r=>r.json()); }
+/* Doc #12: Annahmefotos an den KUNDEN weiterleiten – mit Foto-Freigabe-Auswahl, echtem Anhang, Protokoll (Mitarbeiter/Zeit/Status). Original-Annahmefotos bleiben unberührt. */
+function custPhotoList(o){ const out=[]; (oDevices(o)||[]).forEach((d,di)=>(d.fotos||[]).forEach((f,fi)=>{const s=photoSrc(f);if(s)out.push({src:s,key:'d'+di+'_'+fi});})); (o.photos||[]).forEach((p,pi)=>{const s=photoSrc(p);if(s)out.push({src:s,key:'p'+pi});}); return out; }
+function custPhotosDialog(id){ const o=S.ord.find(x=>x.id===id); if(!o)return; const c=cust(o.cid); const list=custPhotoList(o);
+  if(!list.length){ toast('Keine Annahmefotos an diesem Auftrag'); return; }
+  if(DB.backend!=='server'){ toast('Foto-Versand nur im Online-Betrieb'); return; }
+  const to=(c&&c.mail)||'';
+  openModal(`<div class="dhead"><b style="flex:1">Annahmefotos an Kunden senden</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
+   <div class="dbody">
+     <p class="muted" style="font-size:13px">Wählen Sie die Fotos zur Freigabe. Die ausgewählten Bilder werden als JPEG an den Kunden angehängt. Die Original-Annahmefotos bleiben unverändert erhalten.</p>
+     <label class="f">Empfänger-E-Mail</label><input class="in" id="cph_to" type="email" value="${esc(to)}" placeholder="kunde@example.de">
+     <label class="f" style="margin-top:10px">Fotos freigeben (${list.length})</label>
+     <div class="row" style="flex-wrap:wrap;gap:10px;margin-top:4px">${list.map((f,i)=>`<label style="position:relative;cursor:pointer"><input type="checkbox" class="cph_sel" data-src="${esc(f.src)}" checked style="position:absolute;top:4px;left:4px;z-index:2;width:18px;height:18px"><img src="${esc(f.src)}" style="width:84px;height:84px;object-fit:cover;border-radius:8px;border:1px solid var(--line)"></label>`).join('')}</div>
+     <div class="row" style="margin-top:8px;gap:8px"><button class="btn sm gho" onclick="document.querySelectorAll('.cph_sel').forEach(x=>x.checked=true)">Alle</button><button class="btn sm gho" onclick="document.querySelectorAll('.cph_sel').forEach(x=>x.checked=false)">Keine</button></div>
+     <div class="row" style="margin-top:14px;justify-content:flex-end;gap:8px"><button class="btn gho" onclick="closeAll()">Abbrechen</button><button class="btn pri" id="cph_send" onclick="custPhotosSend('${id}')">Senden</button></div>
+   </div>`);
+}
+function custPhotosSend(id){ const o=S.ord.find(x=>x.id===id); if(!o)return; const c=cust(o.cid);
+  const to=((document.getElementById('cph_to')||{}).value||'').trim();
+  if(!to||to.indexOf('@')<0){ toast('Bitte gültige Empfänger-E-Mail eingeben'); return; }
+  const srcs=Array.prototype.slice.call(document.querySelectorAll('.cph_sel')).filter(x=>x.checked).map(x=>x.getAttribute('data-src'));
+  if(!srcs.length){ toast('Bitte mindestens ein Foto auswählen'); return; }
+  const btn=document.getElementById('cph_send'); if(btn){btn.disabled=true;btn.textContent='Wird gesendet…';}
+  const nm=(c&&c.name)||'Kunde'; const date=(o.created||today()); const base=_fnSafe(o.nr)+'_'+_fnSafe(nm)+'_'+date;
+  let pend=srcs.length; const atts=[];
+  srcs.forEach((src,i)=>_toJpegDataUrl(src,function(j){ atts.push({filename:base+'_'+(i+1)+'.jpg',dataUrl:j});
+    if(--pend===0){
+      const subj=SHOP.name+' – Fotos zu Ihrem Auftrag '+o.nr;
+      const text='anbei die Fotos, die wir bei der Annahme Ihres Geräts ('+oDevLabel(o)+') aufgenommen haben.';
+      sendCustomerMail(o,to,subj,text,{title:'Fotos zur Geräteannahme',greeting:'Guten Tag '+((c&&c.name)||'')+',',attachments:atts}).then(res=>{
+        const ok=!!(res&&res.sent);
+        commLog(o,'out',false,'Annahmefotos gesendet ('+atts.length+' Foto'+(atts.length>1?'s':'')+') an '+to,'nachricht');
+        logActivity(o,'mail','Annahmefotos an Kunden gesendet – '+atts.length+' Foto'+(atts.length>1?'s':'')+' · '+(ok?'zugestellt':'Fehler beim Versand')+' · '+to);
+        save(); closeAll(); portalSync(o); openOrder(o.id);
+        toast(ok?('📷 '+atts.length+' Foto'+(atts.length>1?'s':'')+' an Kunden gesendet'):'Fotos konnten nicht gesendet werden');
+      }).catch(()=>{ if(btn){btn.disabled=false;btn.textContent='Senden';} toast('Fotos konnten nicht gesendet werden'); });
+    }
+  }));
+}
 function _orderSendMsg(o,text,kind,subject){ const c=cust(o.cid); commLog(o,'out',false,text,kind); logActivity(o,'mail',kind==='kva'?'Kostenvoranschlag gesendet':'Nachricht gesendet'); save();
   if(DB.backend==='server'&&c.mail){ sendCustomerMail(o,c.mail,SHOP.name+' – '+(kind==='kva'?'Kostenvoranschlag':'Update')+' zu Auftrag '+o.nr,text,{title:(kind==='kva'?'Ihr Kostenvoranschlag':'Nachricht Ihrer Werkstatt'),greeting:'Guten Tag '+(c.name||'')+','}).then(res=>{ toast(res.sent?'✓ An Kunden gesendet':'Protokolliert (E-Mail: '+(res.note||'—')+')'); }).catch(()=>toast('Gesendet (Protokoll)')); }
   else { S.mailLog&&S.mailLog.unshift({t:new Date().toISOString(),to:c.name,ch:'E-Mail',rule:kind==='kva'?'Kostenvoranschlag':'Kundennachricht',subj:subject,how:'manuell'}); toast(c.mail?'Nachricht protokolliert':'Keine Kunden-E-Mail – nur protokolliert'); }
@@ -3433,9 +3597,10 @@ function ordSetLabor(orderId,min){const o=S.ord.find(x=>x.id===orderId);if(o){o.
 function imgToDataURL(file,max,q,cb){const rd=new FileReader();rd.onload=function(){const im=new Image();im.onload=function(){const cv=document.createElement('canvas');let w=im.width,h=im.height;if(w>=h&&w>max){h=Math.round(h*max/w);w=max;}else if(h>w&&h>max){w=Math.round(w*max/h);h=max;}cv.width=w;cv.height=h;cv.getContext('2d').drawImage(im,0,0,w,h);cb(cv.toDataURL('image/jpeg',q||0.82));};im.src=rd.result;};rd.readAsDataURL(file);}
 function ordAddPhoto(orderId,input){const f=input.files&&input.files[0];if(!f)return;imgToDataURL(f,800,0.82,function(url){const o=S.ord.find(x=>x.id===orderId);if(!o)return;o.photos=o.photos||[];photoUpload(url,orderId,function(ref){o.photos.push(ref);save();openOrder(orderId);toast('Foto hinzugefügt');});});}
 function ordDelPhoto(orderId,idx){const o=S.ord.find(x=>x.id===orderId);if(o&&o.photos){o.photos.splice(idx,1);save();openOrder(orderId);}}
-function photoSection(o){const ph=o.photos||[];return `<label class="f" style="margin-top:16px">Fotos (${ph.length}) <span class="muted" style="font-weight:400">– Zustand, Schaden, Vorher/Nachher</span></label>
+function photoSection(o){const ph=o.photos||[];const nInt=custPhotoList(o).length;return `<label class="f" style="margin-top:16px">Fotos (${ph.length}) <span class="muted" style="font-weight:400">– Zustand, Schaden, Vorher/Nachher</span></label>
   <div class="row" style="flex-wrap:wrap;gap:8px">${ph.map((p,i)=>`<div style="position:relative"><img src="${photoSrc(p)}" style="width:74px;height:74px;object-fit:cover;border-radius:8px;border:1px solid var(--line)"><a onclick="ordDelPhoto('${o.id}',${i})" title="Entfernen" style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:#fff;border-radius:50%;width:18px;height:18px;display:grid;place-items:center;font-size:11px;cursor:pointer">✕</a></div>`).join('')}<label class="btn sm gho" style="cursor:pointer;align-self:center">+ Foto<input type="file" accept="image/*" capture="environment" style="display:none" onchange="ordAddPhoto('${o.id}',this)"></label></div>
-  ${ph.length?'<div class="muted" style="font-size:12px;margin-top:4px">Diese Fotos sieht der Kunde live auf seiner Status-Seite.</div>':''}`;
+  ${ph.length?'<div class="muted" style="font-size:12px;margin-top:4px">Diese Fotos sieht der Kunde live auf seiner Status-Seite.</div>':''}
+  ${nInt?`<div style="margin-top:10px"><button class="btn sm" onclick="custPhotosDialog('${o.id}')">📧 Annahmefotos an Kunden senden (${nInt})</button></div>`:''}`;
 }
 
 /* ============================ B2B-VERTRÄGE (L21) ============================ */
@@ -4425,6 +4590,9 @@ views.einstellungen=function(){
        <label class="f" style="margin-top:12px">📷 E-Mail für Annahme-Fotos</label>
        <input class="in" type="email" value="${esc(st.photoEmail||'')}" placeholder="fotos@deinhandydoc.de" onchange="ensureSettings().photoEmail=this.value.trim();save()">
        <div class="muted" style="font-size:12px;margin-top:6px">Nach dem Speichern eines Auftrags werden die bei der Annahme aufgenommenen Fotos automatisch als <b>JPEG</b> an diese Adresse gesendet – Betreff und Dateiname enthalten Auftragsnummer, Kundenname und Datum. Leer lassen = kein Versand.${DB.backend!=='server'?' <b>Hinweis:</b> Versand nur im Online-Betrieb.':''}</div>
+       <label class="f" style="margin-top:12px">📦 Bestätigungstext bei Geräteübergabe</label>
+       <textarea class="in" rows="3" placeholder="Ich bestätige den Erhalt des Geräts…" onchange="ensureSettings().handoverText=this.value;save()">${esc(st.handoverText||'')}</textarea>
+       <div class="muted" style="font-size:12px;margin-top:6px">Erscheint bei der Abhol-Unterschrift und auf dem Übergabebeleg. Leer lassen = Standardtext.</div>
        <label class="f" style="margin-top:12px">AGB / Hinweistext (erscheint auf dem Beleg)</label>
        <textarea class="in" rows="4" onchange="ensureSettings().agb=this.value;save()">${esc(st.agb)}</textarea>`;})()}
      </div>
@@ -4559,7 +4727,11 @@ function insPartnerNr(p){const r=ensureInsurers()[p];return (r&&r.partnerNr)||en
 function wgConnect(){const w=ensureInsurance();const p=document.getElementById('wg_partner');w.partnerNr=(p&&p.value.trim())||w.partnerNr||'FH-72336-4471';w.connected=true;w.active=true;save();toast('Wertgarantie verbunden');views.einstellungen();paintIcons();}
 function wgDisconnect(){const w=ensureInsurance();w.connected=false;save();toast('Wertgarantie getrennt');views.einstellungen();paintIcons();}
 function insErstattung(o){return Math.max(0,(+o.price||0)-(+((o.ins&&o.ins.selbst)||0)));}
-const WG_LBL={geprueft:['Vertrag geprüft','soft'],eingereicht:['Eingereicht','soft'],freigegeben:['Freigegeben','solid'],abgelehnt:['Abgelehnt','soft'],abgerechnet:['Abgerechnet','solid']};
+const WG_LBL={kva_erstellen:['KVA erstellen','dash'],kva_gesendet:['KVA gesendet','soft'],warte_freigabe:['Warte auf Freigabe','soft'],freigegeben:['Freigegeben','solid'],teilfreigabe:['Teilfreigabe / Rückfrage','soft'],abgelehnt:['Abgelehnt','soft'],reparatur:['Reparatur läuft','soft'],abgeschlossen:['Abgeschlossen','solid'],
+  /* Alt-Status (kompatibel) */ geprueft:['Vertrag geprüft','soft'],eingereicht:['Eingereicht','soft'],abgerechnet:['Abgerechnet','solid']};
+const INS_STATUS_FLOW=['kva_erstellen','kva_gesendet','warte_freigabe','freigegeben','teilfreigabe','abgelehnt','reparatur','abgeschlossen'];
+function insStatusLabel(st){return (WG_LBL[st]||['—'])[0];}
+function insSetStatus(id,st){const o=S.ord.find(x=>x.id===id);if(!o||!o.ins)return;o.ins.status=st;if(st==='freigegeben'&&!o.ins.approvedAt)o.ins.approvedAt=today();if(st==='kva_gesendet'&&!o.ins.submittedAt)o.ins.submittedAt=today();logActivity(o,'ins','Versicherungsstatus: '+insStatusLabel(st));save();afterIns(id);toast('Versicherungsstatus: '+insStatusLabel(st));}
 function insBadge(st){const x=WG_LBL[st]||['—','soft'];return `<span class="pill ${x[1]}"><span class="d"></span>${x[0]}</span>`;}
 function insPanel(o){
   ensureInsurance();
@@ -4574,15 +4746,24 @@ function insPanel(o){
   else if(w.status==='freigegeben') actions=pd.direct?`<button class="btn pri" onclick="insBill('${o.id}')">Mit ${esc(pd.lbl)} abrechnen</button>`:`<button class="btn pri" onclick="insBill('${o.id}')">Nachweis für Kunden erstellen</button><span class="muted" style="font-size:12px;align-self:center">Kunde zahlt, reicht selbst ein</span>`;
   else if(w.status==='abgerechnet') actions=`<span class="muted" style="font-size:13px;align-self:center">${pd.direct?'Erstattung '+eur(insErstattung(o))+' abgerechnet.':'Nachweis erstellt – Kunde reicht selbst ein.'}</span>`;
   else if(w.status==='abgelehnt') actions=`<span class="muted" style="font-size:13px;align-self:center">Kunde zahlt selbst.</span><button class="btn" onclick="insSubmit('${o.id}')">Erneut einreichen</button>`;
+  const stOpts=INS_STATUS_FLOW.concat(INS_STATUS_FLOW.includes(w.status)?[]:[w.status]);
   return `<div class="divider"></div>
    <div class="between"><label class="f" style="margin:0">Versicherung · ${esc(pd.lbl)}${pd.direct?'':' <span class="tag">keine Direktabrechnung</span>'}</label>${insBadge(w.status)}</div>
    <div class="card" style="background:var(--soft);border:0;margin-top:8px">
      <div class="grid g2">
+       <div><label class="f">Versicherungsgesellschaft</label><div style="font-weight:700">${esc(pd.lbl)}</div></div>
        <div><label class="f">Vertragsnummer</label><div style="font-weight:700">${esc(w.vertrag||'—')}</div></div>
-       <div><label class="f">Schaden-Nr.</label><div style="font-weight:700">${esc(w.claimNr||'—')}</div></div>
+       <div><label class="f">Schaden-/Fallnummer</label><div style="font-weight:700">${esc(w.claimNr||'—')}</div></div>
+       <div><label class="f">Schadendatum</label><div style="font-weight:700">${w.schadendatum?fmtDate(w.schadendatum):'—'}</div></div>
+       <div><label class="f">KVA erforderlich</label><div style="font-weight:700">${w.kvaReq==='nein'?'Nein':'Ja'}</div></div>
        <div><label class="f">Selbstbeteiligung (Kunde)</label><div style="font-weight:700">${eur(w.selbst)}</div></div>
+       <div><label class="f">Freigabenummer</label><div style="font-weight:700">${esc(w.freigabeNr||'—')}</div></div>
+       <div><label class="f">Freigabebetrag</label><div style="font-weight:700">${w.freigabeBetrag?eur(w.freigabeBetrag):'—'}</div></div>
        <div><label class="f">${gf?'Erstattung '+esc(pd.lbl):'Übernahme'}</label><div style="font-weight:800">${gf?eur(insErstattung(o)):((w.status==='freigegeben'||w.status==='abgerechnet')?(pd.direct?'übernommen':'selbst einreichen'):'—')}</div></div>
      </div>
+     ${w.note?`<div style="margin-top:10px"><label class="f">Interne Notiz</label><div style="font-size:13px;white-space:pre-wrap">${esc(w.note)}</div></div>`:''}
+     <div style="margin-top:12px"><label class="f">Bearbeitungsstatus</label>
+       <select class="in" style="width:auto;min-width:220px" onchange="insSetStatus('${o.id}',this.value)">${stOpts.map(s=>`<option value="${s}" ${w.status===s?'selected':''}>${esc(insStatusLabel(s))}</option>`).join('')}</select></div>
      <div class="row" style="margin-top:12px;flex-wrap:wrap;gap:8px">${actions}
        <button class="btn" onclick="insDoc('${o.id}')">Schadensmeldung anzeigen</button>
        <button class="btn gho" onclick="insRemove('${o.id}')">Entfernen</button></div>
@@ -4646,37 +4827,58 @@ function wgAcceptLead(id){const l=(S.wgLeads||[]).find(x=>x.id===id);if(!l)retur
   toast('Auftrag '+nr+' angelegt (Wertgarantie)'); views.versicherung(); refreshBadges();
 }
 function wgDismissLead(id){S.wgLeads=(S.wgLeads||[]).filter(x=>x.id!==id);save();views.versicherung();refreshBadges();toast('Vermittlung abgelehnt');}
+let insFilter='alle', insProvFilter='alle';
 views.versicherung=function(){
   ensureInsurance();ensureInsurers();
   const m=document.getElementById('main');
   const gf=curRole()==='inhaber';
   const conn=connectedInsurers();
-  const cases=S.ord.filter(o=>o.ins&&o.ins.on);
-  const offen=cases.filter(o=>['geprueft','eingereicht'].includes(o.ins.status)).length;
-  const freig=cases.filter(o=>o.ins.status==='freigegeben').length;
+  const all=S.ord||[];
+  const cases=all.filter(o=>o.ins&&o.ins.on);
+  const offen=cases.filter(o=>['geprueft','eingereicht','kva_erstellen','kva_gesendet','warte_freigabe'].includes(o.ins.status)).length;
+  const freig=cases.filter(o=>['freigegeben','teilfreigabe'].includes(o.ins.status)).length;
+  const abgelehnt=cases.filter(o=>o.ins.status==='abgelehnt').length;
   const ausstehend=cases.filter(o=>o.ins.status==='freigegeben'&&insProvDef(o.ins.provider).direct).reduce((s,o)=>s+insErstattung(o),0);
   const erstattetM=cases.filter(o=>o.ins.status==='abgerechnet'&&insProvDef(o.ins.provider).direct&&isThisMonth(o.ins.approvedAt||o.readyAt||o.created)).reduce((s,o)=>s+insErstattung(o),0);
+  /* Privat vs Versicherung – Statistik */
+  const priv=all.filter(o=>orderKind(o)==='Privat'), insO=all.filter(o=>orderKind(o)==='Versicherung');
+  const privUms=priv.reduce((s,o)=>s+oTotal(o),0), insUms=insO.reduce((s,o)=>s+oTotal(o),0);
+  /* Durchschn. Bearbeitungszeit freigegebener Fälle (Annahme→Freigabe) */
+  const durs=cases.filter(o=>o.ins.approvedAt&&(o.created)).map(o=>{const a=new Date(o.created),b=new Date(o.ins.approvedAt);const d=(b-a)/86400000;return isFinite(d)&&d>=0?d:null;}).filter(x=>x!=null);
+  const avgTage=durs.length?Math.round(durs.reduce((a,b)=>a+b,0)/durs.length):null;
   const leads=S.wgLeads||[];
   m.innerHTML=`<div class="between"><div><h1 class="h1">Versicherung</h1><p class="sub">Geräteversicherer: Fälle einreichen, Freigaben, Direktabrechnung</p></div>
      <span class="pill ${conn.length?'solid':'soft'}"><span class="d"></span>${conn.length?conn.length+' Versicherer verbunden':'Nicht verbunden'}</span></div>
    <div class="grid g4" style="margin-top:16px">
-     <div class="card kpi"><div class="n">${offen}</div><div class="l">Offene Fälle</div><div class="t">geprüft &amp; eingereicht</div></div>
-     <div class="card kpi"><div class="n">${freig}</div><div class="l">Freigegeben</div><div class="t">abrechenbar</div></div>
+     <div class="card kpi"><div class="n">${offen}</div><div class="l">Offene Fälle</div><div class="t">in Bearbeitung</div></div>
+     <div class="card kpi"><div class="n">${freig}</div><div class="l">Freigegeben</div><div class="t">${abgelehnt} abgelehnt</div></div>
      ${gf?`<div class="card kpi"><div class="n">${eur(ausstehend)}</div><div class="l">Ausstehende Erstattung</div><div class="t">Direktabrechnung</div></div>
-     <div class="card kpi"><div class="n">${eur(erstattetM)}</div><div class="l">Erstattet diesen Monat</div><div class="t">bereits abgerechnet</div></div>`:`<div class="card kpi"><div class="n">${cases.length}</div><div class="l">Fälle gesamt</div><div class="t">alle Versicherer</div></div>
+     <div class="card kpi"><div class="n">${avgTage!=null?avgTage+' Tg':'—'}</div><div class="l">⌀ bis Freigabe</div><div class="t">Annahme → Freigabe</div></div>`:`<div class="card kpi"><div class="n">${cases.length}</div><div class="l">Fälle gesamt</div><div class="t">alle Versicherer</div></div>
      <div class="card kpi"><div class="n">${leads.length}</div><div class="l">Neue Vermittlungen</div><div class="t">von Wertgarantie</div></div>`}
    </div>
+   ${gf?`<div class="card" style="margin-top:14px"><div class="between" style="margin-bottom:8px"><b>Privat vs. Versicherung</b><span class="muted" style="font-size:12px">alle Aufträge</span></div>
+     <div class="grid g4">
+       <div><label class="f">Privataufträge</label><div style="font-weight:800;font-size:18px">${priv.length}</div><div class="muted" style="font-size:12px">${eur(privUms)} Umsatz</div></div>
+       <div><label class="f">🛡 Versicherungsaufträge</label><div style="font-weight:800;font-size:18px">${insO.length}</div><div class="muted" style="font-size:12px">${eur(insUms)} Umsatz</div></div>
+       <div><label class="f">Freigegeben</label><div style="font-weight:800;font-size:18px">${freig}</div><div class="muted" style="font-size:12px">von ${cases.length} Fällen</div></div>
+       <div><label class="f">Abgelehnt</label><div style="font-weight:800;font-size:18px">${abgelehnt}</div><div class="muted" style="font-size:12px">Ablehnungsquote ${cases.length?Math.round(abgelehnt/cases.length*100):0}%</div></div>
+     </div></div>`:''}
    ${leads.length?`<div class="card" style="margin-top:16px"><div class="between"><b>Von Wertgarantie zugewiesene Reparaturen</b><span class="pill soft"><span class="d"></span>${leads.length} neu</span></div>
      <p class="muted" style="font-size:13px;margin:4px 0 12px">Versicherte Kunden, die Wertgarantie an Ihre Werkstatt vermittelt hat. „Annehmen" legt einen Auftrag mit hinterlegtem Versicherungsfall an.</p>
      ${leads.map(l=>`<div class="listitem"><div class="avatar out">${initials(l.name)}</div><div style="flex:1;min-width:0"><b>${esc(l.name)}</b><div class="muted" style="font-size:12px">${esc(l.brand)} ${esc(l.model)} · ${esc(l.issue)} · Vertrag ${esc(l.vertrag)}${l.selbst?' · SB '+eur(l.selbst):''}</div></div>
        <button class="btn sm pri" onclick="wgAcceptLead('${l.id}')">Annehmen</button><button class="btn sm gho" onclick="wgDismissLead('${l.id}')">Ablehnen</button></div>`).join('')}
    </div>`:''}
-   <div class="card" style="margin-top:16px;padding:0;overflow:auto"><table>
-     <thead><tr><th>Auftrag</th><th>Kunde</th><th>Gerät</th><th>Versicherer</th><th>Vertrag</th><th style="text-align:right">Reparatur</th><th style="text-align:right">SB</th>${gf?'<th style="text-align:right">Erstattung</th>':''}<th>Status</th><th></th></tr></thead>
-     <tbody>${cases.length?cases.map(o=>{const pd=insProvDef(o.ins.provider);return `<tr onclick="openOrder('${o.id}')" style="cursor:pointer">
-       <td><b>${o.nr}</b></td><td>${esc(cust(o.cid).name)}</td><td>${esc(o.brand)} ${esc(o.model)}</td><td>${esc(pd.lbl)}${pd.direct?'':' <span class="tag">o. Direktabr.</span>'}</td><td class="mono">${esc(o.ins.vertrag)}</td>
-       <td style="text-align:right" class="mono">${eur(o.price)}</td><td style="text-align:right" class="mono">${eur(o.ins.selbst)}</td>${gf?`<td style="text-align:right" class="mono">${pd.direct?eur(insErstattung(o)):'—'}</td>`:''}
-       <td>${insBadge(o.ins.status)}</td><td style="text-align:right">${insRowAction(o)}</td></tr>`;}).join(''):`<tr><td colspan="${gf?10:9}"><div class="empty">Noch keine Versicherungsfälle. Markieren Sie einen Auftrag im Reparaturauftrag als „Versicherungsfall".</div></td></tr>`}</tbody>
+   ${(()=>{const provs=Array.from(new Set(cases.map(o=>o.ins.provider||'Wertgarantie')));
+     const stChips=[['alle','Alle',cases.length]].concat(INS_STATUS_FLOW.filter(s=>cases.some(o=>o.ins.status===s)).map(s=>[s,insStatusLabel(s),cases.filter(o=>o.ins.status===s).length]));
+     return `<div class="row" style="margin-top:16px;flex-wrap:wrap;gap:8px;align-items:center"><span class="muted" style="font-size:12px">Status</span>${stChips.map(c=>`<button class="chip ${insFilter===c[0]?'on':''}" onclick="insFilter='${c[0]}';views.versicherung();paintIcons()">${esc(c[1])} · ${c[2]}</button>`).join('')}
+     ${provs.length>1?`<span style="flex:1"></span><label class="muted" style="font-size:12px">Versicherer</label><select class="in" style="width:auto;padding:6px 10px" onchange="insProvFilter=this.value;views.versicherung();paintIcons()"><option value="alle"${insProvFilter==='alle'?' selected':''}>Alle</option>${provs.map(p=>`<option value="${esc(p)}"${insProvFilter===p?' selected':''}>${esc(insProvDef(p).lbl)}</option>`).join('')}</select>`:''}</div>`;})()}
+   <div class="card" style="margin-top:12px;padding:0;overflow:auto"><table>
+     <thead><tr><th>Auftrag</th><th>Kunde</th><th>Gerät / Modell</th><th>Versicherer</th><th>Schaden-Nr.</th><th>Annahme</th><th>Auftragsstatus</th><th>Bearbeitung</th>${gf?'<th style="text-align:right">Erstattung</th>':''}<th>Mitarbeiter</th><th></th></tr></thead>
+     <tbody>${(()=>{let rows=cases.filter(o=>insFilter==='alle'||o.ins.status===insFilter).filter(o=>insProvFilter==='alle'||(o.ins.provider||'Wertgarantie')===insProvFilter);
+       return rows.length?rows.map(o=>{const pd=insProvDef(o.ins.provider);return `<tr onclick="openOrder('${o.id}')" style="cursor:pointer">
+       <td><b>${o.nr}</b></td><td>${esc(cust(o.cid).name)}</td><td>${esc(oDevLabel(o))}</td><td>${esc(pd.lbl)}${pd.direct?'':' <span class="tag">o. Direktabr.</span>'}</td><td class="mono">${esc(o.ins.claimNr||'—')}</td>
+       <td class="muted mono">${fmtDate(o.created)}</td><td>${statusPill(o.status)}</td><td>${insBadge(o.ins.status)}</td>${gf?`<td style="text-align:right" class="mono">${pd.direct?eur(insErstattung(o)):'—'}</td>`:''}
+       <td class="muted" style="font-size:12px">${esc(o.createdByName||'—')}</td><td style="text-align:right">${insRowAction(o)}</td></tr>`;}).join(''):`<tr><td colspan="${gf?11:10}"><div class="empty">Keine Fälle in diesem Filter.</div></td></tr>`;})()}</tbody>
    </table></div>
    <div class="note" style="margin-top:14px">Ablauf: Versicherer wählen → Vertrag prüfen → Schadensmeldung einreichen → Freigabe → reparieren → direkt abrechnen (Kunde zahlt nur SB) bzw. Nachweis für Selbst-Einreichung. Verbundene Versicherer: <b>${connectedInsurers().map(p=>insProvDef(p).lbl).join(', ')||'keine'}</b> – weitere in den Einstellungen.</div>`;
 };
@@ -5535,9 +5737,19 @@ function serverLoginOverlay(err){
   const em=document.getElementById('sbEmail'); if(em&&forgot)em.onkeydown=e=>{if(e.key==='Enter')sbDoForgot();};
   const c2=document.getElementById('sb2faCode'); if(c2){try{c2.focus();}catch(e){} c2.onkeydown=e=>{if(e.key==='Enter')sbDo2fa();};}
 }
+function _hydrateBootRetry(tries){ tries=tries||0;
+  return DB.hydrate().then(had=>finishServerBoot(had)).catch(function(e){
+    /* Login war erfolgreich (Token gesetzt). Ein Netzfehler beim Laden des Standes darf NICHT als „Passwort falsch" erscheinen. */
+    if(DB.token && tries<5 && !(e&&/abgelaufen/i.test(e.message||''))){ return new Promise(function(res){ setTimeout(function(){ res(_hydrateBootRetry(tries+1)); }, 1200*(tries+1)); }); }
+    if(DB.token){ /* Server bleibt Quelle der Wahrheit – notfalls mit leerem Cache starten, _mem füllt sich beim nächsten Sync. */ finishServerBoot(false); }
+    else { serverLoginOverlay('Sitzung konnte nicht geladen werden – bitte erneut anmelden.'); }
+  });
+}
 function sbDoLogin(){const em=(document.getElementById('sbEmail')||{}).value||'';const pw=(document.getElementById('sbPw')||{}).value||'';
   if(!em||!pw){serverLoginOverlay('Bitte E-Mail und Passwort eingeben.');return;}
-  DB.login(em.trim(),pw).then(function(d){ if(d&&d.twofa){ sb2faStart(d,'login'); return; } return DB.hydrate().then(had=>finishServerBoot(had)); }).catch(e=>serverLoginOverlay(e.message||'Anmeldung fehlgeschlagen.'));
+  const btn=document.querySelector('#sbLogin button'); if(btn){btn.disabled=true;btn.style.opacity=.7;}
+  DB.login(em.trim(),pw).then(function(d){ if(d&&d.twofa){ sb2faStart(d,'login'); return; } return _hydrateBootRetry(0); })
+    .catch(e=>{ if(btn){btn.disabled=false;btn.style.opacity=1;} serverLoginOverlay(e.message||'Anmeldung fehlgeschlagen.'); });
 }
 function sbDoSignup(){const ws=(document.getElementById('sbWs')||{}).value||'';const em=(document.getElementById('sbEmail')||{}).value||'';const pw=(document.getElementById('sbPw')||{}).value||'';
   if(!ws.trim()){serverLoginOverlay('Bitte einen Werkstatt-Namen angeben.');return;}
