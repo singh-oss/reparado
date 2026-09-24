@@ -1289,7 +1289,7 @@ function openOrder(id){
        <div><label class="f">Termin / Fällig</label><div style="font-weight:700">${o.appt?'Termin '+fmtDate(o.appt)+(o.apptTime?' · '+o.apptTime+' Uhr':'')+' · ':''}Fällig ${fmtDate(o.due)}</div></div>
        <div><label class="f">Garantie</label><div style="font-weight:700">${o.warranty} Monate${warrUntil?' · bis '+fmtDate(warrUntil):' (ab Abholung)'}</div></div>
        <div><label class="f">Annahme-Unterschrift</label><div style="font-weight:700">${o.sig?'Unterschrieben':'Keine Unterschrift'}</div>${o.sig?`<img src="${o.sig}" alt="Annahme-Unterschrift" style="height:40px;margin-top:4px;border:1px solid var(--line);border-radius:6px;background:#fff">`:''}</div>
-       <div><label class="f">Übergabe / Abholung</label><div style="font-weight:700">${o.pickupSig?('Übergeben'+(o.pickupBy==='andere'?' an '+esc(o.pickupName||'andere Person'):' an Kunde')):'Noch nicht übergeben'}</div>${o.pickupSig?`<div class="muted" style="font-size:11px;margin-top:2px">${fmtDateTime(o.pickupAt||'')}${o.pickupEmp?' · '+esc(o.pickupEmp):''}</div><img src="${o.pickupSig}" alt="Abhol-Unterschrift" style="height:40px;margin-top:4px;border:1px solid var(--line);border-radius:6px;background:#fff">`:''}</div>
+       <div><label class="f">Übergabe / Abholung</label><div style="font-weight:700">${o.pickupSig?('Übergeben'+(o.pickupBy==='andere'?' an '+esc(o.pickupName||'andere Person'):' an Kunde')):'Noch nicht übergeben'}</div>${o.pickupSig?`<div class="muted" style="font-size:11px;margin-top:2px">${fmtDateTime(o.pickupAt||'')}${o.pickupEmp?' · '+esc(o.pickupEmp):''}${(o.pickupRepResult||o.repResult)?' · '+esc(REP_RESULT_LABEL[o.pickupRepResult||o.repResult]||(o.pickupRepResult||o.repResult)):''}</div><img src="${o.pickupSig}" alt="Abhol-Unterschrift" style="height:40px;margin-top:4px;border:1px solid var(--line);border-radius:6px;background:#fff">`:''}</div>
      </div>
      ${terminBoxOrder(o)}
      ${activityBox(o)}
@@ -1444,6 +1444,8 @@ function handoverDialog(id){ const o=S.ord.find(x=>x.id===id); if(!o)return; con
   openModal(`<div class="dhead"><b style="flex:1">Gerät übergeben – Abhol-Unterschrift</b><button class="btn sm gho" onclick="closeAll()">Schließen</button></div>
    <div class="dbody">
      <p class="muted" style="font-size:13px;margin-top:0">Auftrag ${esc(o.nr)} · ${esc(oDevLabel(o))}. Dies ist die <b>Abhol-Unterschrift bei der Übergabe</b> – getrennt von der Unterschrift bei der Annahme.</p>
+     <label class="f">Reparaturergebnis</label>
+     <select class="in" id="ho_result">${['repariert','teilweise','unrepariert','nicht_reparierbar','abgelehnt'].map(r=>`<option value="${r}" ${((o.repResult||'repariert')===r)?'selected':''}>${esc(REP_RESULT_LABEL[r]||r)}</option>`).join('')}</select>
      <label class="f">Abgeholt von</label>
      <div class="row" style="gap:14px;flex-wrap:wrap;margin:2px 0 4px">
        <label style="display:flex;align-items:center;gap:6px"><input type="radio" name="ho_who" value="kunde" checked onchange="handoverToggle()"> Kunde selbst${c&&c.name?' ('+esc(c.name)+')':''}</label>
@@ -1482,6 +1484,9 @@ function handoverDo(id){ const o=S.ord.find(x=>x.id===id); if(!o)return; const c
   if(who==='andere'&&!nm){toast('Bitte den Namen der abholenden Person angeben');return;}
   const txt=((document.getElementById('ho_text')||{}).value||'').trim()||handoverText();
   if((document.getElementById('ho_savetext')||{}).checked){ ensureSettings().handoverText=txt; }
+  const resu=((document.getElementById('ho_result')||{}).value||o.repResult||'repariert');
+  if(resu&&o.repResult!==resu){ o.repResult=resu; logActivity(o,'edit','Reparaturergebnis (bei Übergabe): '+(REP_RESULT_LABEL[resu]||resu)); }
+  o.pickupRepResult=resu; /* Ergebnis zum Zeitpunkt der Übergabe festhalten */
   o.pickupSig=c.toDataURL('image/png');
   o.pickupBy=who; o.pickupName=who==='andere'?nm:((cust(o.cid)||{}).name||'');
   o.pickupText=txt; o.pickupAt=new Date().toISOString(); o.pickupEmp=curUserName(); o.pickupEmpId=(S.userId||'');
@@ -1502,6 +1507,8 @@ function printHandover(id){ const o=S.ord.find(x=>x.id===id); if(!o)return; cons
      <tr><th>Kunde</th><td>${esc((c&&c.name)||'—')}</td></tr>
      <tr><th>Gerät</th><td>${esc(oDevLabel(o))}${o.imei?' · IMEI '+esc(o.imei):''}</td></tr>
      <tr><th>Reparatur</th><td>${esc(oIssueLabel(o))}</td></tr>
+     ${(o.pickupRepResult||o.repResult)?`<tr><th>Reparaturergebnis</th><td>${esc(REP_RESULT_LABEL[o.pickupRepResult||o.repResult]||(o.pickupRepResult||o.repResult))}</td></tr>`:''}
+     ${(function(){const z=oDevices(o).map(d=>zubehoerText(d)).filter(Boolean).join(' · ');return z?`<tr><th>Zurückgegebenes Zubehör</th><td>${esc(z)}</td></tr>`:'';})()}
      <tr><th>Abgeholt von</th><td>${recv}</td></tr>
      <tr><th>Übergeben durch</th><td>${esc(o.pickupEmp||'—')}</td></tr>
      <tr><th>Datum / Uhrzeit</th><td>${fmtDateTime(o.pickupAt||new Date().toISOString())}</td></tr>
@@ -2483,6 +2490,7 @@ function custPhotosSend(id){ const o=S.ord.find(x=>x.id===id); if(!o)return; con
       const text='anbei die Fotos, die wir bei der Annahme Ihres Geräts ('+oDevLabel(o)+') aufgenommen haben.';
       sendCustomerMail(o,to,subj,text,{title:'Fotos zur Geräteannahme',greeting:'Guten Tag '+((c&&c.name)||'')+',',attachments:atts}).then(res=>{
         const ok=!!(res&&res.sent);
+        if(ok){ o.photosShared=srcs.slice(); /* Freigabe: genau diese Fotos im geschützten Kundenauftrag sichtbar (Doc 12.1); Original-Fotos bleiben unberührt */ }
         commLog(o,'out',false,'Annahmefotos gesendet ('+atts.length+' Foto'+(atts.length>1?'s':'')+') an '+to,'nachricht');
         logActivity(o,'mail','Annahmefotos an Kunden gesendet – '+atts.length+' Foto'+(atts.length>1?'s':'')+' · '+(ok?'zugestellt':'Fehler beim Versand')+' · '+to);
         save(); closeAll(); portalSync(o); openOrder(o.id);
@@ -2514,6 +2522,7 @@ function portalSnapshot(o){ const c=cust(o.cid); const hist=(o.statusHistory||[]
     repResult:o.repResult||'', repResultLabel:(o.repResult?(REP_RESULT_LABEL[o.repResult]||o.repResult):''), repResultColor:(o.repResult?repResultColor(o.repResult):''), repResultReason:o.repResultReason||'',
     price:oTotal(o), warranty:o.warranty||0, appt:o.appt||'', readyAt:o.readyAt||'', created:o.created||'',
     kva:o.kva||null, messages:ensureComms(o).filter(m=>!m.internal).map(m=>({from:m.dir==='in'?'kunde':'werkstatt',text:m.text,at:m.at,kind:m.kind})),
+    sharedPhotos:(o.photosShared||[]).map(function(s){ return (typeof s==='string'&&s.charAt(0)==='/')?(location.origin+s):s; }),
     updatedAt:new Date().toISOString() }; }
 function portalSync(o,cb){ if(DB.backend!=='server')return; fetch(API+'/api/portal/sync',{method:'POST',headers:DB._hdr(),body:JSON.stringify({orderId:o.id,data:portalSnapshot(o)})}).then(r=>r.json()).then(res=>{ if(res.token&&o.portalToken!==res.token){o.portalToken=res.token;save();} if(cb)cb(res.token); }).catch(()=>{}); }
 function portalPollReplies(){ if(DB.backend!=='server')return; fetch(API+'/api/portal/replies',{headers:DB._hdr()}).then(r=>r.json()).then(res=>{
@@ -4039,6 +4048,8 @@ function deviceSvg(type,px){px=px||56;type=type||'Smartphone';const c='#94a3b8',
     'Smartwatch':'<rect x="17" y="15" width="14" height="18" rx="4" fill="none" stroke="'+c+'" stroke-width="2"/><path d="M20 15l1-6h6l1 6M20 33l1 6h6l1-6" fill="none" stroke="'+c+'" stroke-width="2"/>',
     'Laptop':'<rect x="12" y="12" width="24" height="16" rx="1.5" fill="none" stroke="'+c+'" stroke-width="2"/><path d="M9 32h30l-2 3H11z" fill="none" stroke="'+c+'" stroke-width="2" stroke-linejoin="round"/>',
     'Konsole':'<rect x="9" y="18" width="30" height="14" rx="6" fill="none" stroke="'+c+'" stroke-width="2"/><circle cx="16" cy="25" r="1.4" fill="'+c+'"/><circle cx="32" cy="25" r="1.4" fill="'+c+'"/>',
+    'E-Scooter':'<circle cx="12" cy="35" r="4.5" fill="none" stroke="'+c+'" stroke-width="2"/><circle cx="37" cy="35" r="4.5" fill="none" stroke="'+c+'" stroke-width="2"/><path d="M16 35h17l4-22h4" fill="none" stroke="'+c+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M37 13v-4h6" fill="none" stroke="'+c+'" stroke-width="2" stroke-linecap="round"/>',
+    'E-Bike':'<circle cx="12" cy="34" r="5" fill="none" stroke="'+c+'" stroke-width="2"/><circle cx="36" cy="34" r="5" fill="none" stroke="'+c+'" stroke-width="2"/><path d="M12 34l7-13h10l-5 13M19 21h-4M29 21l7 13M27 21h6" fill="none" stroke="'+c+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
     'Kopfhörer':'<path d="M13 27v-3a11 11 0 0 1 22 0v3" fill="none" stroke="'+c+'" stroke-width="2"/><rect x="10.5" y="26" width="5" height="9" rx="2" fill="'+c+'"/><rect x="32.5" y="26" width="5" height="9" rx="2" fill="'+c+'"/>',
     'Sonstiges':'<rect x="13" y="13" width="22" height="22" rx="3" fill="none" stroke="'+c+'" stroke-width="2"/><path d="M20 24h8M24 20v8" stroke="'+c+'" stroke-width="2"/>'};
   return '<svg width="'+px+'" height="'+px+'" viewBox="0 0 48 48" style="background:'+bg+';border-radius:10px;flex:none">'+(P[type]||P['Smartphone'])+'</svg>';
@@ -4862,7 +4873,9 @@ views.versicherung=function(){
        <div><label class="f">🛡 Versicherungsaufträge</label><div style="font-weight:800;font-size:18px">${insO.length}</div><div class="muted" style="font-size:12px">${eur(insUms)} Umsatz</div></div>
        <div><label class="f">Freigegeben</label><div style="font-weight:800;font-size:18px">${freig}</div><div class="muted" style="font-size:12px">von ${cases.length} Fällen</div></div>
        <div><label class="f">Abgelehnt</label><div style="font-weight:800;font-size:18px">${abgelehnt}</div><div class="muted" style="font-size:12px">Ablehnungsquote ${cases.length?Math.round(abgelehnt/cases.length*100):0}%</div></div>
-     </div></div>`:''}
+     </div>
+     ${(()=>{const byP={};cases.forEach(o=>{const p=insProvDef(o.ins.provider).lbl;if(!byP[p])byP[p]={n:0,ums:0};byP[p].n++;byP[p].ums+=oTotal(o);});const keys=Object.keys(byP).sort((a,b)=>byP[b].n-byP[a].n);return keys.length?`<div style="margin-top:14px;border-top:1px solid var(--line);padding-top:10px"><label class="f">Fälle je Versicherungsgesellschaft</label><div class="row" style="flex-wrap:wrap;gap:8px;margin-top:4px">${keys.map(p=>`<span class="pill soft" style="font-size:12px"><span class="d"></span>${esc(p)}: <b style="margin-left:3px">${byP[p].n}</b>${byP[p].ums?' · '+eur(byP[p].ums):''}</span>`).join('')}</div></div>`:'';})()}
+     </div>`:''}
    ${leads.length?`<div class="card" style="margin-top:16px"><div class="between"><b>Von Wertgarantie zugewiesene Reparaturen</b><span class="pill soft"><span class="d"></span>${leads.length} neu</span></div>
      <p class="muted" style="font-size:13px;margin:4px 0 12px">Versicherte Kunden, die Wertgarantie an Ihre Werkstatt vermittelt hat. „Annehmen" legt einen Auftrag mit hinterlegtem Versicherungsfall an.</p>
      ${leads.map(l=>`<div class="listitem"><div class="avatar out">${initials(l.name)}</div><div style="flex:1;min-width:0"><b>${esc(l.name)}</b><div class="muted" style="font-size:12px">${esc(l.brand)} ${esc(l.model)} · ${esc(l.issue)} · Vertrag ${esc(l.vertrag)}${l.selbst?' · SB '+eur(l.selbst):''}</div></div>
