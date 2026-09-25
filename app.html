@@ -5711,6 +5711,10 @@ function loadDashCatalog(){
           if(nm && !have[k]){ c.models[b].push({name:nm,type:ty,img:''}); have[k]=1; ch=true; } });
       });
       if(c.brands.indexOf('Sonstige')>=0){ c.brands=c.brands.filter(function(x){return x!=='Sonstige';}); c.brands.push('Sonstige'); }
+      /* Reparaturarten + Qualitäten additiv (exakte Namens-Dedup) – vorhandene bleiben, Basispreise unberührt
+         (neue Arten ohne Basispreis -> priceFor liefert leeres Feld = manuelle Eingabe). */
+      c.repairs=c.repairs||[]; (cat.repairs||[]).forEach(function(r){ r=(r||'').trim(); if(r && c.repairs.indexOf(r)<0){ c.repairs.push(r); ch=true; } });
+      c.quals=c.quals||[]; (cat.quals||[]).forEach(function(q){ q=(q||'').trim(); if(q && c.quals.indexOf(q)<0){ c.quals.push(q); ch=true; } });
       c._extCatV=cat.v;
       if(ch){ save(); if(current==='preise'||current==='neworder'){ try{ (views[current]||function(){})(); paintIcons&&paintIcons(); }catch(e){} } }
     }).catch(function(){});
