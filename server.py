@@ -213,6 +213,22 @@ def init_db():
         CREATE TABLE IF NOT EXISTS twofa(
           challenge TEXT PRIMARY KEY, user_id TEXT, workshop_id TEXT, email TEXT,
           name TEXT, role TEXT, code_hash TEXT, purpose TEXT, expires REAL, tries INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS day_plans(
+          user_id TEXT, day TEXT, goal TEXT, goal_done INTEGER DEFAULT 0,
+          tasks TEXT, version INTEGER DEFAULT 0, updated_at TEXT,
+          PRIMARY KEY(user_id, day));
+        CREATE TABLE IF NOT EXISTS workspaces(
+          user_id TEXT PRIMARY KEY, value TEXT, version INTEGER DEFAULT 0, updated_at TEXT);
+        CREATE TABLE IF NOT EXISTS media_store(
+          owner TEXT, id TEXT, ctype TEXT, data TEXT, created REAL,
+          PRIMARY KEY(owner, id));
+        CREATE TABLE IF NOT EXISTS rsign_sessions(
+          token_hash TEXT PRIMARY KEY, owner_id TEXT, payload TEXT,
+          payload_version INTEGER DEFAULT 1, status TEXT, signature_url TEXT,
+          signed_payload TEXT, signed_at TEXT, created_at TEXT, expires_at REAL);
+        CREATE TABLE IF NOT EXISTS rphoto_sessions(
+          token_hash TEXT PRIMARY KEY, owner_id TEXT, title TEXT, photos TEXT,
+          status TEXT, created_at TEXT, expires_at REAL);
         """)
         # Abo/Stripe-Spalten (idempotent nachrüsten)
         for col in ("plan", "sub_status", "trial_end", "stripe_customer", "stripe_sub", "current_period_end", "pub"):
@@ -222,6 +238,195 @@ def init_db():
         far = _iso(time.time() + 30 * 86400)
         try: c.execute("UPDATE workshops SET trial_end=?, plan=COALESCE(NULLIF(plan,''),'trial'), sub_status=COALESCE(NULLIF(sub_status,''),'trial') WHERE trial_end IS NULL OR trial_end=''", (far,))
         except Exception: pass
+
+# ---------- Neue Workspace-Endpunkte (portiert aus worker.js: Tagesplan/Medien/Fern-QR) ----------
+import re as _re
+_SIGN_TTL = 30 * 60
+_PHOTO_TTL = 30 * 60
+_PHOTO_MAX = 20
+def _now_iso(): return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+def _valid_day(v): return bool(v and _re.match(r"^\d{4}-\d{2}-\d{2}$", v))
+def _new_tok(): return base64.urlsafe_b64encode(os.urandom(32)).decode().rstrip("=")
+def _tok_hash(t): return hashlib.sha256(t.encode()).hexdigest()
+def _valid_tok(t): return isinstance(t, str) and bool(_re.match(r"^[A-Za-z0-9_-]{40,64}$", t))
+
+# --- Tagesplan ---
+def _dp_user(p, profile): return p["wid"] + ("" if profile in (None, "", "u1") else "::" + str(profile))
+def _dp_valid(v):
+    if not isinstance(v, dict) or not isinstance(v.get("goal"), str) or len(v["goal"]) > 160: return False
+    t = v.get("tasks")
+    if not isinstance(t, list) or len(t) > 12: return False
+    if not isinstance(v.get("version"), int) or v["version"] < 0: return False
+    if v.get("goalDone") is not None and not isinstance(v.get("goalDone"), bool): return False
+    ids = set()
+    for task in t:
+        if not isinstance(task, dict): return False
+        tid, tx = task.get("id"), task.get("text")
+        if not isinstance(tid, str) or not _re.match(r"^[A-Za-z0-9_-]{1,64}$", tid) or tid in ids: return False
+        if not isinstance(tx, str) or not tx.strip() or len(tx) > 160: return False
+        if not isinstance(task.get("done"), bool): return False
+        ids.add(tid)
+    return True
+def dayplan_get(p, profile, day):
+    u = _dp_user(p, profile)
+    with db() as c:
+        r = c.execute("SELECT goal,goal_done,tasks,version FROM day_plans WHERE user_id=? AND day=?", (u, day)).fetchone()
+    plan = None
+    if r:
+        try: tasks = json.loads(r["tasks"])
+        except Exception: tasks = []
+        plan = {"goal": r["goal"], "goalDone": bool(r["goal_done"]), "tasks": tasks, "version": r["version"]}
+    return {"day": day, "plan": plan}
+def dayplan_put(p, profile, day, v):
+    if not _dp_valid(v): return 400, {"error": "Bitte prüfe die Aufgaben und dein Tagesziel."}
+    u = _dp_user(p, profile); goal = v["goal"].strip(); gd = 1 if v.get("goalDone") else 0
+    tasks = [{"id": t["id"], "text": t["text"].strip(), "done": t["done"]} for t in v["tasks"]]
+    tj = json.dumps(tasks); ts = _now_iso(); ver = v["version"]
+    with db() as c:
+        if ver == 0:
+            changed = c.execute("INSERT OR IGNORE INTO day_plans(user_id,day,goal,goal_done,tasks,version,updated_at) VALUES(?,?,?,?,?,1,?)", (u, day, goal, gd, tj, ts)).rowcount
+        else:
+            changed = c.execute("UPDATE day_plans SET goal=?,goal_done=?,tasks=?,version=version+1,updated_at=? WHERE user_id=? AND day=? AND version=?", (goal, gd, tj, ts, u, day, ver)).rowcount
+    if changed != 1:
+        g = dayplan_get(p, profile, day)
+        return 409, {"error": "Der Tagesplan wurde in einem anderen Fenster geändert. Bitte lade den aktuellen Stand.", "day": day, "plan": g["plan"]}
+    return 200, {"day": day, "plan": {"goal": goal, "goalDone": bool(gd), "tasks": tasks, "version": ver + 1}}
+
+# --- Workspace-State (alternativer Werkstatt-Datenstand, optimistic locking) ---
+def workspace_get(p):
+    with db() as c:
+        r = c.execute("SELECT value,version FROM workspaces WHERE user_id=?", (p["wid"],)).fetchone()
+    if not r: return {"value": None, "version": 0}
+    try: val = json.loads(r["value"])
+    except Exception: val = None
+    return {"value": val, "version": r["version"]}
+def workspace_put(p, data):
+    if not isinstance(data, dict) or not isinstance(data.get("version"), int) or data["version"] < 0: return 400, {"error": "Ungültiger Werkstatt-Datenstand."}
+    val = data.get("value")
+    if not isinstance(val, dict) or val.get("v") != 11 or not isinstance(val.get("ord"), list) or not isinstance(val.get("cust"), list): return 400, {"error": "Ungültiger Werkstatt-Datenstand."}
+    vj = json.dumps(val); ts = _now_iso(); ver = data["version"]
+    if len(vj.encode()) > 1800000: return 413, {"error": "Der Datenstand ist zu groß. Bitte Fotos separat hochladen."}
+    with db() as c:
+        if ver == 0:
+            changed = c.execute("INSERT OR IGNORE INTO workspaces(user_id,value,version,updated_at) VALUES(?,?,1,?)", (p["wid"], vj, ts)).rowcount
+        else:
+            changed = c.execute("UPDATE workspaces SET value=?,version=version+1,updated_at=? WHERE user_id=? AND version=?", (vj, ts, p["wid"], ver)).rowcount
+    if changed != 1: return 409, {"error": "Der Datenstand wurde in einem anderen Fenster geändert. Deine Änderungen wurden nicht überschrieben."}
+    return 200, {"version": ver + 1}
+
+# --- Medien (owner-skopiert, id=sha256) ---
+def media_store_bytes(owner, ctype, data_bytes):
+    mid = hashlib.sha256(data_bytes).hexdigest()
+    with db() as c:
+        c.execute("INSERT OR REPLACE INTO media_store(owner,id,ctype,data,created) VALUES(?,?,?,?,?)", (owner, mid, ctype, base64.b64encode(data_bytes).decode(), time.time()))
+    return mid
+def media_get(owner, mid):
+    if not _re.match(r"^[a-f0-9]{64}$", mid or ""): return None
+    with db() as c:
+        r = c.execute("SELECT ctype,data FROM media_store WHERE owner=? AND id=?", (owner, mid)).fetchone()
+    if not r: return None
+    try: return r["ctype"], base64.b64decode(r["data"])
+    except Exception: return None
+
+# --- Fern-Unterschrift (rsign) ---
+def _sign_row(c, token): return c.execute("SELECT * FROM rsign_sessions WHERE token_hash=?", (_tok_hash(token),)).fetchone()
+def rsign_create(p, data):
+    if not isinstance(data, dict) or not isinstance(data.get("title"), str) or not data["title"].strip(): return 400, {"error": "Die Angaben für die Unterschrift sind unvollständig."}
+    token = _new_tok(); now = time.time(); exp = now + _SIGN_TTL
+    with db() as c:
+        c.execute("INSERT INTO rsign_sessions(token_hash,owner_id,payload,payload_version,status,created_at,expires_at) VALUES(?,?,?,1,'pending',?,?)", (_tok_hash(token), p["wid"], json.dumps(data), _now_iso(), exp))
+    return 201, {"token": token, "expiresAt": _iso(exp)}
+def rsign_get(p, token):
+    if not _valid_tok(token): return 404, {"error": "Nicht gefunden."}
+    with db() as c: r = _sign_row(c, token)
+    if not r or r["owner_id"] != p["wid"]: return 404, {"error": "Nicht gefunden."}
+    st = "expired" if (r["status"] == "pending" and r["expires_at"] < time.time()) else r["status"]
+    return 200, {"status": st, "signatureUrl": r["signature_url"], "signedAt": r["signed_at"], "signedPayload": (json.loads(r["signed_payload"]) if r["signed_payload"] else None)}
+def rsign_put(p, token, data):
+    if not _valid_tok(token): return 404, {"error": "Nicht gefunden."}
+    with db() as c:
+        r = _sign_row(c, token)
+        if not r or r["owner_id"] != p["wid"]: return 404, {"error": "Nicht gefunden."}
+        changed = c.execute("UPDATE rsign_sessions SET payload=?,payload_version=payload_version+1 WHERE token_hash=? AND owner_id=? AND status='pending'", (json.dumps(data), r["token_hash"], p["wid"])).rowcount
+    if changed != 1: return 409, {"error": "Die Unterschrift ist bereits abgeschlossen."}
+    return 200, {"payloadVersion": r["payload_version"] + 1}
+def rsign_delete(p, token):
+    if not _valid_tok(token): return 404, {"error": "Nicht gefunden."}
+    with db() as c:
+        r = _sign_row(c, token)
+        if not r or r["owner_id"] != p["wid"]: return 404, {"error": "Nicht gefunden."}
+        c.execute("UPDATE rsign_sessions SET status='cancelled' WHERE token_hash=? AND owner_id=? AND status='pending'", (r["token_hash"], p["wid"]))
+    return 200, {"status": "cancelled"}
+def public_sign(data):
+    if not isinstance(data, dict) or not _valid_tok(data.get("token")): return 404, {"error": "Dieser Link ist ungültig."}
+    with db() as c:
+        r = _sign_row(c, data["token"])
+        if not r: return 404, {"error": "Dieser Link ist ungültig."}
+        if r["status"] != "pending": return 410, {"error": "Diese Unterschrift wurde bereits übermittelt." if r["status"] == "signed" else "Dieser Link ist nicht mehr gültig."}
+        if r["expires_at"] < time.time(): return 410, {"error": "Dieser Link ist abgelaufen. Bitte in der Werkstatt einen neuen QR-Code anzeigen lassen."}
+        act = data.get("action")
+        if act == "get": return 200, {"payload": json.loads(r["payload"]), "payloadVersion": r["payload_version"], "expiresAt": _iso(r["expires_at"])}
+        if act != "submit": return 400, {"error": "Ungültige Eingabe."}
+        if data.get("payloadVersion") != r["payload_version"]: return 409, {"error": "Die Angaben wurden in der Werkstatt gerade geändert. Bitte noch einmal lesen und bestätigen.", "payload": json.loads(r["payload"]), "payloadVersion": r["payload_version"]}
+        sig = data.get("signature") or ""
+        m = _re.match(r"^data:image/png;base64,([A-Za-z0-9+/=]{200,})$", sig)
+        if not m: return 400, {"error": "Die Unterschrift konnte nicht gelesen werden. Bitte erneut unterschreiben."}
+        try: raw = base64.b64decode(m.group(1))
+        except Exception: return 400, {"error": "Die Unterschrift konnte nicht gelesen werden."}
+        if raw[:4] != b"\x89PNG": return 400, {"error": "Die Unterschrift konnte nicht gelesen werden."}
+        mid = media_store_bytes(r["owner_id"], "image/png", raw)
+        sat = _now_iso()
+        changed = c.execute("UPDATE rsign_sessions SET status='signed',signature_url=?,signed_payload=payload,signed_at=? WHERE token_hash=? AND status='pending' AND payload_version=?", ("/api/media/" + mid, sat, r["token_hash"], r["payload_version"])).rowcount
+    if changed != 1: return 410, {"error": "Diese Unterschrift wurde bereits übermittelt."}
+    return 200, {"status": "signed", "signedAt": sat}
+
+# --- Fern-Foto (rphoto) ---
+def _photo_row(c, token): return c.execute("SELECT * FROM rphoto_sessions WHERE token_hash=?", (_tok_hash(token),)).fetchone()
+def rphoto_create(p, data):
+    title = (data.get("title") or "").strip()[:120] if isinstance(data, dict) else ""
+    if not title: return 400, {"error": "Titel fehlt."}
+    token = _new_tok(); now = time.time(); exp = now + _PHOTO_TTL
+    with db() as c:
+        c.execute("INSERT INTO rphoto_sessions(token_hash,owner_id,title,photos,status,created_at,expires_at) VALUES(?,?,?,'[]','open',?,?)", (_tok_hash(token), p["wid"], title, _now_iso(), exp))
+    return 201, {"token": token, "expiresAt": _iso(exp)}
+def rphoto_get(p, token):
+    if not _valid_tok(token): return 404, {"error": "Nicht gefunden."}
+    with db() as c: r = _photo_row(c, token)
+    if not r or r["owner_id"] != p["wid"]: return 404, {"error": "Nicht gefunden."}
+    st = "expired" if (r["status"] == "open" and r["expires_at"] < time.time()) else r["status"]
+    try: photos = json.loads(r["photos"] or "[]")
+    except Exception: photos = []
+    return 200, {"status": st, "photos": photos}
+def rphoto_delete(p, token):
+    if not _valid_tok(token): return 404, {"error": "Nicht gefunden."}
+    with db() as c:
+        r = _photo_row(c, token)
+        if not r or r["owner_id"] != p["wid"]: return 404, {"error": "Nicht gefunden."}
+        c.execute("UPDATE rphoto_sessions SET status='closed' WHERE token_hash=? AND owner_id=?", (r["token_hash"], p["wid"]))
+    return 200, {"status": "closed"}
+def public_photo(data):
+    if not isinstance(data, dict) or not _valid_tok(data.get("token")): return 404, {"error": "Dieser Link ist ungültig."}
+    with db() as c:
+        r = _photo_row(c, data["token"])
+        if not r: return 404, {"error": "Dieser Link ist ungültig."}
+        if r["status"] != "open" or r["expires_at"] < time.time(): return 410, {"error": "Dieser Link ist nicht mehr gültig. Bitte in der Werkstatt einen neuen QR-Code anzeigen lassen."}
+        try: photos = json.loads(r["photos"] or "[]")
+        except Exception: photos = []
+        act = data.get("action")
+        if act == "get": return 200, {"title": r["title"], "count": len(photos), "max": _PHOTO_MAX, "expiresAt": _iso(r["expires_at"])}
+        if act != "upload": return 400, {"error": "Ungültige Eingabe."}
+        if len(photos) >= _PHOTO_MAX: return 409, {"error": "Es sind bereits %d Fotos in diesem Auftrag." % _PHOTO_MAX}
+        img = data.get("image") or ""
+        m = _re.match(r"^data:image/(jpeg|png|webp);base64,([A-Za-z0-9+/=]{200,})$", img)
+        if not m: return 400, {"error": "Das Foto konnte nicht gelesen werden."}
+        try: raw = base64.b64decode(m.group(2))
+        except Exception: return 400, {"error": "Das Foto konnte nicht gelesen werden."}
+        if len(raw) > 2 * 1024 * 1024: return 413, {"error": "Das Foto ist zu groß."}
+        mid = media_store_bytes(r["owner_id"], "image/" + m.group(1), raw)
+        photos.append({"url": "/api/media/" + mid, "ts": _now_iso()})
+        changed = c.execute("UPDATE rphoto_sessions SET photos=? WHERE token_hash=? AND status='open'", (json.dumps(photos), r["token_hash"])).rowcount
+    if changed != 1: return 409, {"error": "Bitte das Foto noch einmal senden."}
+    return 200, {"count": len(photos)}
 
 # ---------- Passwort & Token ----------
 def hash_pw(pw, salt=None):
@@ -767,9 +972,64 @@ class H(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_response(204); self._cors(); self.end_headers()
 
+    def do_PUT(self):
+        _pa = urlparse(self.path).path
+        if _pa == "/api/day-plan":
+            p = self._auth()
+            if not p: return self._send(401, {"error": "Bitte melde dich erneut an."})
+            q = parse_qs(urlparse(self.path).query); profile = (q.get("profile") or ["u1"])[0]; day = (q.get("day") or [""])[0] or _now_iso()[:10]
+            if not _valid_day(day): return self._send(400, {"error": "Ungültiges Datum."})
+            code, obj = dayplan_put(p, profile, day, self._body()); return self._send(code, obj)
+        if _pa == "/api/workspace-state":
+            p = self._auth()
+            if not p: return self._send(401, {"error": "Bitte erneut anmelden."})
+            code, obj = workspace_put(p, self._body()); return self._send(code, obj)
+        if _pa.startswith("/api/sign-sessions/"):
+            p = self._auth()
+            if not p: return self._send(401, {"error": "Bitte erneut anmelden."})
+            code, obj = rsign_put(p, _urlparse.unquote(_pa[len("/api/sign-sessions/"):]), self._body()); return self._send(code, obj)
+        return self._send(404, {"error": "Nicht gefunden."})
+
+    def do_DELETE(self):
+        _pa = urlparse(self.path).path
+        p = self._auth()
+        if not p: return self._send(401, {"error": "Bitte erneut anmelden."})
+        if _pa.startswith("/api/sign-sessions/"):
+            code, obj = rsign_delete(p, _urlparse.unquote(_pa[len("/api/sign-sessions/"):])); return self._send(code, obj)
+        if _pa.startswith("/api/photo-sessions/"):
+            code, obj = rphoto_delete(p, _urlparse.unquote(_pa[len("/api/photo-sessions/"):])); return self._send(code, obj)
+        return self._send(404, {"error": "Nicht gefunden."})
+
     def do_GET(self):
         if self.path == "/api/health":
             return self._send(200, {"ok": True, "service": "reparado"})
+        _pa = urlparse(self.path).path
+        if _pa == "/api/day-plan":
+            p = self._auth()
+            if not p: return self._send(401, {"error": "Bitte melde dich erneut an, um deine Tagesplanung zu öffnen."})
+            q = parse_qs(urlparse(self.path).query); profile = (q.get("profile") or ["u1"])[0]; day = (q.get("day") or [""])[0] or _now_iso()[:10]
+            if not _valid_day(day): return self._send(400, {"error": "Ungültiges Datum."})
+            return self._send(200, dayplan_get(p, profile, day))
+        if _pa == "/api/workspace-state":
+            p = self._auth()
+            if not p: return self._send(401, {"error": "Bitte erneut anmelden."})
+            return self._send(200, workspace_get(p))
+        if _pa.startswith("/api/sign-sessions/"):
+            p = self._auth()
+            if not p: return self._send(401, {"error": "Bitte erneut anmelden."})
+            code, obj = rsign_get(p, _urlparse.unquote(_pa[len("/api/sign-sessions/"):])); return self._send(code, obj)
+        if _pa.startswith("/api/photo-sessions/"):
+            p = self._auth()
+            if not p: return self._send(401, {"error": "Bitte erneut anmelden."})
+            code, obj = rphoto_get(p, _urlparse.unquote(_pa[len("/api/photo-sessions/"):])); return self._send(code, obj)
+        if _pa.startswith("/api/media/"):
+            p = self._auth()
+            if not p: return self._send(401, {"error": "Bitte erneut anmelden."})
+            got = media_get(p["wid"], _pa[len("/api/media/"):])
+            if not got: return self._send(404, {"error": "Nicht gefunden."})
+            ctype, raw = got
+            self.send_response(200); self.send_header("Content-Type", ctype); self.send_header("Content-Length", str(len(raw)))
+            self.send_header("Cache-Control", "private, no-store"); self.send_header("X-Content-Type-Options", "nosniff"); self._cors(); self.end_headers(); self.wfile.write(raw); return
         if self.path.startswith("/api/geo/plz"):
             q = parse_qs(urlparse(self.path).query); plz = (q.get("plz") or [""])[0]
             if not (plz.isdigit() and len(plz) == 5):
@@ -1010,6 +1270,31 @@ class H(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path == "/api/stripe/webhook":
             return self._webhook()
+        _pa = urlparse(self.path).path
+        if _pa == "/api/sign-sessions":
+            p = self._auth()
+            if not p: return self._send(401, {"error": "Bitte erneut anmelden."})
+            code, obj = rsign_create(p, self._body()); return self._send(code, obj)
+        if _pa == "/api/public-sign":
+            code, obj = public_sign(self._body()); return self._send(code, obj)
+        if _pa == "/api/photo-sessions":
+            p = self._auth()
+            if not p: return self._send(401, {"error": "Bitte erneut anmelden."})
+            code, obj = rphoto_create(p, self._body()); return self._send(code, obj)
+        if _pa == "/api/public-photo":
+            code, obj = public_photo(self._body()); return self._send(code, obj)
+        if _pa == "/api/media":
+            p = self._auth()
+            if not p: return self._send(401, {"error": "Bitte erneut anmelden."})
+            ctype = (self.headers.get("Content-Type") or "").split(";")[0]
+            if ctype not in ("image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml", "application/pdf"):
+                return self._send(415, {"error": "Dieses Dateiformat wird nicht unterstützt."})
+            n = int(self.headers.get("Content-Length", 0) or 0)
+            if n > 12 * 1024 * 1024: return self._send(413, {"error": "Datei zu groß. Maximal 12 MB."})
+            raw = self.rfile.read(n) if n else b""
+            if not raw: return self._send(400, {"error": "Keine Daten."})
+            mid = media_store_bytes(p["wid"], ctype, raw)
+            return self._send(200, {"url": "/api/media/" + mid})
         if self.path.startswith(("/api/voice/incoming", "/api/voice/step", "/api/voice/callback")):
             return self._voice(self.path)
         body = self._body()

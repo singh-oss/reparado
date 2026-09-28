@@ -8,3 +8,6 @@ reparado.db-shm
 reparado.db-wal
 
 _dash_catalog_source.xlsx
+
+_incoming/
+app-v2.html.bak
