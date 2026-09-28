@@ -6298,41 +6298,7 @@ if(!src){ if(--pend===0)setTimeout(step,300); return; }
 photoUpload(src,job.order,function(r){ if(r&&r.pid){ if(job.ref){ delete job.ref.src; job.ref.pid=r.pid; } else { job.arr[job.idx]={pid:r.pid}; } changed++; } if(--pend===0)setTimeout(step,300); }); }); };
 step();
 }
-/* Externer Geräte-Katalog (dash-repair) – lazy geladen, additiv in den Werkstatt-Katalog gemischt.
-   Eigene Modelle/Marken/Preise bleiben unangetastet. Guard über c._extCatV. */
-function loadDashCatalog(){
-  try{
-    fetch('catalog.json',{cache:'default'}).then(function(r){return r.ok?r.json():null;}).then(function(cat){
-      if(!cat||!cat.models) return;
-      const c=ensureCat(); if((c._extCatV||0)>=cat.v) return;
-      c.types=c.types||[]; c.brands=c.brands||[]; c.models=c.models||{};
-      let ch=false;
-      (cat.types||[]).forEach(function(t){ if(c.types.indexOf(t)<0){ c.types.push(t); ch=true; } });
-      Object.keys(cat.models).forEach(function(b){
-        if(c.brands.indexOf(b)<0){ c.brands.push(b); ch=true; }
-        c.models[b]=c.models[b]||[];
-        const have={}; c.models[b].forEach(function(m){ have[(m.name||'').toLowerCase()]=1; });
-        (cat.models[b]||[]).forEach(function(pair){ const nm=pair[0], ty=pair[1]||'Smartphone'; const k=(nm||'').toLowerCase();
-          if(nm && !have[k]){ c.models[b].push({name:nm,type:ty,img:''}); have[k]=1; ch=true; } });
-      });
-      if(c.brands.indexOf('Sonstige')>=0){ c.brands=c.brands.filter(function(x){return x!=='Sonstige';}); c.brands.push('Sonstige'); }
-      if(cat.featured){ var byB={}; cat.featured.forEach(function(f){ (byB[f[0]]=byB[f[0]]||[]).push(f[1]); });
-        Object.keys(byB).forEach(function(b){ var mm=c.models[b]; if(!mm)return; var names=byB[b];
-          for(var i=names.length-1;i>=0;i--){ var nm=(names[i]||'').toLowerCase(); var idx=-1;
-            for(var k=0;k<mm.length;k++){ if((mm[k].name||'').toLowerCase()===nm){ idx=k; break; } }
-            if(idx>0){ mm.unshift(mm.splice(idx,1)[0]); ch=true; } } }); }
-      if(cat.images){ Object.keys(cat.images).forEach(function(b){ var mm=c.models[b]; if(!mm)return;
-        Object.keys(cat.images[b]).forEach(function(mn){ var path=cat.images[b][mn]; var lc=mn.toLowerCase();
-          for(var k=0;k<mm.length;k++){ if((mm[k].name||'').toLowerCase()===lc){ if(!mm[k].img){ mm[k].img=path; ch=true; } break; } }
-        }); }); }
-      c.repairs=c.repairs||[]; (cat.repairs||[]).forEach(function(r){ r=(r||'').trim(); if(r && c.repairs.indexOf(r)<0){ c.repairs.push(r); ch=true; } });
-      c.quals=c.quals||[]; (cat.quals||[]).forEach(function(q){ q=(q||'').trim(); if(q && c.quals.indexOf(q)<0){ c.quals.push(q); ch=true; } });
-      c._extCatV=cat.v;
-      if(ch){ save(); if(current==='preise'||current==='neworder'){ try{ (views[current]||function(){})(); paintIcons&&paintIcons(); }catch(e){} } }
-    }).catch(function(){});
-  }catch(e){}
-}
-function bootApp(){ensureWorkshop(); ensureMaster(); applyMaster(); ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); ensureInv(); ensureProc(); ensureTrade(); ensureShip(); ensureContracts(); ensureInsurers(); ensureIntegrations(); try{ loadDashCatalog(); }catch(e){} const n=pullBookings(); const nq=pullRequests(); pullFeedback(); pullWarranty(); let _lv='dashboard'; try{const _s=localStorage.getItem('rep_lastview'); if(_s&&views[_s]&&canView(_s))_lv=_s;}catch(e){} go(_lv); applyNavRole(); if(!curUser())showLogin();
+function bootApp(){ensureWorkshop(); ensureMaster(); applyMaster(); ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); ensureInv(); ensureProc(); ensureTrade(); ensureShip(); ensureContracts(); ensureInsurers(); ensureIntegrations(); const n=pullBookings(); const nq=pullRequests(); pullFeedback(); pullWarranty(); let _lv='dashboard'; try{const _s=localStorage.getItem('rep_lastview'); if(_s&&views[_s]&&canView(_s))_lv=_s;}catch(e){} go(_lv); applyNavRole(); if(!curUser())showLogin();
 try{ if(curUser() && !localStorage.getItem('velqio_setup_v1') && (S.cust||[]).length===0 && (S.ord||[]).length===0){ try{localStorage.setItem('velqio_setup_v1','1');}catch(e){} setTimeout(function(){ if(!document.getElementById('setupOv'))setupOpen(); }, 800); } }catch(e){}
 if(DB.backend==='server') try{ setTimeout(photoMigrate, 3500); }catch(e){}
 if(nq) setTimeout(()=>toast(nq+' neue Website-Anfrage'+(nq>1?'n':'')),900);
