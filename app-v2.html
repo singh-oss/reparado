@@ -6298,7 +6298,25 @@ if(!src){ if(--pend===0)setTimeout(step,300); return; }
 photoUpload(src,job.order,function(r){ if(r&&r.pid){ if(job.ref){ delete job.ref.src; job.ref.pid=r.pid; } else { job.arr[job.idx]={pid:r.pid}; } changed++; } if(--pend===0)setTimeout(step,300); }); }); };
 step();
 }
-function bootApp(){ensureWorkshop(); ensureMaster(); applyMaster(); ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); ensureInv(); ensureProc(); ensureTrade(); ensureShip(); ensureContracts(); ensureInsurers(); ensureIntegrations(); const n=pullBookings(); const nq=pullRequests(); pullFeedback(); pullWarranty(); let _lv='dashboard'; try{const _s=localStorage.getItem('rep_lastview'); if(_s&&views[_s]&&canView(_s))_lv=_s;}catch(e){} go(_lv); applyNavRole(); if(!curUser())showLogin();
+/* Doc #10: zentrale Gerätebild-Bibliothek – ordnet vorhandenen Modellen ein Foto zu.
+   Reine Bild-Zuordnung (keine Modell-/Marken-/Typ-Änderung); Modelle ohne Foto behalten das Typ-Icon (Fallback).
+   Eine selbst hochgeladene Werkstatt-Aufnahme (m.img gesetzt) wird nie überschrieben. */
+function loadModelImages(){
+  try{
+    fetch('model-images.json',{cache:'default'}).then(function(r){return r.ok?r.json():null;}).then(function(mi){
+      if(!mi||!mi.images) return;
+      var c=ensureCat(); if((c._imgV||0)>=mi.v) return;
+      var ch=false;
+      Object.keys(mi.images).forEach(function(b){ var mm=c.models[b]; if(!mm)return;
+        Object.keys(mi.images[b]).forEach(function(mn){ var path=mi.images[b][mn], lc=mn.toLowerCase();
+          for(var k=0;k<mm.length;k++){ if((mm[k].name||'').toLowerCase()===lc){ if(!mm[k].img){ mm[k].img=path; ch=true; } break; } }
+        }); });
+      c._imgV=mi.v;
+      if(ch){ save(); if(current==='preise'||current==='neworder'){ try{ (views[current]||function(){})(); paintIcons&&paintIcons(); }catch(e){} } }
+    }).catch(function(){});
+  }catch(e){}
+}
+function bootApp(){ensureWorkshop(); ensureMaster(); applyMaster(); ensureAcct(); ensureCat(); ensureStatuses(); ensureSettings(); ensureInv(); ensureProc(); ensureTrade(); ensureShip(); ensureContracts(); ensureInsurers(); ensureIntegrations(); try{ loadModelImages(); }catch(e){} const n=pullBookings(); const nq=pullRequests(); pullFeedback(); pullWarranty(); let _lv='dashboard'; try{const _s=localStorage.getItem('rep_lastview'); if(_s&&views[_s]&&canView(_s))_lv=_s;}catch(e){} go(_lv); applyNavRole(); if(!curUser())showLogin();
 try{ if(curUser() && !localStorage.getItem('velqio_setup_v1') && (S.cust||[]).length===0 && (S.ord||[]).length===0){ try{localStorage.setItem('velqio_setup_v1','1');}catch(e){} setTimeout(function(){ if(!document.getElementById('setupOv'))setupOpen(); }, 800); } }catch(e){}
 if(DB.backend==='server') try{ setTimeout(photoMigrate, 3500); }catch(e){}
 if(nq) setTimeout(()=>toast(nq+' neue Website-Anfrage'+(nq>1?'n':'')),900);
